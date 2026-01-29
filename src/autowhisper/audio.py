@@ -181,8 +181,12 @@ class AudioManager:
         if not self._recording:
             return
 
-        # Convert to mono if needed
-        audio = indata[:, 0] if indata.ndim > 1 else indata.flatten()
+        # Convert to mono and copy (sounddevice reuses buffers)
+        # Avoid double-copy: flatten() already copies, [:, 0] needs explicit copy
+        if indata.ndim > 1:
+            audio = indata[:, 0].copy()
+        else:
+            audio = indata.flatten()  # Already a copy
 
         # Check total duration
         total_samples = sum(len(chunk) for chunk in self._buffer) + len(audio)
@@ -198,7 +202,7 @@ class AudioManager:
             else:
                 self._silence_samples += len(audio)
 
-        self._buffer.append(audio.copy())
+        self._buffer.append(audio)
 
     def is_recording(self) -> bool:
         """Check if currently recording."""

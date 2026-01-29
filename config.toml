@@ -39,8 +39,8 @@ sample_rate = 16000
 # Channels (1 = mono, required by Whisper)
 channels = 1
 
-# Buffer size in samples (512 = ~32ms latency)
-buffer_size = 512
+# Buffer size in samples (1024 = ~64ms latency, reduces callback overhead)
+buffer_size = 1024
 
 # Input device (comment out or use "default" for default microphone)
 # device = "default"
