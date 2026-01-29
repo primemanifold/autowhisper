@@ -172,9 +172,17 @@ class HotkeyManager:
         key_name = self._get_key_name(key)
         logger.debug(f"Key pressed: {key_name}")
 
+        # Check for Escape key to cancel (if enabled)
+        if self.config.escape_to_cancel and key_name in ("esc", "escape"):
+            logger.debug("Escape pressed, cancelling")
+            self._trigger_pressed = False
+            self._send_event(HotkeyEvent.CANCEL)
+            return
+
         # Check for cancel hotkey
         if self._check_combo(self._cancel_combo, key_name):
             logger.debug("Cancel hotkey pressed")
+            self._trigger_pressed = False
             self._send_event(HotkeyEvent.CANCEL)
             return
 

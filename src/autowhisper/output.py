@@ -80,6 +80,10 @@ class OutputManager:
 
         # Try injection methods in order of preference
         if self.config.method == "inject":
+            # Also copy to clipboard if enabled (for later Ctrl+V paste)
+            if self.config.also_copy_to_clipboard:
+                self._copy_to_clipboard(text)
+
             # Try X11 direct injection first
             if self._xlib_available and self._inject_xlib(text):
                 return True
@@ -230,6 +234,39 @@ class OutputManager:
             return False
         except Exception as e:
             logger.warning(f"xdotool injection failed: {e}")
+            return False
+
+    def _copy_to_clipboard(self, text: str) -> bool:
+        """Copy text to clipboard (without pasting)."""
+        try:
+            # Copy to clipboard using xclip
+            if self._xclip_available:
+                proc = subprocess.Popen(
+                    ["xclip", "-selection", "clipboard"],
+                    stdin=subprocess.PIPE,
+                )
+                proc.communicate(input=text.encode("utf-8"), timeout=5)
+
+                if proc.returncode != 0:
+                    logger.warning("xclip failed to copy to clipboard")
+                    return False
+            else:
+                # Try using xsel as fallback
+                proc = subprocess.Popen(
+                    ["xsel", "--clipboard", "--input"],
+                    stdin=subprocess.PIPE,
+                )
+                proc.communicate(input=text.encode("utf-8"), timeout=5)
+
+                if proc.returncode != 0:
+                    logger.warning("xsel failed to copy to clipboard")
+                    return False
+
+            logger.debug(f"Copied {len(text)} characters to clipboard for later paste")
+            return True
+
+        except Exception as e:
+            logger.warning(f"Clipboard copy failed: {e}")
             return False
 
     def _inject_clipboard(self, text: str) -> bool:

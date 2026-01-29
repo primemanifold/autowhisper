@@ -41,6 +41,7 @@ class HotkeyConfig:
     mode: str = "push_to_talk"
     trigger: str = "shift+super"
     cancel: str = "ctrl+alt+c"
+    escape_to_cancel: bool = True  # Allow Escape key to cancel recording
 
 
 @dataclass
@@ -51,6 +52,7 @@ class OutputConfig:
     paste_delay: float = 0.05
     append_newline: bool = False
     lowercase: bool = False
+    also_copy_to_clipboard: bool = True  # Also store in clipboard when using inject method
 
 
 @dataclass

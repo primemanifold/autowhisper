@@ -71,11 +71,18 @@ trigger = "shift+super"
 # Cancel hotkey (abort current recording)
 cancel = "ctrl+alt+c"
 
+# Allow Escape key to cancel recording (in addition to cancel hotkey)
+escape_to_cancel = true
+
 [output]
 # Method: "inject" (xdotool/X11) or "clipboard"
 method = "inject"
 
-# Auto-paste after clipboard copy
+# Also store text in clipboard when using inject method
+# Allows you to paste again later with Ctrl+V
+also_copy_to_clipboard = true
+
+# Auto-paste after clipboard copy (only used when method = "clipboard")
 auto_paste = true
 
 # Delay before paste (seconds)
