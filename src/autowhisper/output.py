@@ -112,10 +112,15 @@ class OutputManager:
 
             # Send key events for each character
             for char in text:
-                keysym = XK.string_to_keysym(char)
-                if keysym == 0:
-                    # Handle special characters
-                    keysym = ord(char)
+                # Handle special characters
+                if char == '\n':
+                    keysym = XK.XK_Return
+                elif char == '\t':
+                    keysym = XK.XK_Tab
+                else:
+                    keysym = XK.string_to_keysym(char)
+                    if keysym == 0:
+                        keysym = ord(char)
 
                 keycode = d.keysym_to_keycode(keysym)
                 if keycode == 0:

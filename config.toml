@@ -70,7 +70,7 @@ auto_paste = true
 paste_delay = 0.05
 
 # Add newline after text
-append_newline = false
+append_newline = true
 
 # Lowercase output
 lowercase = false
