@@ -1,5 +1,6 @@
 .PHONY: all test clean install uninstall help
 .PHONY: daemon-setup daemon-start daemon-stop daemon-restart daemon-status daemon-logs
+.PHONY: config-apply config-edit
 
 # Default target
 all: test
@@ -56,6 +57,15 @@ daemon-status:
 daemon-logs:
 	@./scripts/logs-daemon.sh
 
+# Config management
+config-apply:
+	@./scripts/apply-config.sh config.toml
+
+config-edit:
+	@$${EDITOR:-nano} config.toml
+	@echo ""
+	@echo "Config edited. Run 'make config-apply' to apply changes."
+
 # Check system dependencies
 check-deps:
 	@echo "Checking system dependencies..."
@@ -85,3 +95,7 @@ help:
 	@echo "  make daemon-restart  - Restart the daemon"
 	@echo "  make daemon-status   - Show daemon status and recent logs"
 	@echo "  make daemon-logs     - Follow daemon logs (Ctrl+C to exit)"
+	@echo ""
+	@echo "Config management:"
+	@echo "  make config-edit     - Edit config.toml in your editor"
+	@echo "  make config-apply    - Apply config changes (restarts only if needed)"
