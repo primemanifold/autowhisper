@@ -16,7 +16,7 @@ class ModelConfig:
     """Model configuration."""
     size: str = "distil-large-v3"
     device: str = "cuda"
-    compute_type: str = "int8_float16"
+    compute_type: str = "float16"
     beam_size: int = 1
     language: str = "en"
     num_threads: int = 4

@@ -203,7 +203,9 @@ verify_python_cuda() {
         python3 -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA version: {torch.version.cuda}'); print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')" 2>/dev/null
         return 0
     else
-        warn "PyTorch with CUDA support not found. Install with: pip install torch --index-url https://download.pytorch.org/whl/cu124"
+        warn "PyTorch with CUDA support not found."
+        warn "Install (most GPUs): pip install --upgrade torch torchaudio --index-url https://download.pytorch.org/whl/cu124"
+        warn "RTX 50xx / sm_120: pip install --upgrade --pre torch torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128"
         return 1
     fi
 }
@@ -340,7 +342,8 @@ main() {
         echo ""
         info "Next steps:"
         info "  1. Install Python dependencies: pip install -r requirements.txt"
-        info "  2. Install PyTorch with CUDA: pip install torch --index-url https://download.pytorch.org/whl/cu124"
+        info "  2. Install PyTorch with CUDA (most GPUs): pip install --upgrade torch torchaudio --index-url https://download.pytorch.org/whl/cu124"
+        info "     RTX 50xx / sm_120: pip install --upgrade --pre torch torchaudio --index-url https://download.pytorch.org/whl/nightly/cu128"
         info "  3. Run autowhisper: python3 -m autowhisper"
     else
         error "CUDA installation failed"

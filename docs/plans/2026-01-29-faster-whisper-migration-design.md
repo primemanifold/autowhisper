@@ -34,7 +34,7 @@ Migrate autowhisper from whisper-rs (Rust/whisper.cpp) to faster-whisper (Python
 │         ▼                   ▼                   ▼          │
 │  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐  │
 │  │   OutputMgr  │    │  FeedbackMgr │    │   VAD        │  │
-│  │ (xlib/xdotool)│   │ (simpleaudio)│    │ (silero)     │  │
+│  │ (xlib/xdotool)│   │ (sounddevice)│    │ (silero)     │  │
 │  └──────────────┘    └──────────────┘    └──────────────┘  │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -95,7 +95,7 @@ Migrate autowhisper from whisper-rs (Rust/whisper.cpp) to faster-whisper (Python
 | Audio capture | sounddevice | NumPy-native, simple API, ~50ms latency |
 | VAD | Silero VAD | Neural network-based, accurate, ~5ms latency |
 | Text output | python-xlib + xdotool | Direct X11 for speed, xdotool as fallback |
-| Beeps | simpleaudio + numpy | Lightweight, numpy already required |
+| Beeps | sounddevice + numpy | Reuses PortAudio stack (more compatible) |
 | Hotkeys | pynput | Well-maintained, cross-platform |
 | Inference | faster-whisper | CTranslate2, superior CUDA optimization |
 
@@ -105,7 +105,7 @@ Migrate autowhisper from whisper-rs (Rust/whisper.cpp) to faster-whisper (Python
 [model]
 size = "distil-large-v3"
 device = "cuda"
-compute_type = "int8_float16"
+compute_type = "float16"
 beam_size = 1
 language = "en"
 
@@ -152,7 +152,6 @@ sounddevice>=0.4.6
 numpy>=1.24.0
 pynput>=1.7.6
 python-xlib>=0.33
-simpleaudio>=1.0.4
 toml>=0.10.2
 ```
 

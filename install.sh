@@ -84,6 +84,19 @@ cp "$SCRIPT_DIR/autowhisper.service" "$INSTALL_DIR/"
 
 chown -R $ACTUAL_USER:$ACTUAL_USER "$INSTALL_DIR"
 
+# Select PyTorch wheel index based on GPU compute capability.
+# RTX 50xx (Blackwell, sm_120) requires CUDA 12.8+ wheels for native support.
+PYTORCH_INDEX_URL="https://download.pytorch.org/whl/cu124"
+PYTORCH_PRE_FLAG=""
+if command -v nvidia-smi &> /dev/null; then
+    GPU_CAP="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | tr -d ' ' | { read -r cap; echo "$cap"; })"
+    GPU_CAP_MAJOR="${GPU_CAP%%.*}"
+    if [[ -n "$GPU_CAP_MAJOR" && "$GPU_CAP_MAJOR" -ge 12 ]]; then
+        PYTORCH_INDEX_URL="https://download.pytorch.org/whl/nightly/cu128"
+        PYTORCH_PRE_FLAG="--pre"
+    fi
+fi
+
 echo "[4/6] Creating Python virtual environment and installing CUDA PyTorch..."
 cd "$INSTALL_DIR"
 
@@ -95,9 +108,9 @@ sudo -u $ACTUAL_USER bash -c "
     source venv/bin/activate
     pip install --upgrade pip
 
-    # Install PyTorch with CUDA 12.4 support (compatible with CUDA 13.0)
-    echo 'Installing PyTorch + torchaudio with CUDA 12.4 support...'
-    pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+    # Install PyTorch + torchaudio (GPU support depends on wheel build).
+    echo \"Installing PyTorch + torchaudio from: ${PYTORCH_INDEX_URL}\"
+    pip install --upgrade ${PYTORCH_PRE_FLAG} torch torchaudio --index-url ${PYTORCH_INDEX_URL}
 
     # Install remaining dependencies
     pip install -r requirements.txt
@@ -109,6 +122,7 @@ sudo -u $ACTUAL_USER bash -c "
     python3 -c '
 import torch
 print(f\"PyTorch version: {torch.__version__}\")
+print(f\"CUDA arch list: {torch.cuda.get_arch_list() if torch.cuda.is_available() else 'N/A'}\")
 print(f\"CUDA available: {torch.cuda.is_available()}\")
 if torch.cuda.is_available():
     print(f\"CUDA version: {torch.version.cuda}\")
