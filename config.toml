@@ -8,8 +8,8 @@ size = "distil-large-v3"
 # Device: cuda, cpu, or auto
 device = "cuda"
 
-# Compute type: float16 (recommended for RTX 50xx), int8_float16, int8, float32
-compute_type = "float16"
+# Compute type: bfloat16 (fastest for RTX 50xx), float16, int8_float16, int8, float32
+compute_type = "bfloat16"
 
 # Beam size (1 = fastest, 5 = more accurate)
 beam_size = 1

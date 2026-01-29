@@ -15,7 +15,7 @@ def project_root() -> Path:
 @pytest.fixture(scope="session")
 def test_audio_path(project_root: Path) -> Path:
     """Return the path to the test audio file."""
-    audio_path = project_root / "test" / "Audio_Sample_-_The_Quick_Brown_Fox_Jumps_Over_The_Lazy_Dog.ogg"
+    audio_path = project_root / "tests" / "Audio_Sample_-_The_Quick_Brown_Fox_Jumps_Over_The_Lazy_Dog.ogg"
     if not audio_path.exists():
         pytest.skip(f"Test audio file not found: {audio_path}")
     return audio_path
