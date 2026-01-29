@@ -1,0 +1,20 @@
+# AutoWhisper Python dependencies
+
+# Core inference - faster-whisper with CUDA support
+# Note: Install PyTorch with CUDA first via:
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu124
+faster-whisper>=1.0.0
+
+# Audio
+sounddevice>=0.4.6
+numpy>=1.24.0
+simpleaudio>=1.0.4
+
+# Hotkeys
+pynput>=1.7.6
+
+# X11 output
+python-xlib>=0.33
+
+# Configuration
+toml>=0.10.2

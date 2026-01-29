@@ -1,0 +1,41 @@
+[Unit]
+Description=AutoWhisper GPU-Accelerated Voice-to-Text Daemon (Python/faster-whisper)
+Documentation=https://github.com/autowhisper/autowhisper
+After=network.target sound.target graphical-session.target
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/opt/autowhisper
+
+# X11/Display environment
+Environment="DISPLAY=:0"
+Environment="XAUTHORITY=/home/%i/.Xauthority"
+# Note: 1000 is replaced with actual UID during install
+Environment="XDG_RUNTIME_DIR=/run/user/1000"
+Environment="PULSE_RUNTIME_PATH=/run/user/1000/pulse"
+
+# Python environment
+Environment="PYTHONUNBUFFERED=1"
+
+# Run the Python daemon
+ExecStart=/opt/autowhisper/venv/bin/python -m autowhisper --config /opt/autowhisper/config.toml
+
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening (relaxed for PulseAudio and X11 access)
+NoNewPrivileges=true
+PrivateTmp=false
+ProtectSystem=strict
+ProtectHome=false
+ReadWritePaths=/opt/autowhisper /tmp
+
+# Resource limits
+MemoryMax=6G
+CPUQuota=400%
+
+[Install]
+WantedBy=default.target

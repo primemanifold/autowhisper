@@ -1,0 +1,39 @@
+# Models
+/models/*.bin
+/models/*.gguf
+!/models/.gitkeep
+
+# Logs
+*.log
+*.log.*
+
+# PID files
+*.pid
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+fwbench-venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test audio
+*.wav
+*.mp3
+*.flac
+!test_audio/.gitkeep

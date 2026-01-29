@@ -1,0 +1,198 @@
+"""Configuration management for AutoWhisper."""
+
+import logging
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Optional
+
+import toml
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ModelConfig:
+    """Model configuration."""
+    size: str = "distil-large-v3"
+    device: str = "cuda"
+    compute_type: str = "int8_float16"
+    beam_size: int = 1
+    language: str = "en"
+    num_threads: int = 4
+
+
+@dataclass
+class AudioConfig:
+    """Audio capture configuration."""
+    sample_rate: int = 16000
+    channels: int = 1
+    buffer_size: int = 512
+    device: Optional[str] = None
+    vad_enabled: bool = True
+    vad_threshold: float = 0.5
+    silence_duration: float = 0.3
+    max_duration: float = 60.0
+
+
+@dataclass
+class HotkeyConfig:
+    """Hotkey configuration."""
+    mode: str = "push_to_talk"
+    trigger: str = "shift+super"
+    cancel: str = "ctrl+alt+c"
+
+
+@dataclass
+class OutputConfig:
+    """Text output configuration."""
+    method: str = "inject"
+    auto_paste: bool = True
+    paste_delay: float = 0.05
+    append_newline: bool = False
+    lowercase: bool = False
+
+
+@dataclass
+class FeedbackConfig:
+    """Audio feedback configuration."""
+    enabled: bool = True
+    frequency_start: int = 800
+    frequency_stop: int = 400
+    frequency_error: int = 600
+    duration: float = 0.1
+    volume: float = 0.3
+
+
+@dataclass
+class DaemonConfig:
+    """Daemon configuration."""
+    log_level: str = "info"
+    log_file: Optional[str] = None
+    pid_file: str = "/tmp/autowhisper.pid"
+    work_dir: str = "/opt/autowhisper"
+
+
+@dataclass
+class Config:
+    """Main configuration container."""
+    model: ModelConfig = field(default_factory=ModelConfig)
+    audio: AudioConfig = field(default_factory=AudioConfig)
+    hotkeys: HotkeyConfig = field(default_factory=HotkeyConfig)
+    output: OutputConfig = field(default_factory=OutputConfig)
+    feedback: FeedbackConfig = field(default_factory=FeedbackConfig)
+    daemon: DaemonConfig = field(default_factory=DaemonConfig)
+
+    @classmethod
+    def load(cls, path: str | Path) -> "Config":
+        """Load configuration from a TOML file."""
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Config file not found: {path}")
+
+        with open(path, "r") as f:
+            data = toml.load(f)
+
+        config = cls._from_dict(data)
+        config.validate()
+        return config
+
+    @classmethod
+    def _from_dict(cls, data: dict) -> "Config":
+        """Create Config from a dictionary."""
+        return cls(
+            model=ModelConfig(**data.get("model", {})),
+            audio=AudioConfig(**data.get("audio", {})),
+            hotkeys=HotkeyConfig(**data.get("hotkeys", {})),
+            output=OutputConfig(**data.get("output", {})),
+            feedback=FeedbackConfig(**{
+                k: v for k, v in data.get("feedback", {}).items()
+                if k in FeedbackConfig.__dataclass_fields__
+            }),
+            daemon=DaemonConfig(**{
+                k: v for k, v in data.get("daemon", {}).items()
+                if k in DaemonConfig.__dataclass_fields__
+            }),
+        )
+
+    def validate(self) -> None:
+        """Validate configuration values."""
+        valid_models = [
+            "tiny", "tiny.en",
+            "base", "base.en",
+            "small", "small.en",
+            "medium", "medium.en",
+            "large", "large-v1", "large-v2", "large-v3",
+            "distil-large-v2", "distil-large-v3",
+            "distil-medium.en", "distil-small.en",
+        ]
+        if self.model.size not in valid_models:
+            raise ValueError(
+                f"Invalid model size: {self.model.size}. "
+                f"Must be one of: {valid_models}"
+            )
+
+        valid_devices = ["cuda", "cpu", "auto"]
+        if self.model.device not in valid_devices:
+            raise ValueError(
+                f"Invalid device: {self.model.device}. "
+                f"Must be one of: {valid_devices}"
+            )
+
+        valid_compute_types = [
+            "float16", "float32", "int8", "int8_float16",
+            "int8_float32", "int8_bfloat16", "bfloat16",
+        ]
+        if self.model.compute_type not in valid_compute_types:
+            raise ValueError(
+                f"Invalid compute_type: {self.model.compute_type}. "
+                f"Must be one of: {valid_compute_types}"
+            )
+
+        if self.audio.sample_rate != 16000:
+            logger.warning(
+                f"Sample rate {self.audio.sample_rate} is not Whisper's native 16kHz. "
+                "Performance may be affected."
+            )
+
+        valid_modes = ["push_to_talk", "toggle"]
+        if self.hotkeys.mode not in valid_modes:
+            raise ValueError(
+                f"Invalid hotkey mode: {self.hotkeys.mode}. "
+                f"Must be one of: {valid_modes}"
+            )
+
+        valid_methods = ["inject", "clipboard"]
+        if self.output.method not in valid_methods:
+            raise ValueError(
+                f"Invalid output method: {self.output.method}. "
+                f"Must be one of: {valid_methods}"
+            )
+
+        if not 0.0 <= self.feedback.volume <= 1.0:
+            raise ValueError(
+                f"Invalid volume: {self.feedback.volume}. Must be between 0.0 and 1.0"
+            )
+
+    @classmethod
+    def default(cls) -> "Config":
+        """Create a default configuration."""
+        return cls()
+
+
+def find_config_file() -> Path:
+    """Find the configuration file in standard locations."""
+    search_paths = [
+        Path("config.toml"),
+        Path.home() / ".config" / "autowhisper" / "config.toml",
+        Path("/etc/autowhisper/config.toml"),
+        Path("/opt/autowhisper/config.toml"),
+    ]
+
+    for path in search_paths:
+        if path.exists():
+            return path
+
+    raise FileNotFoundError(
+        f"No config file found. Searched: {[str(p) for p in search_paths]}"
+    )

@@ -1,0 +1,45 @@
+#!/bin/bash
+set -e
+
+case "$1" in
+    configure)
+        # Create models directory if it doesn't exist
+        mkdir -p /usr/share/autowhisper/models
+
+        # Check if whisper.cpp is available
+        if command -v whisper-cli &> /dev/null; then
+            echo "whisper.cpp detected"
+        fi
+
+        # Inform user about model download
+        echo ""
+        echo "================================================================"
+        echo "AutoWhisper installed successfully!"
+        echo "================================================================"
+        echo ""
+        echo "IMPORTANT: You need to download a Whisper model to use AutoWhisper."
+        echo ""
+        echo "Quick start:"
+        echo "  1. Download model: sudo /usr/share/autowhisper/download-models.sh small"
+        echo "  2. Start service:  sudo systemctl enable --now autowhisper@\$USER"
+        echo "  3. Test hotkey:    Press Ctrl+Alt+V and speak"
+        echo ""
+        echo "Configuration: /etc/autowhisper/config.toml"
+        echo "Documentation: /usr/share/doc/autowhisper/"
+        echo ""
+        echo "View logs: journalctl -u autowhisper@\$USER -f"
+        echo ""
+        ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0

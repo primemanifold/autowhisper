@@ -1,0 +1,11 @@
+autowhisper (0.1.0-1) noble; urgency=medium
+
+  * Initial release
+  * GPU-accelerated voice-to-text daemon
+  * Sub-200ms latency on RTX GPUs
+  * Push-to-talk and toggle modes
+  * X11 text injection support
+  * Offline operation with Whisper models
+  * systemd service integration
+
+ -- Your Name <your.email@example.com>  Tue, 28 Jan 2025 11:00:00 +0000
