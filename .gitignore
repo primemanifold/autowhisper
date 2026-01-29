@@ -18,8 +18,15 @@ __pycache__/
 .Python
 venv/
 fwbench-venv/
+.hotkey-venv/
 ENV/
 env/
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Downloaded packages
+*.deb
 
 # IDE
 .vscode/

@@ -160,27 +160,35 @@ del model
 '
 " || echo "Model download failed - will download on first run"
 
-echo "[6/6] Installing systemd service..."
-# Create service file with correct UID
-sed "s/1000/$ACTUAL_UID/g" "$INSTALL_DIR/autowhisper.service" > /etc/systemd/system/autowhisper@.service
-systemctl daemon-reload
+echo "[6/6] Installing systemd user service..."
+# Install as a user service (runs within the graphical session)
+USER_SERVICE_DIR="$ACTUAL_HOME/.config/systemd/user"
+mkdir -p "$USER_SERVICE_DIR"
+cp "$INSTALL_DIR/autowhisper.service" "$USER_SERVICE_DIR/"
+chown -R $ACTUAL_USER:$ACTUAL_USER "$ACTUAL_HOME/.config/systemd"
+
+# Reload systemd for user (as the actual user)
+sudo -u $ACTUAL_USER XDG_RUNTIME_DIR=/run/user/$ACTUAL_UID systemctl --user daemon-reload
 
 echo ""
 echo "=========================================="
 echo "Installation Complete!"
 echo "=========================================="
 echo ""
-echo "To start AutoWhisper:"
-echo "  sudo systemctl start autowhisper@$ACTUAL_USER"
+echo "IMPORTANT: AutoWhisper runs as a user service within your graphical session."
+echo "You must be logged into a graphical desktop (GNOME, KDE, etc.) for it to work."
 echo ""
-echo "To enable on boot:"
-echo "  sudo systemctl enable autowhisper@$ACTUAL_USER"
+echo "To start AutoWhisper (run as your user, NOT with sudo):"
+echo "  systemctl --user start autowhisper"
+echo ""
+echo "To enable on login:"
+echo "  systemctl --user enable autowhisper"
 echo ""
 echo "To check status:"
-echo "  sudo systemctl status autowhisper@$ACTUAL_USER"
+echo "  systemctl --user status autowhisper"
 echo ""
 echo "To view logs:"
-echo "  journalctl -u autowhisper@$ACTUAL_USER -f"
+echo "  journalctl --user -u autowhisper -f"
 echo ""
 echo "Or run manually:"
 echo "  cd /opt/autowhisper && source venv/bin/activate && python -m autowhisper"
