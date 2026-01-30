@@ -55,7 +55,7 @@ vad_threshold = 0.5
 silence_duration = 0.3
 
 # Maximum recording duration (seconds, safety limit)
-max_duration = 60.0
+max_duration = 600.0
 
 [hotkeys]
 # Mode: "push_to_talk" or "toggle"
