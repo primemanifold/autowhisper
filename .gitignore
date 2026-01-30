@@ -44,3 +44,4 @@ Thumbs.db
 *.mp3
 *.flac
 !test_audio/.gitkeep
+src/autowhisper.egg-info/

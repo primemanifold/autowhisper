@@ -6,7 +6,7 @@
 
 - **OS**: Ubuntu 24.04 LTS (or similar Linux with X11)
 - **GPU**: NVIDIA GPU with CUDA support
-- **RAM**: 4GB minimum (8GB+ recommended)
+- **RAM**: 8GB minimum recommended
 - **VRAM**: 2GB minimum for distil-large-v3 model
 - **Python**: 3.10 or higher
 
@@ -52,7 +52,7 @@ sudo apt install -y python3 python3-pip python3-venv
 
 ```bash
 # Clone the repository
-git clone <repository-url> autowhisper
+git clone https://github.com/autowhisper/autowhisper.git
 cd autowhisper
 
 # Create virtual environment
@@ -64,7 +64,7 @@ pip install -e .
 
 # Models are downloaded automatically on first run
 # Or download manually:
-python -c "from faster_whisper import WhisperModel; WhisperModel('distil-large-v3')"
+python -c "from faster_whisper import WhisperModel; WhisperModel('distil-small.en')"
 ```
 
 ### Using the Install Script (Recommended)
@@ -80,7 +80,7 @@ This will:
 3. Create Python virtual environment
 4. Install package and dependencies
 5. Download the model
-6. Install systemd service
+6. Install systemd user service
 
 ---
 
@@ -90,9 +90,9 @@ Edit `config.toml` before running:
 
 ```toml
 [model]
-size = "distil-large-v3"         # Model name
+size = "distil-small.en"         # Model name (see table below)
 device = "cuda"                   # cuda or cpu
-compute_type = "float16"          # float16, int8_float16, int8, float32
+compute_type = "bfloat16"         # bfloat16 (RTX 50xx), float16 (RTX 20-40)
 beam_size = 1                     # 1 = fastest
 language = "en"                   # or "auto"
 
@@ -121,23 +121,29 @@ python -m autowhisper --config config.toml
 python -m autowhisper --config config.toml --log-level debug
 ```
 
-### As systemd Service
+### As systemd User Service
 
 ```bash
-# Start service
-sudo systemctl start autowhisper@$USER
+# Install service (run once)
+./scripts/setup-daemon.sh
 
-# Enable on boot
-sudo systemctl enable autowhisper@$USER
+# Start service
+systemctl --user start autowhisper
+
+# Enable on login
+systemctl --user enable autowhisper
 
 # Check status
-sudo systemctl status autowhisper@$USER
+systemctl --user status autowhisper
 
 # View logs
-journalctl -u autowhisper@$USER -f
+journalctl --user -u autowhisper -f
 
 # Stop service
-sudo systemctl stop autowhisper@$USER
+systemctl --user stop autowhisper
+
+# Restart after config changes
+systemctl --user restart autowhisper
 ```
 
 ---
@@ -146,25 +152,30 @@ sudo systemctl stop autowhisper@$USER
 
 ### Compute Type Selection
 
-| Compute Type | Speed | Accuracy | VRAM |
-|--------------|-------|----------|------|
-| float32 | Slowest | Best | Highest |
-| float16 | Fast | Excellent | Medium |
-| int8_float16 | Faster | Very Good | Lower |
-| int8 | Fastest | Good | Lowest |
+| Compute Type | Best For | Speed | Accuracy | VRAM |
+|--------------|----------|-------|----------|------|
+| bfloat16 | RTX 50xx (Blackwell) | Fastest | Excellent | Medium |
+| float16 | RTX 20-40 series | Fast | Excellent | Medium |
+| int8_float16 | Lower VRAM GPUs | Faster | Very Good | Lower |
+| int8 | Minimal VRAM | Fast | Good | Lowest |
+| float32 | CPU fallback | Slowest | Best | Highest |
 
-**Recommended for RTX GPUs:** `float16`
+**For RTX 50xx GPUs:** Use `bfloat16` for best performance.
+**For RTX 20-40 GPUs:** Use `float16`.
 
-### Model Selection for Speed
+### Model Selection
 
-| Model | Speed | Accuracy | VRAM |
-|-------|-------|----------|------|
-| tiny | Fastest (~20-30ms) | Good | 150MB |
-| base | Fast (~40-60ms) | Very Good | 250MB |
-| small | Balanced (~80-120ms) | Excellent | 500MB |
-| distil-large-v3 | Balanced (~100-150ms) | Best | 1.5GB |
+| Model | Mean Time | Speed | Accuracy | VRAM |
+|-------|-----------|-------|----------|------|
+| tiny.en | 78ms | 49x realtime | Good | 150MB |
+| base.en | 143ms | 27x realtime | Very Good | 250MB |
+| distil-small.en | 198ms | 19x realtime | Very Good | 400MB |
+| small.en | 211ms | 18x realtime | Excellent | 500MB |
+| distil-medium.en | 381ms | 10x realtime | Excellent | 800MB |
+| distil-large-v3 | 448ms | 8.5x realtime | Best | 1.5GB |
+| large-v3 | 926ms | 4.1x realtime | Best | 2GB |
 
-For most GPUs, **distil-large-v3 with float16** is recommended for best accuracy with good speed.
+**Recommended:** `distil-small.en` for best speed/accuracy balance.
 
 ---
 
@@ -200,12 +211,15 @@ nvidia-smi
 
 # Check Python can see CUDA
 python -c "import torch; print(torch.cuda.is_available())"
+
+# Run fix script if needed
+sudo ./scripts/fix-nvidia.sh
 ```
 
 **"Model file not found"**
 ```bash
 # Models download automatically, but you can force download:
-python -c "from faster_whisper import WhisperModel; WhisperModel('distil-large-v3', device='cuda')"
+python -c "from faster_whisper import WhisperModel; WhisperModel('distil-small.en', device='cuda')"
 ```
 
 **"No audio captured"**
@@ -225,15 +239,19 @@ pulseaudio --start
 ```bash
 # pynput may need special permissions
 # Use the systemd service which runs with proper permissions
-sudo systemctl start autowhisper@$USER
+systemctl --user start autowhisper
+
+# Check if X11 display is set
+echo $DISPLAY
 ```
 
 ### Performance Issues
 
 **Slow transcription**
 - Verify GPU is being used: `nvidia-smi` while transcribing
-- Use `compute_type = "int8_float16"` for faster inference
+- Use appropriate compute type for your GPU
 - Reduce beam_size to 1 in config
+- Try a faster model
 
 **High memory usage**
 - Reduce max_duration in config
@@ -279,16 +297,15 @@ python -m ruff check src/
 
 ```bash
 # Stop and disable service
-sudo systemctl stop autowhisper@$USER
-sudo systemctl disable autowhisper@$USER
+systemctl --user stop autowhisper
+systemctl --user disable autowhisper
 
 # Remove service file
-sudo rm /etc/systemd/system/autowhisper@.service
-sudo systemctl daemon-reload
+rm ~/.config/systemd/user/autowhisper.service
+systemctl --user daemon-reload
 
 # Remove installation
 rm -rf venv/
-sudo rm -rf /opt/autowhisper
 
 # Remove models (optional, stored in ~/.cache/huggingface/)
 rm -rf ~/.cache/huggingface/hub/models--*whisper*
@@ -300,7 +317,7 @@ rm -rf ~/.cache/huggingface/hub/models--*whisper*
 
 1. **Test the installation**: Press your hotkey (default: Shift+Super) and speak
 2. **Customize config**: Edit `config.toml` to change hotkeys, model, output method
-3. **Monitor performance**: Check logs with `journalctl -u autowhisper@$USER -f`
+3. **Monitor performance**: Check logs with `journalctl --user -u autowhisper -f`
 4. **Optimize**: Try different compute types and models for your use case
 
 For more information, see [README.md](README.md).

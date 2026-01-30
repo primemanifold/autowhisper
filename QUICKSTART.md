@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get AutoWhisper running in 5 minutes!
+Get AutoWhisper running in 5 minutes.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ Get AutoWhisper running in 5 minutes!
 Before installing, run the system compatibility check to catch any issues:
 
 ```bash
-cd /home/isura/autowhisper
+cd autowhisper
 ./scripts/check-system.sh
 ```
 
@@ -40,15 +40,15 @@ Common issues it can fix:
 ### Option 1: Automated Install (Recommended)
 
 ```bash
-cd /home/isura/autowhisper
+cd autowhisper
 sudo ./install.sh
 ```
 
 This will:
-- Install all dependencies
+- Install all system dependencies
 - Create Python virtual environment
-- Download the distil-large-v3 model
-- Install systemd service
+- Download the model (on first run)
+- Install systemd user service
 
 Takes ~5-10 minutes depending on your internet speed.
 
@@ -62,7 +62,7 @@ sudo apt install -y build-essential pkg-config libssl-dev \
     nvidia-cuda-toolkit pulseaudio python3 python3-pip python3-venv
 
 # Create virtual environment
-cd /home/isura/autowhisper
+cd autowhisper
 python3 -m venv venv
 source venv/bin/activate
 
@@ -74,16 +74,17 @@ pip install -e .
 
 ## Configuration
 
-The default config is already optimized for NVIDIA GPUs. To customize:
+The default config is optimized for NVIDIA GPUs. To customize:
 
 ```bash
 nano config.toml
 ```
 
 Key settings:
-- `model.size = "distil-large-v3"` - Use distil-large-v3 model (best balance)
-- `hotkeys.trigger = "shift+super"` - Change hotkey
-- `output.method = "inject"` - Direct text injection
+- `model.size` - Model to use (see performance table in README)
+- `model.compute_type` - Use `bfloat16` for RTX 50xx, `float16` for RTX 20-40
+- `hotkeys.trigger` - Change hotkey (default: `shift+super`)
+- `output.method` - `inject` for direct typing, `clipboard` for clipboard
 
 ## Running
 
@@ -96,10 +97,10 @@ python -m autowhisper --config config.toml
 
 You should see:
 ```
-INFO AutoWhisper Daemon v0.1.0
-INFO Model: distil-large-v3 (float16)
-INFO Device: cuda | Hotkey: shift+super
-INFO Daemon started, waiting for hotkey events...
+Loading configuration from config.toml
+INFO AutoWhisper v2.0.0 starting
+INFO Model: distil-small.en on cuda
+INFO Hotkey: shift+super (push_to_talk)
 ```
 
 **Test it:**
@@ -108,19 +109,22 @@ INFO Daemon started, waiting for hotkey events...
 3. Speak: "This is a test"
 4. Release the hotkey
 5. You'll hear a low-pitched beep (400Hz)
-6. After ~150ms, your text appears!
+6. Your text appears in the active window
 
 ### Run as Service (Background)
 
 ```bash
-# Start service
-sudo systemctl start autowhisper@$USER
+# Install service (if not done by install.sh)
+./scripts/setup-daemon.sh
 
-# Enable on boot
-sudo systemctl enable autowhisper@$USER
+# Start service
+systemctl --user start autowhisper
+
+# Enable on login
+systemctl --user enable autowhisper
 
 # Check status
-systemctl status autowhisper@$USER
+systemctl --user status autowhisper
 ```
 
 ## Usage
@@ -146,20 +150,19 @@ mode = "toggle"  # instead of "push_to_talk"
 
 ### Cancel Recording
 
-Press `Ctrl+Alt+C` to cancel current recording without transcribing.
+- Press `Escape` to cancel (if `escape_to_cancel = true`)
+- Press `Ctrl+Alt+C` to cancel current recording
 
 ## Performance
 
-With your NVIDIA GPU:
+With your NVIDIA GPU and bfloat16 compute type:
 
-| Model | Transcription Time (5s audio) | Total Latency |
-|-------|-------------------------------|---------------|
-| tiny | 20-30ms | 50-80ms |
-| base | 40-60ms | 80-110ms |
-| small | 80-120ms | 120-160ms |
-| **distil-large-v3** | **100-150ms** | **150-200ms** ⭐ |
-
-**Recommended: distil-large-v3** for best accuracy/speed balance.
+| Model | Mean Time | Speed | Use Case |
+|-------|-----------|-------|----------|
+| tiny.en | 78ms | 49x realtime | Fastest, good accuracy |
+| base.en | 143ms | 27x realtime | Fast, better accuracy |
+| distil-small.en | 198ms | 19x realtime | Balanced (recommended) |
+| distil-large-v3 | 448ms | 8.5x realtime | Best accuracy |
 
 ## Troubleshooting
 
@@ -189,10 +192,10 @@ sudo reboot
 
 ```bash
 # Check if daemon is running
-ps aux | grep autowhisper
+systemctl --user status autowhisper
 
 # View logs
-journalctl -u autowhisper@$USER -f
+journalctl --user -u autowhisper -f
 ```
 
 ### No audio captured
@@ -223,22 +226,22 @@ auto_paste = true
 # Check GPU usage while speaking
 watch -n 0.1 nvidia-smi
 
-# Try faster compute type in config.toml:
+# Try faster model in config.toml:
 [model]
-compute_type = "int8_float16"
+size = "tiny.en"
 ```
 
 ## Viewing Logs
 
 ```bash
 # Real-time logs
-journalctl -u autowhisper@$USER -f
+journalctl --user -u autowhisper -f
 
 # Last 100 lines
-journalctl -u autowhisper@$USER -n 100
+journalctl --user -u autowhisper -n 100
 
 # Since last boot
-journalctl -u autowhisper@$USER -b
+journalctl --user -u autowhisper -b
 ```
 
 ## Customization
@@ -248,12 +251,14 @@ journalctl -u autowhisper@$USER -b
 Edit `config.toml`:
 ```toml
 [model]
-size = "small"  # tiny, base, small, medium, large-v3, distil-large-v3
+size = "distil-large-v3"  # For best accuracy
+# or
+size = "tiny.en"  # For fastest speed
 ```
 
 Restart service:
 ```bash
-sudo systemctl restart autowhisper@$USER
+systemctl --user restart autowhisper
 ```
 
 ### Change Hotkey
@@ -272,6 +277,7 @@ Supported keys: ctrl, alt, shift, super, space, a-z, 0-9, f1-f12
 ```toml
 [output]
 method = "inject"
+also_copy_to_clipboard = true  # Also copy to clipboard
 ```
 
 **Clipboard + auto-paste:**
@@ -303,7 +309,7 @@ python -c "
 from faster_whisper import WhisperModel
 import time
 
-model = WhisperModel('distil-large-v3', device='cuda', compute_type='float16')
+model = WhisperModel('distil-small.en', device='cuda', compute_type='bfloat16')
 
 for i in range(3):
     start = time.time()
@@ -318,19 +324,19 @@ for i in range(3):
 - **Read [README.md](README.md)** for detailed architecture
 - **Read [BUILD.md](BUILD.md)** for advanced build options
 - **Customize config.toml** to your preferences
-- **Try different models** (tiny for speed, distil-large-v3 for accuracy)
+- **Try different models** for your speed/accuracy needs
 
 ## Getting Help
 
 Check logs first:
 ```bash
-journalctl -u autowhisper@$USER -n 50
+journalctl --user -u autowhisper -n 50
 ```
 
 Common issues are usually:
-1. GPU not detected → Install NVIDIA drivers
+1. GPU not detected → Run `./scripts/fix-nvidia.sh`
 2. Hotkey not working → Check pynput permissions
 3. No audio → Test microphone with `arecord`
 4. Text not appearing → Try clipboard mode
 
-Enjoy your GPU-accelerated voice-to-text! 🚀
+Enjoy your GPU-accelerated voice-to-text!

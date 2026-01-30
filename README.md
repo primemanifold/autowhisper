@@ -2,52 +2,55 @@
 
 **GPU-Accelerated Voice-to-Text Daemon for Ubuntu**
 
-A zero-UI, background daemon that converts speech to text using NVIDIA GPU acceleration with faster-whisper and distil-large-v3. Triggered by keyboard shortcuts with audio feedback, delivering transcribed text directly to any application.
+A zero-UI, background daemon that converts speech to text using NVIDIA GPU acceleration with faster-whisper. Triggered by keyboard shortcuts with audio feedback, delivering transcribed text directly to any application.
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-- 🚀 **Sub-200ms latency** - GPU-accelerated inference with faster-whisper
-- 🎯 **Zero UI** - Runs entirely in background as daemon
-- ⌨️ **Hotkey triggered** - Customizable keyboard shortcuts
-- 🔊 **Audio feedback** - Beeps indicate recording start/stop
-- 📋 **Instant output** - Text appears directly in active window
-- 🔒 **100% offline** - No network requests, complete privacy
-- 🎮 **RTX optimized** - Tuned for high performance GPUs
-
----
-
-## 📊 Performance
-
-### Expected on RTX GPU + distil-large-v3
-
-| Component | Latency |
-|-----------|---------|
-| Recording start | ~32ms |
-| VAD processing | ~10-15ms |
-| GPU inference (5s audio) | ~100-150ms |
-| Text injection | ~20-30ms |
-| **Total** | **~150-200ms** |
-
-**Real-Time Factor:** 30-50x (transcribes 1s of audio in ~20-35ms)
+- **Sub-500ms latency** - GPU-accelerated inference with faster-whisper
+- **Zero UI** - Runs entirely in background as a systemd user service
+- **Hotkey triggered** - Customizable keyboard shortcuts (push-to-talk or toggle mode)
+- **Audio feedback** - Beeps indicate recording start/stop/error
+- **Instant output** - Text appears directly in active window via xdotool or clipboard
+- **100% offline** - No network requests, complete privacy
+- **RTX optimized** - Tuned for NVIDIA GPUs with bfloat16/float16 support
 
 ---
 
-## 🎯 Quick Start
+## Performance
+
+Benchmarks on RTX 5070 Laptop with bfloat16:
+
+| Model | Mean | Min | Speed | Accuracy |
+|-------|------|-----|-------|----------|
+| tiny.en | 78ms | 19ms | 49x realtime | Good |
+| base.en | 143ms | 90ms | 27x realtime | Very Good |
+| distil-small.en | 198ms | 138ms | 19x realtime | Very Good |
+| small.en | 211ms | 100ms | 18x realtime | Excellent |
+| distil-medium.en | 381ms | 158ms | 10x realtime | Excellent |
+| **distil-large-v3** | **448ms** | **276ms** | **8.5x realtime** | **Best** |
+| large-v3-turbo | 657ms | 346ms | 5.8x realtime | Best |
+
+**Recommended:** `distil-small.en` for speed, `distil-large-v3` for accuracy.
+
+---
+
+## Quick Start
 
 ### Prerequisites
 
-- Ubuntu 24.04 LTS (or similar with X11)
+- Ubuntu 24.04 LTS (or 22.04 with X11)
 - NVIDIA GPU with CUDA support
 - Python 3.10+
-- 4GB+ RAM, 2GB+ VRAM
+- 8GB+ RAM, 2GB+ VRAM
 
 ### Installation
 
 ```bash
 # Clone repository
-cd /home/isura/autowhisper
+git clone https://github.com/autowhisper/autowhisper.git
+cd autowhisper
 
 # Create virtual environment
 python3 -m venv venv
@@ -56,25 +59,30 @@ source venv/bin/activate
 # Install dependencies
 pip install -e .
 
-# Start service
-sudo systemctl start autowhisper@$USER
-sudo systemctl enable autowhisper@$USER
+# Start the daemon
+python -m autowhisper --config config.toml
 ```
 
-See [QUICKSTART.md](QUICKSTART.md) for details.
+See [QUICKSTART.md](QUICKSTART.md) for detailed installation with systemd service.
 
 ### Usage
 
+**Push-to-Talk Mode (Default):**
 1. **Press and hold** `Shift+Super` (default hotkey)
 2. **Speak** clearly
-3. **Release** key
-4. Text appears in active window!
+3. **Release** the hotkey
+4. Text appears in active window
+
+**Toggle Mode:**
+1. **Press once** to start recording
+2. **Speak** as long as needed
+3. **Press again** to stop and transcribe
+
+**Cancel Recording:** Press `Escape` or `Ctrl+Alt+C`
 
 ---
 
-## 🏗️ Architecture
-
-### System Overview
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -102,6 +110,7 @@ See [QUICKSTART.md](QUICKSTART.md) for details.
 | Module | Technology | Purpose |
 |--------|-----------|---------|
 | **Audio Capture** | sounddevice | Low-latency 16kHz mono recording |
+| **VAD** | Silero VAD | Voice activity detection, silence trimming |
 | **Inference** | faster-whisper + CUDA | GPU-accelerated transcription |
 | **Hotkeys** | pynput | Global keyboard hooks |
 | **Output** | xdotool/xclip | Text injection to active window |
@@ -110,64 +119,69 @@ See [QUICKSTART.md](QUICKSTART.md) for details.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 autowhisper/
-├── src/
-│   └── autowhisper/
-│       ├── __init__.py       # Package init
-│       ├── __main__.py       # Entry point & CLI
-│       ├── config.py         # Configuration loader
-│       ├── audio.py          # Audio capture & VAD
-│       ├── inference.py      # faster-whisper GPU inference
-│       ├── hotkey.py         # Global hotkey listener
-│       ├── output.py         # Text injection & clipboard
-│       ├── feedback.py       # Beep generation
-│       └── daemon.py         # State machine & event loop
+├── src/autowhisper/
+│   ├── __init__.py       # Package init, version
+│   ├── __main__.py       # Entry point & CLI
+│   ├── config.py         # Configuration loader
+│   ├── audio.py          # Audio capture & VAD
+│   ├── inference.py      # faster-whisper GPU inference
+│   ├── hotkey.py         # Global hotkey listener
+│   ├── output.py         # Text injection & clipboard
+│   ├── feedback.py       # Beep generation
+│   └── daemon.py         # State machine & event loop
+├── scripts/
+│   ├── check-system.sh   # System compatibility checker
+│   ├── fix-nvidia.sh     # NVIDIA driver fixer
+│   ├── setup-daemon.sh   # systemd service setup
+│   └── *.sh              # Various utility scripts
+├── tests/                # Unit and integration tests
 ├── models/               # Whisper models (downloaded automatically)
 ├── config.toml           # Runtime configuration
-├── pyproject.toml        # Python dependencies
-├── requirements.txt      # Pip requirements
-├── Makefile              # Build shortcuts
+├── pyproject.toml        # Python package definition
+├── autowhisper.service   # systemd user service file
 ├── install.sh            # Automated installer
-├── autowhisper.service   # systemd unit file
-└── README.md             # This file
+└── Makefile              # Build shortcuts
 ```
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
-Edit [config.toml](config.toml) to customize:
+Edit `config.toml` to customize behavior:
 
 ### Model Settings
 
 ```toml
 [model]
-size = "distil-large-v3"  # tiny, base, small, medium, large-v3, distil-large-v3
-device = "cuda"           # cuda or cpu
-compute_type = "float16"  # float16 (RTX), int8_float16, int8, float32
+size = "distil-small.en"  # See model table above
+device = "cuda"           # cuda, cpu, or auto
+compute_type = "bfloat16" # bfloat16 (RTX 50xx), float16 (RTX 20-40), int8_float16, int8
 beam_size = 1             # 1 = fastest, 5 = more accurate
 language = "en"           # or "auto" for detection
+num_threads = 4           # CPU threads for preprocessing
 ```
 
-**Model Comparison:**
+**Compute Type Selection:**
 
-| Model | Speed (5s audio) | Accuracy | VRAM |
-|-------|------------------|----------|------|
-| tiny | 20-30ms | Good | 150MB |
-| base | 40-60ms | Very Good | 250MB |
-| small | 80-120ms | Excellent | 500MB |
-| **distil-large-v3** | **100-150ms** | **Best** ⭐ | 1.5GB |
+| Compute Type | Best For | Speed | VRAM |
+|--------------|----------|-------|------|
+| bfloat16 | RTX 50xx series | Fastest | Medium |
+| float16 | RTX 20-40 series | Fast | Medium |
+| int8_float16 | Lower VRAM GPUs | Faster | Lower |
+| int8 | Minimal VRAM | Fast | Lowest |
 
 ### Hotkey Settings
 
 ```toml
 [hotkeys]
-mode = "push_to_talk"    # or "toggle"
-trigger = "shift+super"  # Start/stop recording
-cancel = "ctrl+alt+c"    # Cancel current recording
+mode = "push_to_talk"     # or "toggle"
+trigger = "shift+super"   # Start/stop recording
+cancel = "ctrl+alt+c"     # Cancel current recording
+escape_to_cancel = true   # Allow Escape to cancel
 ```
 
 **Supported keys:** ctrl, alt, shift, super, space, a-z, 0-9, f1-f12
@@ -176,104 +190,98 @@ cancel = "ctrl+alt+c"    # Cancel current recording
 
 ```toml
 [output]
-method = "inject"        # "inject" (xdotool) or "clipboard"
-auto_paste = true        # Auto Ctrl+V after clipboard
-lowercase = false        # Convert to lowercase
-append_newline = false   # Add newline after text
+method = "inject"              # "inject" (xdotool) or "clipboard"
+also_copy_to_clipboard = true  # Copy to clipboard when using inject
+auto_paste = true              # Auto Ctrl+V after clipboard copy
+paste_delay = 0.05             # Delay before paste (seconds)
+lowercase = false              # Convert to lowercase
+append_newline = true          # Add newline after text
 ```
 
 ### Audio Settings
 
 ```toml
 [audio]
-vad_enabled = true       # Trim silence (Silero VAD)
-vad_threshold = 0.5      # 0.0-1.0 (higher = stricter)
-max_duration = 60.0      # Max recording length (seconds)
+sample_rate = 16000       # Whisper native rate (don't change)
+buffer_size = 1024        # ~64ms latency
+vad_enabled = true        # Trim silence (Silero VAD)
+vad_threshold = 0.5       # 0.0-1.0 (higher = stricter)
+silence_duration = 0.3    # Silence to trim (seconds)
+max_duration = 60.0       # Max recording length (seconds)
 ```
 
 ### Feedback Settings
 
 ```toml
 [feedback]
-enabled = true           # Enable audio beeps
-frequency_start = 800    # Start beep frequency (Hz)
-frequency_stop = 400     # Stop beep frequency (Hz)
-volume = 0.3             # 0.0 - 1.0
+enabled = true            # Enable audio beeps
+frequency_start = 800     # Start beep frequency (Hz)
+frequency_stop = 400      # Stop beep frequency (Hz)
+frequency_error = 600     # Error beep frequency (Hz)
+duration = 0.1            # Beep duration (seconds)
+volume = 0.3              # 0.0 - 1.0
 ```
 
 ---
 
-## 🔨 Building from Source
-
-### Prerequisites
-
-```bash
-# Install system dependencies
-sudo apt install -y \
-    build-essential pkg-config libssl-dev \
-    libasound2-dev portaudio19-dev \
-    libx11-dev xdotool xclip \
-    nvidia-cuda-toolkit pulseaudio
-
-# Install Python 3.10+
-sudo apt install -y python3 python3-pip python3-venv
-```
-
-### Build AutoWhisper
-
-```bash
-cd /home/isura/autowhisper
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install package
-pip install -e .
-
-# Models are downloaded automatically on first run
-```
-
-See [BUILD.md](BUILD.md) for detailed instructions.
-
----
-
-## 🚀 Running
+## Running
 
 ### Foreground (Testing)
 
 ```bash
 source venv/bin/activate
 python -m autowhisper --config config.toml
-```
 
-Enable debug logging:
-```bash
+# With debug logging
 python -m autowhisper --config config.toml --log-level debug
+
+# Override model
+python -m autowhisper --config config.toml --model tiny.en
 ```
 
-### Background (systemd Service)
+### Background (systemd User Service)
 
 ```bash
-# Start
-sudo systemctl start autowhisper@$USER
+# Install service
+./scripts/setup-daemon.sh
 
-# Enable on boot
-sudo systemctl enable autowhisper@$USER
+# Start service
+systemctl --user start autowhisper
+
+# Enable on login
+systemctl --user enable autowhisper
 
 # View logs
-journalctl -u autowhisper@$USER -f
+journalctl --user -u autowhisper -f
 
 # Status
-systemctl status autowhisper@$USER
+systemctl --user status autowhisper
+
+# Restart after config changes
+systemctl --user restart autowhisper
 
 # Stop
-sudo systemctl stop autowhisper@$USER
+systemctl --user stop autowhisper
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## Utility Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/check-system.sh` | Check system compatibility (GPU, RAM, packages) |
+| `scripts/fix-nvidia.sh` | Fix common NVIDIA driver issues |
+| `scripts/setup-daemon.sh` | Install systemd user service |
+| `scripts/restart-daemon.sh` | Restart the daemon service |
+| `scripts/stop-daemon.sh` | Stop the daemon service |
+| `scripts/logs-daemon.sh` | View daemon logs |
+| `scripts/status-daemon.sh` | Check daemon status |
+| `scripts/apply-config.sh` | Apply config changes and restart |
+
+---
+
+## Troubleshooting
 
 ### Run the diagnostic script first
 
@@ -281,7 +289,7 @@ sudo systemctl stop autowhisper@$USER
 ./scripts/check-system.sh
 ```
 
-This checks GPU, drivers, RAM, and system packages, and tells you exactly what's wrong.
+This checks GPU, drivers, RAM, and system packages.
 
 ### No GPU detected / Driver issues
 
@@ -301,10 +309,10 @@ sudo reboot
 
 ```bash
 # Check service is running
-systemctl status autowhisper@$USER
+systemctl --user status autowhisper
 
 # View logs
-journalctl -u autowhisper@$USER -n 50
+journalctl --user -u autowhisper -n 50
 ```
 
 ### No audio captured
@@ -320,8 +328,10 @@ pactl list sources short
 ### Text not appearing
 
 ```bash
-# Try clipboard mode
-# Edit config.toml:
+# Test xdotool
+xdotool type "test"
+
+# Try clipboard mode in config.toml:
 [output]
 method = "clipboard"
 auto_paste = true
@@ -333,87 +343,25 @@ auto_paste = true
 # Verify GPU usage while recording
 watch -n 0.1 nvidia-smi
 
-# Try smaller model in config.toml:
+# Try faster model in config.toml:
 [model]
-size = "small"
+size = "tiny.en"
 ```
 
 See [BUILD.md](BUILD.md) for more troubleshooting.
 
 ---
 
-## 📈 Benchmarking
-
-Test your system performance:
-
-```bash
-# Create 5-second test audio
-arecord -d 5 -f S16_LE -r 16000 -c 1 test.wav
-
-# Run benchmark
-python -c "
-from faster_whisper import WhisperModel
-import time
-
-model = WhisperModel('distil-large-v3', device='cuda', compute_type='float16')
-
-start = time.time()
-segments, _ = model.transcribe('test.wav', beam_size=1)
-list(segments)  # Consume iterator
-print(f'Time: {time.time() - start:.3f}s')
-"
-```
-
----
-
-## 🔒 Privacy & Security
-
-### Privacy Guarantees
-
-- ✅ **100% offline** - No network requests
-- ✅ **No storage** - Audio deleted immediately after transcription
-- ✅ **No telemetry** - Zero data collection
-- ✅ **Open source** - Audit the code yourself
-
-### Security Considerations
-
-- Runs as user service (systemd user instance)
-- PID file prevents multiple instances
-- Input validation on all configuration
-- Sandboxed systemd service with limited permissions
-
----
-
-## 🗺️ Roadmap
-
-### Phase 1: Core Functionality ✅
-
-- [x] Audio capture with VAD
-- [x] GPU-accelerated inference
-- [x] Global hotkey support
-- [x] Text injection
-- [x] Audio feedback
-- [x] Configuration system
-- [x] systemd service
-
-### Phase 2: Enhancements (Future)
-
-- [ ] Wayland support (ydotool)
-- [ ] Streaming mode (real-time transcription)
-- [ ] Command mode (voice commands)
-- [ ] Custom vocabulary
-- [ ] Multiple language support
-- [ ] Usage statistics
-- [ ] Auto-updates
-
----
-
-## 🛠️ Development
+## Development
 
 ### Running Tests
 
 ```bash
+source venv/bin/activate
 python -m pytest -v
+
+# With coverage
+python -m pytest --cov=autowhisper
 ```
 
 ### Code Formatting
@@ -429,17 +377,64 @@ python -m ruff check src/
 python -m autowhisper --config config.toml --log-level debug
 ```
 
+See [TESTING.md](TESTING.md) for comprehensive testing guide.
+
 ---
 
-## 📚 Documentation
+## Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - Get started in 5 minutes
 - **[BUILD.md](BUILD.md)** - Detailed build instructions
 - **[TESTING.md](TESTING.md)** - Testing guide
+- **[PACKAGING.md](PACKAGING.md)** - Creating distribution packages
+- **[DISTRIBUTION.md](DISTRIBUTION.md)** - Distribution guide
 
 ---
 
-## 🤝 Contributing
+## Privacy & Security
+
+### Privacy Guarantees
+
+- **100% offline** - No network requests
+- **No storage** - Audio deleted immediately after transcription
+- **No telemetry** - Zero data collection
+- **Open source** - Audit the code yourself
+
+### Security Considerations
+
+- Runs as user service (systemd user instance)
+- PID file prevents multiple instances
+- Input validation on all configuration
+- Resource limits in systemd service (6GB RAM, 400% CPU)
+
+---
+
+## Roadmap
+
+### Phase 1: Core Functionality (Complete)
+
+- [x] Audio capture with VAD
+- [x] GPU-accelerated inference
+- [x] Global hotkey support (push-to-talk and toggle)
+- [x] Text injection and clipboard output
+- [x] Audio feedback
+- [x] Configuration system
+- [x] systemd user service
+- [x] Diagnostic and fix scripts
+
+### Phase 2: Enhancements (Future)
+
+- [ ] Wayland support (ydotool)
+- [ ] Streaming mode (real-time transcription)
+- [ ] Command mode (voice commands)
+- [ ] Custom vocabulary
+- [ ] Multiple language support
+- [ ] Usage statistics
+- [ ] GUI configuration tool
+
+---
+
+## Contributing
 
 Contributions welcome! Please:
 
@@ -452,13 +447,13 @@ Contributions welcome! Please:
 
 ---
 
-## 📝 License
+## License
 
-Apache License 2.0 - See LICENSE file for details
+MIT License - See [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **[OpenAI Whisper](https://github.com/openai/whisper)** - Speech recognition model
 - **[faster-whisper](https://github.com/guillaumekln/faster-whisper)** - CTranslate2 optimization
@@ -467,22 +462,12 @@ Apache License 2.0 - See LICENSE file for details
 
 ---
 
-## 📞 Support
+## Support
 
 - **Issues:** Report bugs on GitHub Issues
-- **Discussions:** Ask questions on GitHub Discussions
-- **Logs:** Check `journalctl -u autowhisper@$USER -f`
+- **Logs:** Check `journalctl --user -u autowhisper -f`
+- **Diagnostics:** Run `./scripts/check-system.sh`
 
 ---
 
-## 🎯 Project Goals
-
-1. ✅ **Sub-200ms latency** - Feels instant to users
-2. ✅ **Zero UI** - True background daemon
-3. ✅ **GPU acceleration** - Leverage NVIDIA hardware
-4. ✅ **Production ready** - Stable, reliable, documented
-5. ✅ **Privacy first** - 100% offline operation
-
----
-
-Built with Python and faster-whisper
+**AutoWhisper v2.0.0** - Built with Python and faster-whisper
