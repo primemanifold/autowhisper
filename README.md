@@ -275,14 +275,26 @@ sudo systemctl stop autowhisper@$USER
 
 ## 🐛 Troubleshooting
 
-### No GPU detected
+### Run the diagnostic script first
 
 ```bash
-# Check NVIDIA driver
-nvidia-smi
+./scripts/check-system.sh
+```
+
+This checks GPU, drivers, RAM, and system packages, and tells you exactly what's wrong.
+
+### No GPU detected / Driver issues
+
+```bash
+# Run the automated fix script
+sudo ./scripts/fix-nvidia.sh
+
+# Or manually:
+nvidia-smi  # Check if driver works
 
 # Install if needed
 sudo ubuntu-drivers autoinstall
+sudo reboot
 ```
 
 ### Hotkey not working

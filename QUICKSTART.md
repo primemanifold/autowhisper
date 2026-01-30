@@ -4,9 +4,36 @@ Get AutoWhisper running in 5 minutes!
 
 ## Prerequisites
 
-- Ubuntu 24.04 LTS
+- Ubuntu 24.04 LTS (or 22.04)
 - NVIDIA GPU with drivers installed
 - Python 3.10+
+- 8GB+ RAM, 2GB+ VRAM
+
+## Pre-Installation Check (Recommended)
+
+Before installing, run the system compatibility check to catch any issues:
+
+```bash
+cd /home/isura/autowhisper
+./scripts/check-system.sh
+```
+
+This will verify:
+- NVIDIA GPU is detected and driver is working
+- Sufficient RAM and VRAM
+- Required system packages are installed
+- Audio system is functioning
+
+**If the check reports NVIDIA driver issues**, run the fix script:
+
+```bash
+sudo ./scripts/fix-nvidia.sh
+```
+
+Common issues it can fix:
+- Driver/library version mismatch (usually needs reboot)
+- Missing NVIDIA driver (auto-installs)
+- Kernel module issues
 
 ## Installation
 
@@ -136,12 +163,26 @@ With your NVIDIA GPU:
 
 ## Troubleshooting
 
-### No GPU detected
+### Run the diagnostic first
 
 ```bash
+./scripts/check-system.sh
+```
+
+This will identify most issues and tell you how to fix them.
+
+### No GPU detected / Driver issues
+
+```bash
+# Check if nvidia-smi works
 nvidia-smi
-# If this fails, install NVIDIA drivers:
+
+# If it fails, run the fix script:
+sudo ./scripts/fix-nvidia.sh
+
+# Or manually install drivers:
 sudo ubuntu-drivers autoinstall
+sudo reboot
 ```
 
 ### Hotkey not working
