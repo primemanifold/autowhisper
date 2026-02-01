@@ -838,6 +838,74 @@ class SettingsDialog(Gtk.Dialog):
         vbox.pack_start(expander, False, False, 0)
         return frame
 
+    def _build_output_section(self) -> Gtk.Frame:
+        """Build the Output settings section."""
+        frame = Gtk.Frame()
+        frame.set_label("  Output  ")
+        frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        vbox.set_margin_start(12)
+        vbox.set_margin_end(12)
+        vbox.set_margin_top(8)
+        vbox.set_margin_bottom(8)
+        frame.add(vbox)
+
+        # Primary: Method
+        method_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        method_label = Gtk.Label(label="Method:")
+        method_label.set_xalign(0)
+        method_label.set_size_request(90, -1)
+        method_row.pack_start(method_label, False, False, 0)
+        self._output_method_combo = Gtk.ComboBoxText()
+        self._output_method_combo.append("inject", "Type text (xdotool)")
+        self._output_method_combo.append("clipboard", "Copy to clipboard")
+        self._output_method_combo.set_active(0 if self._config.output.method == "inject" else 1)
+        method_row.pack_start(self._output_method_combo, True, True, 0)
+        vbox.pack_start(method_row, False, False, 0)
+
+        # Advanced expander
+        expander = Gtk.Expander(label="Advanced")
+        adv_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        adv_box.set_margin_start(8)
+        adv_box.set_margin_top(8)
+        expander.add(adv_box)
+
+        # Also copy to clipboard (for inject mode)
+        self._also_copy_check = Gtk.CheckButton(label="Also copy to clipboard (inject mode)")
+        self._also_copy_check.set_active(self._config.output.also_copy_to_clipboard)
+        adv_box.pack_start(self._also_copy_check, False, False, 0)
+
+        # Auto paste (for clipboard mode)
+        self._auto_paste_check = Gtk.CheckButton(label="Auto-paste after copy (clipboard mode)")
+        self._auto_paste_check.set_active(self._config.output.auto_paste)
+        adv_box.pack_start(self._auto_paste_check, False, False, 0)
+
+        # Paste delay
+        delay_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        delay_label = Gtk.Label(label="Paste delay (s):")
+        delay_label.set_xalign(0)
+        delay_label.set_size_request(110, -1)
+        delay_row.pack_start(delay_label, False, False, 0)
+        self._paste_delay_spin = Gtk.SpinButton.new_with_range(0.01, 0.5, 0.01)
+        self._paste_delay_spin.set_value(self._config.output.paste_delay)
+        self._paste_delay_spin.set_digits(2)
+        delay_row.pack_start(self._paste_delay_spin, True, True, 0)
+        adv_box.pack_start(delay_row, False, False, 0)
+
+        # Append newline
+        self._append_newline_check = Gtk.CheckButton(label="Append newline after text")
+        self._append_newline_check.set_active(self._config.output.append_newline)
+        adv_box.pack_start(self._append_newline_check, False, False, 0)
+
+        # Lowercase
+        self._lowercase_check = Gtk.CheckButton(label="Convert to lowercase")
+        self._lowercase_check.set_active(self._config.output.lowercase)
+        adv_box.pack_start(self._lowercase_check, False, False, 0)
+
+        vbox.pack_start(expander, False, False, 0)
+        return frame
+
 
 # Keep old name for compatibility
 HotkeySettingsDialog = SettingsDialog
