@@ -1141,40 +1141,32 @@ class TrayManager:
         response = dialog.run()
 
         if response == Gtk.ResponseType.OK:
-            changed = False
+            # Check what changed for restart notification
+            model_changed = (
+                dialog.model_config["size"] != self._config.model.size or
+                dialog.model_config["device"] != self._config.model.device or
+                dialog.model_config["compute_type"] != self._config.model.compute_type
+            )
 
-            # Check hotkey changes
-            if dialog.trigger_hotkeys != self._trigger_hotkeys:
-                self._trigger_hotkeys = dialog.trigger_hotkeys
-                self._update_trigger_label()
-                changed = True
-            if dialog.cancel_hotkeys != self._cancel_hotkeys:
-                self._cancel_hotkeys = dialog.cancel_hotkeys
-                self._update_cancel_label()
-                changed = True
+            # Save all settings
+            self._save_settings(dialog)
 
-            # Check device changes
-            if dialog.input_device != self._input_device_id:
-                self._input_device_id = dialog.input_device
-                self._input_device = dialog.input_device_name
-                self._update_mic_label(self._input_device)
-                changed = True
-                logger.info(f"Input device changed to: {self._input_device}")
+            # Update local state for menu display
+            self._trigger_hotkeys = dialog.trigger_hotkeys
+            self._cancel_hotkeys = dialog.cancel_hotkeys
+            self._input_device_id = dialog.input_device
+            self._output_device_id = dialog.output_device
+            self._input_device = dialog.input_device_name
+            self._output_device = dialog.output_device_name
 
-            if dialog.output_device != self._output_device_id:
-                self._output_device_id = dialog.output_device
-                self._output_device = dialog.output_device_name
-                self._update_speaker_label(self._output_device)
-                changed = True
-                logger.info(f"Output device changed to: {self._output_device}")
+            # Update menu labels
+            self._update_trigger_label()
+            self._update_cancel_label()
+            self._update_mic_label(self._input_device)
+            self._update_speaker_label(self._output_device)
 
-            if changed:
-                self._save_settings(
-                    dialog.trigger_hotkeys,
-                    dialog.cancel_hotkeys,
-                    dialog.input_device,
-                    dialog.output_device,
-                )
+            if model_changed:
+                logger.info("Model settings changed - restart required")
 
         dialog.destroy()
 
@@ -1190,13 +1182,7 @@ class TrayManager:
             return "(none)"
         return ", ".join(display_hotkey(hk) for hk in hotkeys)
 
-    def _save_settings(
-        self,
-        trigger: list[str],
-        cancel: list[str],
-        input_device: str | None,
-        output_device: str | None,
-    ) -> None:
+    def _save_settings(self, dialog: SettingsDialog) -> None:
         """Save all settings to config file."""
         if not self._config_path:
             return
@@ -1209,23 +1195,40 @@ class TrayManager:
             else:
                 config = {}
 
-            # Save hotkeys
-            if "hotkeys" not in config:
-                config["hotkeys"] = {}
-            config["hotkeys"]["trigger"] = trigger
-            config["hotkeys"]["cancel"] = cancel
+            # Model settings
+            model_cfg = dialog.model_config
+            if "model" not in config:
+                config["model"] = {}
+            config["model"].update(model_cfg)
 
-            # Save audio devices
+            # Audio settings
+            audio_cfg = dialog.audio_config
             if "audio" not in config:
                 config["audio"] = {}
-            if input_device:
-                config["audio"]["device"] = input_device
-            elif "device" in config["audio"]:
-                del config["audio"]["device"]
-            if output_device:
-                config["audio"]["output_device"] = output_device
-            elif "output_device" in config["audio"]:
-                del config["audio"]["output_device"]
+            # Handle None values (remove from config)
+            for key, value in audio_cfg.items():
+                if value is None:
+                    config["audio"].pop(key, None)
+                else:
+                    config["audio"][key] = value
+
+            # Hotkey settings
+            hotkeys_cfg = dialog.hotkeys_config
+            if "hotkeys" not in config:
+                config["hotkeys"] = {}
+            config["hotkeys"].update(hotkeys_cfg)
+
+            # Output settings
+            output_cfg = dialog.output_config
+            if "output" not in config:
+                config["output"] = {}
+            config["output"].update(output_cfg)
+
+            # Feedback settings
+            feedback_cfg = dialog.feedback_config
+            if "feedback" not in config:
+                config["feedback"] = {}
+            config["feedback"].update(feedback_cfg)
 
             with open(config_path, "w") as f:
                 toml.dump(config, f)
