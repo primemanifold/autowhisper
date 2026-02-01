@@ -1,3 +1,17 @@
+autowhisper (0.2.0-1) noble; urgency=medium
+
+  * Settings UI expansion: expose all TOML config options
+  * Add tabbed interface (General/Advanced tabs)
+  * Model settings: size, device, compute type, beam size, language, threads
+  * Audio settings: VAD, threshold, silence duration, max duration
+  * Hotkeys settings: mode (push-to-talk/toggle), escape to cancel
+  * Output settings: method, auto-paste, paste delay, newline, lowercase
+  * Feedback settings: frequencies, duration, volume
+  * Collapsible Advanced sections per category
+  * Dynamic dialog resize when expanders toggle
+
+ -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Sat, 01 Feb 2026 18:00:00 +0000
+
 autowhisper (0.1.0-4) noble; urgency=medium
 
   * Add pybuild-plugin-pyproject build dependency for PEP517 support

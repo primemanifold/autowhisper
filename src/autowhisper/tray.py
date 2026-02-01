@@ -70,7 +70,7 @@ STATE_TITLES = {
 }
 
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 
 MODEL_SIZES = [
     ("tiny.en", "Tiny (English) - Fastest"),
