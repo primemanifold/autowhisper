@@ -58,7 +58,7 @@ class OutputConfig:
     method: str = "inject"
     auto_paste: bool = True
     paste_delay: float = 0.05
-    append_newline: bool = False
+    ending_action: str = "none"  # "none", "newline", or "return_key"
     lowercase: bool = False
     also_copy_to_clipboard: bool = True  # Also store in clipboard when using inject method
 
@@ -188,6 +188,13 @@ class Config:
             raise ValueError(
                 f"Invalid output method: {self.output.method}. "
                 f"Must be one of: {valid_methods}"
+            )
+
+        valid_ending_actions = ["none", "newline", "return_key"]
+        if self.output.ending_action not in valid_ending_actions:
+            raise ValueError(
+                f"Invalid ending_action: {self.output.ending_action}. "
+                f"Must be one of: {valid_ending_actions}"
             )
 
         if not 0.0 <= self.feedback.volume <= 1.0:

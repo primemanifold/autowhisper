@@ -79,8 +79,11 @@ auto_paste = true
 # Delay before paste (seconds)
 paste_delay = 0.05
 
-# Add newline after text
-append_newline = true
+# Ending action after text: "none", "newline", or "return_key"
+# - none: no action after text
+# - newline: append newline character to text
+# - return_key: send Return/Enter keypress (submits in apps like Claude Code)
+ending_action = "none"
 
 # Lowercase output
 lowercase = false

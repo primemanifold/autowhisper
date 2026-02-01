@@ -75,7 +75,8 @@ class OutputManager:
         if self.config.lowercase:
             text = text.lower()
 
-        if self.config.append_newline:
+        # Handle ending_action: "newline" appends \n to text
+        if self.config.ending_action == "newline":
             text += "\n"
 
         # Try injection methods in order of preference
@@ -86,17 +87,27 @@ class OutputManager:
 
             # Try X11 direct injection first
             if self._xlib_available and self._inject_xlib(text):
+                # Handle ending_action: "return_key" sends Return keypress after text
+                if self.config.ending_action == "return_key":
+                    self._send_return_key()
                 return True
 
             # Fall back to xdotool
             if self._xdotool_available and self._inject_xdotool(text):
+                # Handle ending_action: "return_key" sends Return keypress after text
+                if self.config.ending_action == "return_key":
+                    self._send_return_key()
                 return True
 
             # Fall back to clipboard + paste
             logger.warning("Direct injection failed, falling back to clipboard")
 
         # Clipboard method (or fallback)
-        return self._inject_clipboard(text)
+        result = self._inject_clipboard(text)
+        # Handle ending_action: "return_key" sends Return keypress after paste
+        if result and self.config.ending_action == "return_key":
+            self._send_return_key()
+        return result
 
     def _inject_xlib(self, text: str) -> bool:
         """Inject text using python-xlib (direct X11)."""
@@ -295,4 +306,26 @@ class OutputManager:
                 return False
         except Exception as e:
             logger.warning(f"Paste failed: {e}")
+            return False
+
+    def _send_return_key(self) -> bool:
+        """Send Return/Enter keypress."""
+        try:
+            if self._xdotool_available:
+                result = subprocess.run(
+                    ["xdotool", "key", "--clearmodifiers", "Return"],
+                    timeout=5,
+                    capture_output=True,
+                )
+                if result.returncode == 0:
+                    logger.debug("Sent Return keypress via xdotool")
+                    return True
+                else:
+                    logger.warning(f"xdotool key Return failed: {result.stderr.decode()}")
+                    return False
+            else:
+                logger.warning("Cannot send Return key: xdotool not available")
+                return False
+        except Exception as e:
+            logger.warning(f"Return keypress failed: {e}")
             return False

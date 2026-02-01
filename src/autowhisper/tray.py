@@ -107,6 +107,12 @@ LANGUAGES = [
     ("zh", "Chinese"),
 ]
 
+ENDING_ACTIONS = [
+    ("none", "None"),
+    ("newline", "Newline character"),
+    ("return_key", "Return keypress (submit)"),
+]
+
 
 def normalize_key(keyname: str) -> str | None:
     """Normalize key name to match pynput format."""
@@ -557,7 +563,7 @@ class SettingsDialog(Gtk.Dialog):
             "also_copy_to_clipboard": self._also_copy_check.get_active(),
             "auto_paste": self._auto_paste_check.get_active(),
             "paste_delay": self._paste_delay_spin.get_value(),
-            "append_newline": self._append_newline_check.get_active(),
+            "ending_action": self._ending_action_combo.get_active_id(),
             "lowercase": self._lowercase_check.get_active(),
         }
 
@@ -927,10 +933,24 @@ class SettingsDialog(Gtk.Dialog):
         delay_row.pack_start(self._paste_delay_spin, True, True, 0)
         adv_box.pack_start(delay_row, False, False, 0)
 
-        # Append newline
-        self._append_newline_check = Gtk.CheckButton(label="Append newline after text")
-        self._append_newline_check.set_active(self._config.output.append_newline)
-        adv_box.pack_start(self._append_newline_check, False, False, 0)
+        # Ending action
+        ending_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        ending_label = Gtk.Label(label="Ending action:")
+        ending_label.set_xalign(0)
+        ending_label.set_size_request(110, -1)
+        ending_row.pack_start(ending_label, False, False, 0)
+        self._ending_action_combo = Gtk.ComboBoxText()
+        for action_id, display_name in ENDING_ACTIONS:
+            self._ending_action_combo.append(action_id, display_name)
+        # Set active based on config
+        active_idx = 0
+        for i, (action_id, _) in enumerate(ENDING_ACTIONS):
+            if action_id == self._config.output.ending_action:
+                active_idx = i
+                break
+        self._ending_action_combo.set_active(active_idx)
+        ending_row.pack_start(self._ending_action_combo, True, True, 0)
+        adv_box.pack_start(ending_row, False, False, 0)
 
         # Lowercase
         self._lowercase_check = Gtk.CheckButton(label="Convert to lowercase")
