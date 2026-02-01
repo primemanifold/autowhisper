@@ -1,3 +1,10 @@
+autowhisper (0.1.0-3) noble; urgency=medium
+
+  * Fix Debian build: use pybuild instead of Makefile install
+  * Install systemd user service to /usr/lib/systemd/user/
+
+ -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Sat, 01 Feb 2026 14:00:00 +0000
+
 autowhisper (0.1.0-2) noble; urgency=medium
 
   * Initial release

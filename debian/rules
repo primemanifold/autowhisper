@@ -1,45 +1,29 @@
 #!/usr/bin/make -f
 
 export DH_VERBOSE = 1
+export PYBUILD_NAME = autowhisper
 
 %:
-	dh $@
-
-override_dh_auto_clean:
-	# Clean Python build artifacts
-	find . -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true
-	find . -type f -name "*.pyc" -delete 2>/dev/null || true
-	find . -type d -name "*.egg-info" -exec rm -r {} + 2>/dev/null || true
-	rm -rf build/ dist/ .eggs/ 2>/dev/null || true
-
-override_dh_auto_build:
-	# Python package doesn't need separate build step
-	# Dependencies will be installed via dh_python3
+	dh $@ --with python3 --buildsystem=pybuild
 
 override_dh_auto_test:
-	# Skip tests during package build (can enable later)
-	# python3 -m pytest tests/ || true
+	# Skip tests during package build
+	true
 
 override_dh_auto_install:
-	# Install Python package
 	dh_auto_install
 
-	# Install systemd service
+	# Install systemd user service template
 	install -D -m 644 autowhisper.service \
-		$(CURDIR)/debian/autowhisper/lib/systemd/system/autowhisper@.service
+		$(CURDIR)/debian/autowhisper/usr/lib/systemd/user/autowhisper.service
 
-	# Install config
+	# Install default config
 	install -D -m 644 config.toml \
 		$(CURDIR)/debian/autowhisper/etc/autowhisper/config.toml
 
 	# Install documentation
 	install -D -m 644 README.md \
 		$(CURDIR)/debian/autowhisper/usr/share/doc/autowhisper/README.md
-	install -D -m 644 QUICKSTART.md \
-		$(CURDIR)/debian/autowhisper/usr/share/doc/autowhisper/QUICKSTART.md 2>/dev/null || true
-
-	# Create models directory
-	install -d $(CURDIR)/debian/autowhisper/usr/share/autowhisper/models
 
 override_dh_installsystemd:
-	dh_installsystemd --name=autowhisper@
+	# Skip - we use a user service, not a system service
