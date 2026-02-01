@@ -906,6 +906,93 @@ class SettingsDialog(Gtk.Dialog):
         vbox.pack_start(expander, False, False, 0)
         return frame
 
+    def _build_feedback_section(self) -> Gtk.Frame:
+        """Build the Feedback settings section."""
+        frame = Gtk.Frame()
+        frame.set_label("  Feedback  ")
+        frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        vbox.set_margin_start(12)
+        vbox.set_margin_end(12)
+        vbox.set_margin_top(8)
+        vbox.set_margin_bottom(8)
+        frame.add(vbox)
+
+        # Primary: Enabled + Volume row
+        primary_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+
+        self._feedback_enabled_check = Gtk.CheckButton(label="Enabled")
+        self._feedback_enabled_check.set_active(self._config.feedback.enabled)
+        primary_row.pack_start(self._feedback_enabled_check, False, False, 0)
+
+        vol_label = Gtk.Label(label="Volume:")
+        vol_label.set_xalign(0)
+        primary_row.pack_start(vol_label, False, False, 0)
+
+        self._feedback_volume_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.1)
+        self._feedback_volume_scale.set_value(self._config.feedback.volume)
+        self._feedback_volume_scale.set_digits(1)
+        self._feedback_volume_scale.set_size_request(120, -1)
+        primary_row.pack_start(self._feedback_volume_scale, True, True, 0)
+
+        vbox.pack_start(primary_row, False, False, 0)
+
+        # Advanced expander
+        expander = Gtk.Expander(label="Advanced")
+        adv_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        adv_box.set_margin_start(8)
+        adv_box.set_margin_top(8)
+        expander.add(adv_box)
+
+        # Start frequency
+        start_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        start_label = Gtk.Label(label="Start freq (Hz):")
+        start_label.set_xalign(0)
+        start_label.set_size_request(110, -1)
+        start_row.pack_start(start_label, False, False, 0)
+        self._freq_start_spin = Gtk.SpinButton.new_with_range(200, 2000, 50)
+        self._freq_start_spin.set_value(self._config.feedback.frequency_start)
+        start_row.pack_start(self._freq_start_spin, True, True, 0)
+        adv_box.pack_start(start_row, False, False, 0)
+
+        # Stop frequency
+        stop_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        stop_label = Gtk.Label(label="Stop freq (Hz):")
+        stop_label.set_xalign(0)
+        stop_label.set_size_request(110, -1)
+        stop_row.pack_start(stop_label, False, False, 0)
+        self._freq_stop_spin = Gtk.SpinButton.new_with_range(200, 2000, 50)
+        self._freq_stop_spin.set_value(self._config.feedback.frequency_stop)
+        stop_row.pack_start(self._freq_stop_spin, True, True, 0)
+        adv_box.pack_start(stop_row, False, False, 0)
+
+        # Error frequency
+        error_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        error_label = Gtk.Label(label="Error freq (Hz):")
+        error_label.set_xalign(0)
+        error_label.set_size_request(110, -1)
+        error_row.pack_start(error_label, False, False, 0)
+        self._freq_error_spin = Gtk.SpinButton.new_with_range(200, 2000, 50)
+        self._freq_error_spin.set_value(self._config.feedback.frequency_error)
+        error_row.pack_start(self._freq_error_spin, True, True, 0)
+        adv_box.pack_start(error_row, False, False, 0)
+
+        # Duration
+        dur_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        dur_label = Gtk.Label(label="Duration (s):")
+        dur_label.set_xalign(0)
+        dur_label.set_size_request(110, -1)
+        dur_row.pack_start(dur_label, False, False, 0)
+        self._feedback_duration_spin = Gtk.SpinButton.new_with_range(0.05, 0.5, 0.05)
+        self._feedback_duration_spin.set_value(self._config.feedback.duration)
+        self._feedback_duration_spin.set_digits(2)
+        dur_row.pack_start(self._feedback_duration_spin, True, True, 0)
+        adv_box.pack_start(dur_row, False, False, 0)
+
+        vbox.pack_start(expander, False, False, 0)
+        return frame
+
 
 # Keep old name for compatibility
 HotkeySettingsDialog = SettingsDialog
