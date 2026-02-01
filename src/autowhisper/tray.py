@@ -775,6 +775,69 @@ class SettingsDialog(Gtk.Dialog):
         vbox.pack_start(expander, False, False, 0)
         return frame
 
+    def _build_hotkeys_section(self) -> Gtk.Frame:
+        """Build the Hotkeys settings section."""
+        frame = Gtk.Frame()
+        frame.set_label("  Hotkeys  ")
+        frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        vbox.set_margin_start(12)
+        vbox.set_margin_end(12)
+        vbox.set_margin_top(8)
+        vbox.set_margin_bottom(8)
+        frame.add(vbox)
+
+        # Primary: Trigger hotkeys
+        self._trigger_group = HotkeyGroup(
+            "Recording (hold to speak)",
+            self._config.hotkeys.trigger,
+            "shift+super"
+        )
+        vbox.pack_start(self._trigger_group, False, False, 0)
+
+        # Primary: Cancel hotkeys
+        self._cancel_group = HotkeyGroup(
+            "Cancel Recording",
+            self._config.hotkeys.cancel,
+            "esc"
+        )
+        vbox.pack_start(self._cancel_group, False, False, 0)
+
+        # Hint
+        hint = Gtk.Label()
+        hint.set_markup("<small>Click button, press keys. Backspace clears.</small>")
+        hint.set_opacity(0.6)
+        vbox.pack_start(hint, False, False, 0)
+
+        # Advanced expander
+        expander = Gtk.Expander(label="Advanced")
+        adv_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        adv_box.set_margin_start(8)
+        adv_box.set_margin_top(8)
+        expander.add(adv_box)
+
+        # Mode
+        mode_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        mode_label = Gtk.Label(label="Mode:")
+        mode_label.set_xalign(0)
+        mode_label.set_size_request(110, -1)
+        mode_row.pack_start(mode_label, False, False, 0)
+        self._hotkey_mode_combo = Gtk.ComboBoxText()
+        self._hotkey_mode_combo.append("push_to_talk", "Push to Talk (hold)")
+        self._hotkey_mode_combo.append("toggle", "Toggle (press twice)")
+        self._hotkey_mode_combo.set_active(0 if self._config.hotkeys.mode == "push_to_talk" else 1)
+        mode_row.pack_start(self._hotkey_mode_combo, True, True, 0)
+        adv_box.pack_start(mode_row, False, False, 0)
+
+        # Escape to cancel
+        self._escape_to_cancel_check = Gtk.CheckButton(label="Escape key cancels recording")
+        self._escape_to_cancel_check.set_active(self._config.hotkeys.escape_to_cancel)
+        adv_box.pack_start(self._escape_to_cancel_check, False, False, 0)
+
+        vbox.pack_start(expander, False, False, 0)
+        return frame
+
 
 # Keep old name for compatibility
 HotkeySettingsDialog = SettingsDialog
