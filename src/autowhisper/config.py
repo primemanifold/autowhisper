@@ -76,6 +76,12 @@ class DaemonConfig:
 
 
 @dataclass
+class TrayConfig:
+    """System tray configuration."""
+    enabled: bool = True
+
+
+@dataclass
 class Config:
     """Main configuration container."""
     model: ModelConfig = field(default_factory=ModelConfig)
@@ -84,6 +90,7 @@ class Config:
     output: OutputConfig = field(default_factory=OutputConfig)
     feedback: FeedbackConfig = field(default_factory=FeedbackConfig)
     daemon: DaemonConfig = field(default_factory=DaemonConfig)
+    tray: TrayConfig = field(default_factory=TrayConfig)
 
     @classmethod
     def load(cls, path: str | Path) -> "Config":
@@ -114,6 +121,10 @@ class Config:
             daemon=DaemonConfig(**{
                 k: v for k, v in data.get("daemon", {}).items()
                 if k in DaemonConfig.__dataclass_fields__
+            }),
+            tray=TrayConfig(**{
+                k: v for k, v in data.get("tray", {}).items()
+                if k in TrayConfig.__dataclass_fields__
             }),
         )
 

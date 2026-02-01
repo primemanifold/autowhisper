@@ -112,3 +112,8 @@ pid_file = "/tmp/autowhisper.pid"
 
 # Working directory
 work_dir = "/opt/autowhisper"
+
+[tray]
+# Enable system tray icon
+# Shows recording status: green (ready), red (recording), amber (processing)
+enabled = true

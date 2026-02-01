@@ -17,6 +17,7 @@ from .feedback import FeedbackManager
 from .hotkey import HotkeyEvent, HotkeyManager
 from .inference import WhisperInference
 from .output import OutputManager
+from .tray import TrayManager, TrayState
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +45,7 @@ class AutoWhisperDaemon:
         self._output = OutputManager(config.output)
         self._feedback = FeedbackManager(config.feedback)
         self._hotkey = HotkeyManager(config.hotkeys, self._event_queue)
+        self._tray = TrayManager(config.tray.enabled)
 
         # Minimum recording duration (seconds)
         self._min_duration = 0.5
@@ -68,6 +70,9 @@ class AutoWhisperDaemon:
 
         logger.info("Initializing output subsystem")
         self._output.initialize()
+
+        logger.info("Starting tray icon")
+        self._tray.start()
 
         logger.info("Initialization complete")
 
@@ -112,6 +117,7 @@ class AutoWhisperDaemon:
 
         logger.info("Starting recording")
         self._state = DaemonState.RECORDING
+        self._tray.set_state(TrayState.RECORDING)
         self._feedback.play_start()
         self._audio.start_recording()
 
@@ -123,6 +129,7 @@ class AutoWhisperDaemon:
 
         logger.info("Stopping recording")
         self._state = DaemonState.PROCESSING
+        self._tray.set_state(TrayState.PROCESSING)
         self._feedback.play_stop()
 
         # Get recorded audio
@@ -133,6 +140,7 @@ class AutoWhisperDaemon:
             logger.warning(f"Recording too short ({duration:.2f}s), skipping")
             self._feedback.play_short_beep()
             self._state = DaemonState.IDLE
+            self._tray.set_state(TrayState.IDLE)
             return
 
         # Trim silence
@@ -140,6 +148,7 @@ class AutoWhisperDaemon:
         if len(audio) == 0:
             logger.warning("No audio after silence trimming")
             self._state = DaemonState.IDLE
+            self._tray.set_state(TrayState.IDLE)
             return
 
         # Transcribe
@@ -161,6 +170,7 @@ class AutoWhisperDaemon:
             self._feedback.play_error()
 
         self._state = DaemonState.IDLE
+        self._tray.set_state(TrayState.IDLE)
 
     def _handle_cancel(self) -> None:
         """Handle CANCEL event."""
@@ -173,6 +183,7 @@ class AutoWhisperDaemon:
             return
 
         self._state = DaemonState.IDLE
+        self._tray.set_state(TrayState.IDLE)
 
     def _signal_handler(self, signum: int, frame) -> None:
         """Handle shutdown signals."""
@@ -207,6 +218,9 @@ class AutoWhisperDaemon:
 
         # Stop hotkey listener
         self._hotkey.stop()
+
+        # Stop tray icon
+        self._tray.stop()
 
         # Stop recording if active
         if self._audio.is_recording():
