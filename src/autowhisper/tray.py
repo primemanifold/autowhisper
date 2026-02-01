@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import math
 import threading
 from enum import Enum, auto
 from typing import TYPE_CHECKING
@@ -111,7 +110,7 @@ class TrayManager:
             self._icons[state] = self._create_icon(STATE_COLORS[state])
 
     def _create_icon(self, color: tuple[int, int, int], size: int = 64) -> Image.Image:
-        """Create a circle voice wave icon."""
+        """Create a circle wave icon with bars."""
         img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
 
@@ -121,16 +120,17 @@ class TrayManager:
         # Draw circle outline
         draw.ellipse([cx-r, cy-r, cx+r, cy+r], outline=color, width=2)
 
-        # Draw smooth voice wave inside
-        points = []
-        for i in range(44):
-            x = 10 + i
-            t = i / 43
-            envelope = 1 - abs(t - 0.5) * 2
-            envelope = envelope ** 0.7
-            y = cy + int(14 * envelope * math.sin(i * math.pi / 7))
-            points.append((x, y))
-        draw.line(points, fill=color, width=3)
+        # Draw waveform bars inside (with padding from circle edge)
+        bar_width = 3
+        bar_gap = 3
+        heights = [10, 18, 24, 18, 10]
+        total = len(heights) * bar_width + (len(heights) - 1) * bar_gap
+        x = cx - total // 2
+        for h in heights:
+            y1 = cy - h // 2
+            y2 = cy + h // 2
+            draw.rounded_rectangle([x, y1, x + bar_width, y2], radius=2, fill=color)
+            x += bar_width + bar_gap
 
         return img
 
