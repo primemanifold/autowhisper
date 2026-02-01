@@ -9,4 +9,4 @@ autowhisper (0.1.0-2) noble; urgency=medium
   * X11 text injection with clipboard fallback
   * systemd user service integration
 
- -- Isura Ranatunga <isura@primemanifold.com>  Sat, 01 Feb 2026 12:00:00 +0000
+ -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Sat, 01 Feb 2026 12:00:00 +0000

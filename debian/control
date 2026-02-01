@@ -1,7 +1,7 @@
 Source: autowhisper
 Section: sound
 Priority: optional
-Maintainer: Isura Ranatunga <isura@primemanifold.com>
+Maintainer: AutoWhisper Contributors <autowhisper@users.noreply.github.com>
 Build-Depends: debhelper-compat (= 13),
                dh-python,
                python3,
