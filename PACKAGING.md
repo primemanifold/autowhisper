@@ -1,60 +1,85 @@
 # Debian Package Creation
 
-## Quick Build
+## Quick Release
 
 ```bash
-sudo apt install -y debhelper devscripts build-essential python3 python3-pip python3-venv
-./build-deb.sh
+./scripts/release.sh patch   # 0.1.0 → 0.1.1
+./scripts/release.sh minor   # 0.1.0 → 0.2.0
+./scripts/release.sh major   # 0.1.0 → 1.0.0
+```
+
+Or use the Claude Code skill: `/release`
+
+## Local Testing with pbuilder
+
+Test builds locally before uploading to Launchpad (simulates their build environment):
+
+### One-time Setup
+
+```bash
+# Install pbuilder
+sudo apt install pbuilder
+
+# Create Noble base image with all repos
+sudo pbuilder create --distribution noble --components "main universe multiverse"
+
+# (Optional) Allow pbuilder without password
+echo "$(whoami) ALL=(root) NOPASSWD: /usr/sbin/pbuilder" | sudo tee /etc/sudoers.d/pbuilder
+sudo chmod 440 /etc/sudoers.d/pbuilder
+```
+
+### Test a Build
+
+```bash
+# Build source package
+rm -rf /tmp/aw-build && mkdir /tmp/aw-build && cd /tmp/aw-build
+git clone /path/to/autowhisper autowhisper-0.1.0
+cd autowhisper-0.1.0 && rm -rf .git && cd ..
+tar czf autowhisper_0.1.0.orig.tar.gz autowhisper-0.1.0
+cd autowhisper-0.1.0
+debuild -S -sa -d -k<YOUR_GPG_KEY>
+
+# Test with pbuilder
+cd ..
+sudo pbuilder build --buildresult ./result autowhisper_*.dsc
+
+# If successful, upload to PPA
+dput ppa:primemanifold/autowhisper autowhisper_*_source.changes
+```
+
+## Manual Build
+
+```bash
+sudo apt install -y debhelper devscripts dh-python pybuild-plugin-pyproject
+dpkg-buildpackage -us -uc -b
 sudo dpkg -i ../autowhisper_*.deb && sudo apt install -f
 ```
 
 ## Package Structure
 
 ```
-/usr/bin/autowhisper                      # Entry point
-/opt/autowhisper/                         # Application + venv
-/etc/autowhisper/config.toml              # Configuration
-/lib/systemd/system/autowhisper@.service  # systemd service
-/usr/share/autowhisper/download-models.sh # Model downloader
+/usr/bin/autowhisper                        # CLI entry point
+/usr/lib/python3/dist-packages/autowhisper/ # Python package
+/usr/lib/systemd/user/autowhisper.service   # systemd user service
+/etc/autowhisper/config.toml                # Configuration
+/usr/share/doc/autowhisper/                 # Documentation
 ```
 
-## Distribution Options
-
-### Option 1: GitHub Releases (Easiest)
+## PPA Upload
 
 ```bash
-./build-deb.sh
-gh release create v0.1.0 ../autowhisper_*.deb --title "AutoWhisper v0.1.0"
-```
+# Build and sign source package
+debuild -S -sa -k<YOUR_GPG_KEY>
 
-Users install with:
-```bash
-wget https://github.com/yourname/autowhisper/releases/latest/download/autowhisper_*.deb
-sudo dpkg -i autowhisper_*.deb && sudo apt install -f
-```
-
-### Option 2: Launchpad PPA
-
-1. Create account at https://launchpad.net
-2. Setup GPG key: `gpg --full-generate-key && gpg --send-keys YOUR_KEY_ID`
-3. Create PPA at https://launchpad.net/~/+activate-ppa
-4. Upload:
-```bash
-debuild -S -sa
-dput ppa:yourname/autowhisper ../autowhisper_*_source.changes
+# Upload to PPA
+dput ppa:primemanifold/autowhisper ../autowhisper_*_source.changes
 ```
 
 Users install with:
 ```bash
-sudo add-apt-repository ppa:yourname/autowhisper
+sudo add-apt-repository ppa:primemanifold/autowhisper
+sudo apt update
 sudo apt install autowhisper
-```
-
-## Updating
-
-```bash
-dch -v 0.2.0-1 "New upstream release"
-./build-deb.sh
 ```
 
 ## Verify Package
