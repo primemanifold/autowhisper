@@ -56,7 +56,9 @@ apt-get install -y \
     pulseaudio \
     nvidia-cuda-toolkit \
     git \
-    curl
+    curl \
+    gir1.2-ayatanaappindicator3-0.1 \
+    python3-gi
 
 echo "[2/6] Checking NVIDIA GPU..."
 if ! command -v nvidia-smi &> /dev/null; then
@@ -78,6 +80,12 @@ mkdir -p "$INSTALL_DIR/scripts"
 
 # Copy source files
 cp "$SCRIPT_DIR/src/autowhisper/"*.py "$INSTALL_DIR/src/autowhisper/"
+
+# Copy icons if they exist
+if [ -d "$SCRIPT_DIR/src/autowhisper/icons" ]; then
+    mkdir -p "$INSTALL_DIR/src/autowhisper/icons"
+    cp "$SCRIPT_DIR/src/autowhisper/icons/"* "$INSTALL_DIR/src/autowhisper/icons/" 2>/dev/null || true
+fi
 cp "$SCRIPT_DIR/config.toml" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/requirements.txt" "$INSTALL_DIR/"
 cp "$SCRIPT_DIR/pyproject.toml" "$INSTALL_DIR/"
@@ -108,7 +116,8 @@ echo "[4/6] Creating Python virtual environment and installing CUDA PyTorch..."
 cd "$INSTALL_DIR"
 
 # Create venv as actual user
-sudo -u $ACTUAL_USER python3 -m venv venv
+# Use --system-site-packages so venv can access system gi (PyGObject) for tray icon
+sudo -u $ACTUAL_USER python3 -m venv --system-site-packages venv
 
 # Activate and install dependencies with CUDA support
 sudo -u $ACTUAL_USER bash -c "
@@ -176,6 +185,12 @@ chown -R $ACTUAL_USER:$ACTUAL_USER "$ACTUAL_HOME/.config/systemd"
 
 # Reload systemd for user (as the actual user)
 sudo -u $ACTUAL_USER XDG_RUNTIME_DIR=/run/user/$ACTUAL_UID systemctl --user daemon-reload
+
+# Restart the service if it's already enabled
+if sudo -u $ACTUAL_USER XDG_RUNTIME_DIR=/run/user/$ACTUAL_UID systemctl --user is-enabled autowhisper.service &>/dev/null; then
+    echo "Restarting AutoWhisper service..."
+    sudo -u $ACTUAL_USER XDG_RUNTIME_DIR=/run/user/$ACTUAL_UID systemctl --user restart autowhisper.service
+fi
 
 echo ""
 echo "=========================================="

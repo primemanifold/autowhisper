@@ -33,8 +33,9 @@ class DaemonState(Enum):
 class AutoWhisperDaemon:
     """Main daemon that orchestrates all components."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, config_path: str = None):
         self.config = config
+        self._config_path = config_path
         self._state = DaemonState.IDLE
         self._event_queue: queue.Queue[HotkeyEvent] = queue.Queue(maxsize=100)
         self._shutdown_event = threading.Event()
@@ -45,7 +46,13 @@ class AutoWhisperDaemon:
         self._output = OutputManager(config.output)
         self._feedback = FeedbackManager(config.feedback)
         self._hotkey = HotkeyManager(config.hotkeys, self._event_queue)
-        self._tray = TrayManager(config.tray.enabled)
+        self._tray = TrayManager(
+            config.tray.enabled,
+            on_quit=self._request_shutdown,
+            on_settings_open=self._pause_hotkey,
+            on_settings_close=self._resume_hotkey,
+            config_path=config_path,
+        )
 
         # Minimum recording duration (seconds)
         self._min_duration = 0.5
@@ -72,6 +79,10 @@ class AutoWhisperDaemon:
         self._output.initialize()
 
         logger.info("Starting tray icon")
+        self._tray.set_input_device(self._audio.input_device_name)
+        self._tray.set_output_device(self._audio.output_device_name)
+        self._tray.set_hotkey(self.config.hotkeys.trigger)
+        self._tray.set_cancel_hotkey(self.config.hotkeys.cancel)
         self._tray.start()
 
         logger.info("Initialization complete")
@@ -189,8 +200,33 @@ class AutoWhisperDaemon:
         """Handle shutdown signals."""
         sig_name = signal.Signals(signum).name
         logger.info(f"Received {sig_name}, shutting down")
+        self._request_shutdown()
+
+    def _request_shutdown(self) -> None:
+        """Request daemon shutdown (from signal or tray menu)."""
         self._state = DaemonState.SHUTDOWN
         self._shutdown_event.set()
+
+    def _pause_hotkey(self) -> None:
+        """Pause the hotkey listener (for settings dialog)."""
+        logger.info("Pausing hotkey listener")
+        self._hotkey.stop()
+
+    def _resume_hotkey(self) -> None:
+        """Resume the hotkey listener (after settings dialog)."""
+        logger.info("Resuming hotkey listener")
+        # Reload config to get new hotkey
+        if self._config_path:
+            try:
+                new_config = Config.load(self._config_path)
+                self.config.hotkeys = new_config.hotkeys
+                self._hotkey = HotkeyManager(self.config.hotkeys, self._event_queue)
+                # Update tray display
+                self._tray.set_hotkey(self.config.hotkeys.trigger)
+                self._tray.set_cancel_hotkey(self.config.hotkeys.cancel)
+            except Exception as e:
+                logger.error(f"Failed to reload config: {e}")
+        self._hotkey.start()
 
     def _write_pid_file(self) -> None:
         """Write PID file."""

@@ -85,6 +85,8 @@ class AudioManager:
         self._silence_threshold_samples = int(
             config.silence_duration * config.sample_rate
         )
+        self._input_device_name = "Unknown"
+        self._output_device_name = "Unknown"
 
     def initialize(self) -> None:
         """Initialize audio system and optionally load VAD."""
@@ -97,13 +99,30 @@ class AudioManager:
             self._vad = SileroVAD(threshold=self.config.vad_threshold)
             self._vad.load()
 
-        # Test audio device
+        # Query audio devices
         try:
-            devices = sd.query_devices()
             default_input = sd.query_devices(kind="input")
-            logger.info(f"Default input device: {default_input['name']}")
+            self._input_device_name = default_input['name']
+            logger.info(f"Default input device: {self._input_device_name}")
         except Exception as e:
-            logger.warning(f"Could not query audio devices: {e}")
+            logger.warning(f"Could not query input device: {e}")
+
+        try:
+            default_output = sd.query_devices(kind="output")
+            self._output_device_name = default_output['name']
+            logger.info(f"Default output device: {self._output_device_name}")
+        except Exception as e:
+            logger.warning(f"Could not query output device: {e}")
+
+    @property
+    def input_device_name(self) -> str:
+        """Get the name of the input device."""
+        return self._input_device_name
+
+    @property
+    def output_device_name(self) -> str:
+        """Get the name of the output device."""
+        return self._output_device_name
 
     def start_recording(self) -> None:
         """Start capturing audio."""

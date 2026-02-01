@@ -39,9 +39,16 @@ class AudioConfig:
 class HotkeyConfig:
     """Hotkey configuration."""
     mode: str = "push_to_talk"
-    trigger: str = "shift+super"
-    cancel: str = "ctrl+alt+c"
+    trigger: list[str] = field(default_factory=lambda: ["shift+super"])
+    cancel: list[str] = field(default_factory=lambda: ["esc"])
     escape_to_cancel: bool = True  # Allow Escape key to cancel recording
+
+    def __post_init__(self):
+        # Normalize strings to lists for backwards compatibility
+        if isinstance(self.trigger, str):
+            self.trigger = [self.trigger]
+        if isinstance(self.cancel, str):
+            self.cancel = [self.cancel]
 
 
 @dataclass

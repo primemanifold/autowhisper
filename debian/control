@@ -22,7 +22,10 @@ Build-Depends: debhelper-compat (= 13),
                libxi-dev,
                libxrandr-dev,
                portaudio19-dev,
-               nvidia-cuda-toolkit
+               nvidia-cuda-toolkit,
+               libjpeg-dev,
+               libpng-dev,
+               zlib1g-dev
 Standards-Version: 4.6.0
 Homepage: https://github.com/autowhisper/autowhisper
 Vcs-Browser: https://github.com/autowhisper/autowhisper
@@ -40,7 +43,9 @@ Depends: ${python3:Depends},
          xclip,
          pulseaudio,
          nvidia-driver-535 | nvidia-driver-545 | nvidia-driver-550,
-         nvidia-cuda-toolkit
+         nvidia-cuda-toolkit,
+         python3-gi,
+         gir1.2-ayatanappindicator3-0.1 | gir1.2-appindicator3-0.1
 Recommends: python3-torch
 Description: GPU-accelerated voice-to-text for Ubuntu
  AutoWhisper converts speech to text using NVIDIA GPU acceleration.

@@ -80,11 +80,13 @@ class HotkeyManager:
         self.config = config
         self.event_queue = event_queue
 
-        self._trigger_combo = KeyCombo.parse(config.trigger)
-        self._cancel_combo = KeyCombo.parse(config.cancel)
+        # Parse all trigger and cancel combos (support lists)
+        self._trigger_combos = [KeyCombo.parse(t) for t in config.trigger]
+        self._cancel_combos = [KeyCombo.parse(c) for c in config.cancel]
 
         self._pressed_modifiers: Set[str] = set()
         self._trigger_pressed = False
+        self._active_trigger: Optional[KeyCombo] = None  # The combo that activated recording
         self._listener: Optional[keyboard.Listener] = None
         self._running = False
 
@@ -149,6 +151,23 @@ class HotkeyManager:
         # Check if key matches
         return key_name == combo.key or key_name == combo.key.replace("_", "")
 
+    def _check_any_trigger(self, key_name: str = None) -> Optional[KeyCombo]:
+        """Check if any trigger combo matches. Returns matching combo or None."""
+        for combo in self._trigger_combos:
+            if combo.is_modifier_only:
+                if combo.modifiers == self._pressed_modifiers:
+                    return combo
+            elif key_name and self._check_combo(combo, key_name):
+                return combo
+        return None
+
+    def _check_any_cancel(self, key_name: str) -> bool:
+        """Check if any cancel combo matches."""
+        for combo in self._cancel_combos:
+            if not combo.is_modifier_only and self._check_combo(combo, key_name):
+                return True
+        return False
+
     def _on_press(self, key) -> None:
         """Handle key press events."""
         if not self._running:
@@ -160,13 +179,13 @@ class HotkeyManager:
             self._pressed_modifiers.add(modifier)
             logger.debug(f"Modifier pressed: {modifier}, current: {self._pressed_modifiers}")
 
-            # Check if trigger is modifier-only combo (like shift+super)
-            if self._trigger_combo.is_modifier_only:
-                if self._trigger_combo.modifiers == self._pressed_modifiers:
-                    if not self._trigger_pressed:
-                        logger.debug("Modifier-only trigger combo detected!")
-                        self._trigger_pressed = True
-                        self._send_event(HotkeyEvent.START)
+            # Check if any trigger is modifier-only combo (like shift+super)
+            matched = self._check_any_trigger()
+            if matched and matched.is_modifier_only and not self._trigger_pressed:
+                logger.debug("Modifier-only trigger combo detected!")
+                self._trigger_pressed = True
+                self._active_trigger = matched
+                self._send_event(HotkeyEvent.START)
             return
 
         key_name = self._get_key_name(key)
@@ -180,14 +199,15 @@ class HotkeyManager:
             return
 
         # Check for cancel hotkey
-        if self._check_combo(self._cancel_combo, key_name):
+        if self._check_any_cancel(key_name):
             logger.debug("Cancel hotkey pressed")
             self._trigger_pressed = False
             self._send_event(HotkeyEvent.CANCEL)
             return
 
         # Check for trigger hotkey (non-modifier-only)
-        if not self._trigger_combo.is_modifier_only and self._check_combo(self._trigger_combo, key_name):
+        matched = self._check_any_trigger(key_name)
+        if matched and not matched.is_modifier_only:
             if self.config.mode == "toggle":
                 # Toggle mode: alternate between start/stop
                 if self._trigger_pressed:
@@ -195,11 +215,13 @@ class HotkeyManager:
                     self._send_event(HotkeyEvent.STOP)
                 else:
                     self._trigger_pressed = True
+                    self._active_trigger = matched
                     self._send_event(HotkeyEvent.START)
             else:
                 # Push-to-talk mode: start on press
                 if not self._trigger_pressed:
                     self._trigger_pressed = True
+                    self._active_trigger = matched
                     self._send_event(HotkeyEvent.START)
 
     def _on_release(self, key) -> None:
@@ -215,13 +237,15 @@ class HotkeyManager:
 
             # For push-to-talk with modifier-only combos
             if (
-                self._trigger_combo.is_modifier_only
+                self._active_trigger
+                and self._active_trigger.is_modifier_only
                 and self.config.mode == "push_to_talk"
                 and self._trigger_pressed
-                and modifier in self._trigger_combo.modifiers
+                and modifier in self._active_trigger.modifiers
             ):
                 logger.debug("Modifier-only trigger released, stopping")
                 self._trigger_pressed = False
+                self._active_trigger = None
                 self._send_event(HotkeyEvent.STOP)
             return
 
@@ -229,12 +253,14 @@ class HotkeyManager:
 
         # Push-to-talk: stop on release (for non-modifier-only combos)
         if (
-            not self._trigger_combo.is_modifier_only
+            self._active_trigger
+            and not self._active_trigger.is_modifier_only
             and self.config.mode == "push_to_talk"
             and self._trigger_pressed
         ):
-            if self._check_combo(self._trigger_combo, key_name):
+            if self._check_combo(self._active_trigger, key_name):
                 self._trigger_pressed = False
+                self._active_trigger = None
                 self._send_event(HotkeyEvent.STOP)
 
     def _send_event(self, event: HotkeyEvent) -> None:

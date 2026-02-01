@@ -153,7 +153,7 @@ def main() -> int:
 
     # Create and run daemon
     try:
-        daemon = AutoWhisperDaemon(config)
+        daemon = AutoWhisperDaemon(config, config_path=str(config_path))
         daemon.initialize()
         daemon.run()
         return 0
