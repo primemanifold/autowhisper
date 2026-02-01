@@ -4,6 +4,16 @@ GPU-accelerated voice-to-text for Ubuntu. Press a hotkey, speak, release — tex
 
 ## Install
 
+### From PPA (Recommended)
+
+```bash
+sudo add-apt-repository ppa:primemanifold/autowhisper
+sudo apt update
+sudo apt install autowhisper
+```
+
+### From Source
+
 ```bash
 git clone https://github.com/autowhisper/autowhisper.git
 cd autowhisper
@@ -61,4 +71,4 @@ journalctl --user -u autowhisper -f  # view logs
 
 ## License
 
-MIT
+Apache 2.0
