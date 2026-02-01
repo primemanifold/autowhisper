@@ -477,6 +477,66 @@ class SettingsDialog(Gtk.Dialog):
             return "Default"
         return self._spk_combo.get_active_text()
 
+    @property
+    def model_config(self) -> dict:
+        """Get model settings as dict."""
+        return {
+            "size": self._model_size_combo.get_active_id(),
+            "device": self._model_device_combo.get_active_id(),
+            "compute_type": self._compute_type_combo.get_active_id(),
+            "beam_size": int(self._beam_size_spin.get_value()),
+            "language": self._language_combo.get_active_id(),
+            "num_threads": int(self._num_threads_spin.get_value()),
+        }
+
+    @property
+    def audio_config(self) -> dict:
+        """Get audio settings as dict."""
+        input_dev = self._mic_combo.get_active_id()
+        output_dev = self._spk_combo.get_active_id()
+        return {
+            "device": None if input_dev == "default" else input_dev,
+            "output_device": None if output_dev == "default" else output_dev,
+            "vad_enabled": self._vad_enabled_check.get_active(),
+            "vad_threshold": self._vad_threshold_scale.get_value(),
+            "silence_duration": self._silence_duration_spin.get_value(),
+            "max_duration": self._max_duration_spin.get_value(),
+        }
+
+    @property
+    def hotkeys_config(self) -> dict:
+        """Get hotkey settings as dict."""
+        return {
+            "trigger": self._trigger_group.hotkeys,
+            "cancel": self._cancel_group.hotkeys,
+            "mode": self._hotkey_mode_combo.get_active_id(),
+            "escape_to_cancel": self._escape_to_cancel_check.get_active(),
+        }
+
+    @property
+    def output_config(self) -> dict:
+        """Get output settings as dict."""
+        return {
+            "method": self._output_method_combo.get_active_id(),
+            "also_copy_to_clipboard": self._also_copy_check.get_active(),
+            "auto_paste": self._auto_paste_check.get_active(),
+            "paste_delay": self._paste_delay_spin.get_value(),
+            "append_newline": self._append_newline_check.get_active(),
+            "lowercase": self._lowercase_check.get_active(),
+        }
+
+    @property
+    def feedback_config(self) -> dict:
+        """Get feedback settings as dict."""
+        return {
+            "enabled": self._feedback_enabled_check.get_active(),
+            "volume": self._feedback_volume_scale.get_value(),
+            "frequency_start": int(self._freq_start_spin.get_value()),
+            "frequency_stop": int(self._freq_stop_spin.get_value()),
+            "frequency_error": int(self._freq_error_spin.get_value()),
+            "duration": self._feedback_duration_spin.get_value(),
+        }
+
     def _on_key_press(self, widget, event) -> bool:
         """Route key press to active group."""
         from gi.repository import Gdk
