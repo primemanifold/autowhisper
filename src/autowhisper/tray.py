@@ -387,7 +387,8 @@ class SettingsDialog(Gtk.Dialog):
             title="AutoWhisper Settings",
             flags=Gtk.DialogFlags.MODAL,
         )
-        self.set_default_size(450, 600)
+        self.set_default_size(450, -1)  # Width only, height auto
+        self.set_resizable(True)
 
         self._config = config
 
@@ -406,34 +407,69 @@ class SettingsDialog(Gtk.Dialog):
             self._input_devices = []
             self._output_devices = []
 
-        # Scrollable content area
+        # Content area with notebook (tabs)
         content_area = self.get_content_area()
 
-        scrolled = Gtk.ScrolledWindow()
-        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
-        scrolled.set_min_content_height(400)
-        content_area.pack_start(scrolled, True, True, 0)
+        notebook = Gtk.Notebook()
+        notebook.set_margin_start(8)
+        notebook.set_margin_end(8)
+        notebook.set_margin_top(8)
+        notebook.set_margin_bottom(8)
+        content_area.pack_start(notebook, True, True, 0)
 
-        # Main container inside scroll
-        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-        box.set_margin_start(16)
-        box.set_margin_end(16)
-        box.set_margin_top(12)
-        box.set_margin_bottom(8)
-        scrolled.add(box)
+        # === General Tab (Audio, Hotkeys) ===
+        general_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        general_box.set_margin_start(12)
+        general_box.set_margin_end(12)
+        general_box.set_margin_top(12)
+        general_box.set_margin_bottom(8)
 
-        # Build sections
-        box.pack_start(self._build_model_section(), False, False, 0)
-        box.pack_start(self._build_audio_section(), False, False, 0)
-        box.pack_start(self._build_hotkeys_section(), False, False, 0)
-        box.pack_start(self._build_output_section(), False, False, 0)
-        box.pack_start(self._build_feedback_section(), False, False, 0)
+        general_box.pack_start(self._build_audio_section(), False, False, 0)
+        general_box.pack_start(self._build_hotkeys_section(), False, False, 0)
+
+        notebook.append_page(general_box, Gtk.Label(label="General"))
+
+        # === Advanced Tab (Model, Output, Feedback) ===
+        advanced_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        advanced_box.set_margin_start(12)
+        advanced_box.set_margin_end(12)
+        advanced_box.set_margin_top(12)
+        advanced_box.set_margin_bottom(8)
+
+        advanced_box.pack_start(self._build_model_section(), False, False, 0)
+        advanced_box.pack_start(self._build_output_section(), False, False, 0)
+        advanced_box.pack_start(self._build_feedback_section(), False, False, 0)
+
+        notebook.append_page(advanced_box, Gtk.Label(label="Advanced"))
 
         # Key capture events
         self.connect("key-press-event", self._on_key_press)
         self.connect("key-release-event", self._on_key_release)
 
         self.show_all()
+
+        # Connect expanders to resize dialog when toggled
+        self._connect_expander_resize()
+
+    def _connect_expander_resize(self) -> None:
+        """Connect all expanders to resize dialog on toggle."""
+        def on_expander_toggled(expander, param):
+            # Queue resize after expander animation
+            GLib.idle_add(self._resize_to_fit)
+
+        # Find all expanders in the dialog
+        def connect_expanders(widget):
+            if isinstance(widget, Gtk.Expander):
+                widget.connect("notify::expanded", on_expander_toggled)
+            if isinstance(widget, Gtk.Container):
+                widget.foreach(connect_expanders)
+
+        connect_expanders(self.get_content_area())
+
+    def _resize_to_fit(self) -> bool:
+        """Resize dialog to fit content."""
+        self.resize(1, 1)  # Shrink to minimum, then GTK will expand to fit
+        return False  # Don't repeat
 
     def _truncate_name(self, name: str, max_len: int) -> str:
         """Truncate device name for display."""
