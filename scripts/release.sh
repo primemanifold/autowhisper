@@ -9,8 +9,8 @@ GPG_KEY="9D95F673AAED28443AAF932A0252321A2401D829"
 PPA="ppa:primemanifold/autowhisper"
 MAINTAINER="AutoWhisper Contributors <autowhisper@users.noreply.github.com>"
 
-# Ubuntu series to build for (newest first)
-UBUNTU_SERIES=("noble" "mantic" "jammy" "focal")
+# Ubuntu series to build for
+UBUNTU_SERIES=("noble")
 
 # Colors
 RED='\033[0;31m'
