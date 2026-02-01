@@ -371,13 +371,21 @@ class SettingsDialog(Gtk.Dialog):
             self._input_devices = []
             self._output_devices = []
 
-        # Content
-        box = self.get_content_area()
-        box.set_spacing(12)
+        # Scrollable content area
+        content_area = self.get_content_area()
+
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scrolled.set_min_content_height(400)
+        content_area.pack_start(scrolled, True, True, 0)
+
+        # Main container inside scroll
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
         box.set_margin_start(16)
         box.set_margin_end(16)
         box.set_margin_top(12)
         box.set_margin_bottom(8)
+        scrolled.add(box)
 
         # === Audio Devices Section ===
         audio_frame = Gtk.Frame()
