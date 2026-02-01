@@ -10,7 +10,7 @@ PPA="ppa:primemanifold/autowhisper"
 MAINTAINER="AutoWhisper Contributors <autowhisper@users.noreply.github.com>"
 
 # Ubuntu series to build for (newest first)
-UBUNTU_SERIES=("noble" "mantic" "jammy")
+UBUNTU_SERIES=("noble" "mantic" "jammy" "focal")
 
 # Colors
 RED='\033[0;31m'
