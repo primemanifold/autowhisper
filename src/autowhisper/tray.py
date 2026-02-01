@@ -676,6 +676,105 @@ class SettingsDialog(Gtk.Dialog):
         vbox.pack_start(expander, False, False, 0)
         return frame
 
+    def _build_audio_section(self) -> Gtk.Frame:
+        """Build the Audio Devices settings section."""
+        frame = Gtk.Frame()
+        frame.set_label("  Audio  ")
+        frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        vbox.set_margin_start(12)
+        vbox.set_margin_end(12)
+        vbox.set_margin_top(8)
+        vbox.set_margin_bottom(8)
+        frame.add(vbox)
+
+        # Primary: Microphone selector
+        mic_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        mic_label = Gtk.Label(label="Microphone:")
+        mic_label.set_xalign(0)
+        mic_label.set_size_request(90, -1)
+        mic_row.pack_start(mic_label, False, False, 0)
+
+        self._mic_combo = Gtk.ComboBoxText()
+        self._mic_combo.append("default", "System Default")
+        active_input = 0
+        for i, (idx, name) in enumerate(self._input_devices):
+            self._mic_combo.append(str(idx), self._truncate_name(name, 35))
+            if self._config.audio.device and (str(idx) == str(self._config.audio.device) or name == self._config.audio.device):
+                active_input = i + 1
+        self._mic_combo.set_active(active_input)
+        mic_row.pack_start(self._mic_combo, True, True, 0)
+        vbox.pack_start(mic_row, False, False, 0)
+
+        # Primary: Speaker selector
+        spk_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        spk_label = Gtk.Label(label="Speaker:")
+        spk_label.set_xalign(0)
+        spk_label.set_size_request(90, -1)
+        spk_row.pack_start(spk_label, False, False, 0)
+
+        self._spk_combo = Gtk.ComboBoxText()
+        self._spk_combo.append("default", "System Default")
+        active_output = 0
+        for i, (idx, name) in enumerate(self._output_devices):
+            self._spk_combo.append(str(idx), self._truncate_name(name, 35))
+            if self._config.audio.output_device and (str(idx) == str(self._config.audio.output_device) or name == self._config.audio.output_device):
+                active_output = i + 1
+        self._spk_combo.set_active(active_output)
+        spk_row.pack_start(self._spk_combo, True, True, 0)
+        vbox.pack_start(spk_row, False, False, 0)
+
+        # Advanced expander
+        expander = Gtk.Expander(label="Advanced")
+        adv_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        adv_box.set_margin_start(8)
+        adv_box.set_margin_top(8)
+        expander.add(adv_box)
+
+        # VAD enabled
+        self._vad_enabled_check = Gtk.CheckButton(label="Voice Activity Detection (VAD)")
+        self._vad_enabled_check.set_active(self._config.audio.vad_enabled)
+        adv_box.pack_start(self._vad_enabled_check, False, False, 0)
+
+        # VAD threshold
+        vad_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        vad_label = Gtk.Label(label="VAD threshold:")
+        vad_label.set_xalign(0)
+        vad_label.set_size_request(110, -1)
+        vad_row.pack_start(vad_label, False, False, 0)
+        self._vad_threshold_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.1)
+        self._vad_threshold_scale.set_value(self._config.audio.vad_threshold)
+        self._vad_threshold_scale.set_digits(1)
+        vad_row.pack_start(self._vad_threshold_scale, True, True, 0)
+        adv_box.pack_start(vad_row, False, False, 0)
+
+        # Silence duration
+        silence_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        silence_label = Gtk.Label(label="Silence trim (s):")
+        silence_label.set_xalign(0)
+        silence_label.set_size_request(110, -1)
+        silence_row.pack_start(silence_label, False, False, 0)
+        self._silence_duration_spin = Gtk.SpinButton.new_with_range(0.1, 2.0, 0.1)
+        self._silence_duration_spin.set_value(self._config.audio.silence_duration)
+        self._silence_duration_spin.set_digits(1)
+        silence_row.pack_start(self._silence_duration_spin, True, True, 0)
+        adv_box.pack_start(silence_row, False, False, 0)
+
+        # Max duration
+        max_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        max_label = Gtk.Label(label="Max duration (s):")
+        max_label.set_xalign(0)
+        max_label.set_size_request(110, -1)
+        max_row.pack_start(max_label, False, False, 0)
+        self._max_duration_spin = Gtk.SpinButton.new_with_range(10, 600, 10)
+        self._max_duration_spin.set_value(self._config.audio.max_duration)
+        max_row.pack_start(self._max_duration_spin, True, True, 0)
+        adv_box.pack_start(max_row, False, False, 0)
+
+        vbox.pack_start(expander, False, False, 0)
+        return frame
+
 
 # Keep old name for compatibility
 HotkeySettingsDialog = SettingsDialog
