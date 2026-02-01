@@ -1,7 +1,7 @@
 Source: autowhisper
 Section: sound
 Priority: optional
-Maintainer: Your Name <your.email@example.com>
+Maintainer: Isura Ranatunga <isura@primemanifold.com>
 Build-Depends: debhelper-compat (= 13),
                dh-python,
                python3,
@@ -23,9 +23,9 @@ Build-Depends: debhelper-compat (= 13),
                portaudio19-dev,
                nvidia-cuda-toolkit
 Standards-Version: 4.6.0
-Homepage: https://github.com/yourusername/autowhisper
-Vcs-Browser: https://github.com/yourusername/autowhisper
-Vcs-Git: https://github.com/yourusername/autowhisper.git
+Homepage: https://github.com/autowhisper/autowhisper
+Vcs-Browser: https://github.com/autowhisper/autowhisper
+Vcs-Git: https://github.com/autowhisper/autowhisper.git
 
 Package: autowhisper
 Architecture: all

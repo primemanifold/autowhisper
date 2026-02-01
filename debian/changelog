@@ -1,3 +1,13 @@
+autowhisper (2.0.0-1) noble; urgency=medium
+
+  * Add unified CLI tool (autowhisper start/stop/doctor/config/model)
+  * Add system diagnostics with autowhisper doctor
+  * Add model management with autowhisper model list/download
+  * Simplify documentation
+  * Clean up codebase
+
+ -- Isura Ranatunga <isura@primemanifold.com>  Sat, 01 Feb 2026 12:00:00 +0000
+
 autowhisper (0.1.0-1) noble; urgency=medium
 
   * Initial release
@@ -8,4 +18,4 @@ autowhisper (0.1.0-1) noble; urgency=medium
   * Offline operation with Whisper models
   * systemd service integration
 
- -- Your Name <your.email@example.com>  Tue, 28 Jan 2025 11:00:00 +0000
+ -- Isura Ranatunga <isura@primemanifold.com>  Tue, 28 Jan 2025 11:00:00 +0000
