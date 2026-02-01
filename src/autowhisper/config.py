@@ -117,11 +117,22 @@ class Config:
     @classmethod
     def _from_dict(cls, data: dict) -> "Config":
         """Create Config from a dictionary."""
+        # Handle output config with backwards compatibility
+        output_data = dict(data.get("output", {}))
+        # Migrate append_newline -> ending_action
+        if "append_newline" in output_data and "ending_action" not in output_data:
+            output_data["ending_action"] = "newline" if output_data["append_newline"] else "none"
+        # Filter to valid fields only
+        output_data = {
+            k: v for k, v in output_data.items()
+            if k in OutputConfig.__dataclass_fields__
+        }
+
         return cls(
             model=ModelConfig(**data.get("model", {})),
             audio=AudioConfig(**data.get("audio", {})),
             hotkeys=HotkeyConfig(**data.get("hotkeys", {})),
-            output=OutputConfig(**data.get("output", {})),
+            output=OutputConfig(**output_data),
             feedback=FeedbackConfig(**{
                 k: v for k, v in data.get("feedback", {}).items()
                 if k in FeedbackConfig.__dataclass_fields__

@@ -1279,6 +1279,8 @@ class TrayManager:
             if "output" not in config:
                 config["output"] = {}
             config["output"].update(output_cfg)
+            # Remove deprecated append_newline key (migrated to ending_action)
+            config["output"].pop("append_newline", None)
 
             # Feedback settings
             feedback_cfg = dialog.feedback_config
