@@ -312,6 +312,8 @@ class OutputManager:
         """Send Return/Enter keypress."""
         try:
             if self._xdotool_available:
+                # Small delay to let the application process the injected text
+                time.sleep(0.05)
                 result = subprocess.run(
                     ["xdotool", "key", "--clearmodifiers", "Return"],
                     timeout=5,
