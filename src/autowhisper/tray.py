@@ -422,74 +422,12 @@ class SettingsDialog(Gtk.Dialog):
         box.set_margin_bottom(8)
         scrolled.add(box)
 
-        # === Audio Devices Section ===
-        audio_frame = Gtk.Frame()
-        audio_frame.set_label("  Audio Devices  ")
-        audio_frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
-        audio_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-        audio_box.set_margin_start(12)
-        audio_box.set_margin_end(12)
-        audio_box.set_margin_top(8)
-        audio_box.set_margin_bottom(8)
-        audio_frame.add(audio_box)
-
-        # Microphone selector
-        mic_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        mic_label = Gtk.Label(label="Microphone:")
-        mic_label.set_xalign(0)
-        mic_label.set_size_request(90, -1)
-        mic_row.pack_start(mic_label, False, False, 0)
-
-        self._mic_combo = Gtk.ComboBoxText()
-        self._mic_combo.append("default", "System Default")
-        active_input = 0
-        for i, (idx, name) in enumerate(self._input_devices):
-            self._mic_combo.append(str(idx), self._truncate_name(name, 35))
-        self._mic_combo.set_active(active_input)
-        mic_row.pack_start(self._mic_combo, True, True, 0)
-        audio_box.pack_start(mic_row, False, False, 0)
-
-        # Speaker selector
-        spk_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
-        spk_label = Gtk.Label(label="Speaker:")
-        spk_label.set_xalign(0)
-        spk_label.set_size_request(90, -1)
-        spk_row.pack_start(spk_label, False, False, 0)
-
-        self._spk_combo = Gtk.ComboBoxText()
-        self._spk_combo.append("default", "System Default")
-        active_output = 0
-        for i, (idx, name) in enumerate(self._output_devices):
-            self._spk_combo.append(str(idx), self._truncate_name(name, 35))
-        self._spk_combo.set_active(active_output)
-        spk_row.pack_start(self._spk_combo, True, True, 0)
-        audio_box.pack_start(spk_row, False, False, 0)
-
-        box.pack_start(audio_frame, False, False, 0)
-
-        # === Hotkeys Section ===
-        # Recording shortcut group
-        self._trigger_group = HotkeyGroup(
-            "Recording (hold to speak)",
-            trigger_hotkeys,
-            "shift+super"
-        )
-        box.pack_start(self._trigger_group, False, False, 0)
-
-        # Cancel shortcut group
-        self._cancel_group = HotkeyGroup(
-            "Cancel Recording",
-            cancel_hotkeys,
-            "esc"
-        )
-        box.pack_start(self._cancel_group, False, False, 0)
-
-        # Hint
-        hint = Gtk.Label()
-        hint.set_markup("<small>Click a hotkey button then press keys. Backspace clears, Escape cancels.</small>")
-        hint.set_opacity(0.6)
-        hint.set_line_wrap(True)
-        box.pack_start(hint, False, False, 4)
+        # Build sections
+        box.pack_start(self._build_model_section(), False, False, 0)
+        box.pack_start(self._build_audio_section(), False, False, 0)
+        box.pack_start(self._build_hotkeys_section(), False, False, 0)
+        box.pack_start(self._build_output_section(), False, False, 0)
+        box.pack_start(self._build_feedback_section(), False, False, 0)
 
         # Key capture events
         self.connect("key-press-event", self._on_key_press)
