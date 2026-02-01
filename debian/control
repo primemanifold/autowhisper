@@ -41,19 +41,18 @@ Depends: ${python3:Depends},
          nvidia-driver-535 | nvidia-driver-545 | nvidia-driver-550,
          nvidia-cuda-toolkit
 Recommends: python3-torch
-Description: GPU-accelerated voice-to-text daemon (Python/faster-whisper)
- AutoWhisper is a high-performance, background daemon that converts
- speech to text using NVIDIA GPU acceleration and faster-whisper with
- distil-large-v3 model.
+Description: GPU-accelerated voice-to-text for Ubuntu
+ AutoWhisper converts speech to text using NVIDIA GPU acceleration.
+ Press a hotkey, speak, release - text appears in any window.
  .
  Features:
   * Sub-200ms latency with GPU acceleration
-  * Zero UI - runs as background daemon
-  * Hotkey triggered (customizable)
-  * Audio feedback with beeps
+  * Unified CLI: autowhisper start/stop/doctor/config
+  * Hotkey triggered (push-to-talk or toggle)
   * Direct text injection to any window
   * 100% offline operation
-  * Optimized for NVIDIA RTX GPUs
  .
- This package includes the daemon and systemd service integration.
- Whisper models are automatically downloaded on first use via faster-whisper.
+ Usage:
+  * autowhisper doctor    - Check system compatibility
+  * autowhisper start     - Start the service
+  * autowhisper config    - View/edit configuration

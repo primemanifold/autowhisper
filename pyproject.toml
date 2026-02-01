@@ -34,6 +34,7 @@ dependencies = [
     "pynput>=1.7.6",
     "python-xlib>=0.33",
     "toml>=0.10.2",
+    "click>=8.0.0",
 ]
 
 [project.optional-dependencies]
@@ -46,7 +47,7 @@ dev = [
 ]
 
 [project.scripts]
-autowhisper = "autowhisper.__main__:main"
+autowhisper = "autowhisper.cli:cli"
 
 [project.urls]
 Homepage = "https://github.com/autowhisper/autowhisper"

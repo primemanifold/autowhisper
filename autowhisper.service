@@ -7,7 +7,7 @@
 # Logs:    journalctl --user -u autowhisper -f
 
 [Unit]
-Description=AutoWhisper GPU-Accelerated Voice-to-Text Daemon (Python/faster-whisper)
+Description=AutoWhisper GPU-Accelerated Voice-to-Text
 Documentation=https://github.com/autowhisper/autowhisper
 # Only start after graphical session is ready
 After=graphical-session.target
