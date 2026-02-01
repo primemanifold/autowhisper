@@ -72,6 +72,41 @@ STATE_TITLES = {
 
 VERSION = "0.1.0"
 
+MODEL_SIZES = [
+    ("tiny.en", "Tiny (English) - Fastest"),
+    ("base.en", "Base (English)"),
+    ("small.en", "Small (English)"),
+    ("distil-small.en", "Distil Small (English)"),
+    ("medium.en", "Medium (English)"),
+    ("distil-medium.en", "Distil Medium (English)"),
+    ("distil-large-v3", "Distil Large v3 - Best"),
+    ("large-v3", "Large v3"),
+]
+
+COMPUTE_TYPES = [
+    ("float16", "Float16 (Default)"),
+    ("bfloat16", "BFloat16 (RTX 50xx)"),
+    ("int8", "Int8 (Smallest)"),
+    ("int8_float16", "Int8+Float16"),
+    ("float32", "Float32 (Slowest)"),
+]
+
+DEVICES = [
+    ("cuda", "CUDA (GPU)"),
+    ("cpu", "CPU"),
+    ("auto", "Auto"),
+]
+
+LANGUAGES = [
+    ("en", "English"),
+    ("auto", "Auto-detect"),
+    ("es", "Spanish"),
+    ("fr", "French"),
+    ("de", "German"),
+    ("ja", "Japanese"),
+    ("zh", "Chinese"),
+]
+
 
 def normalize_key(keyname: str) -> str | None:
     """Normalize key name to match pynput format."""
@@ -525,6 +560,121 @@ class SettingsDialog(Gtk.Dialog):
         if self._cancel_group.handle_key_release():
             return True
         return False
+
+    def _build_model_section(self) -> Gtk.Frame:
+        """Build the Model settings section."""
+        frame = Gtk.Frame()
+        frame.set_label("  Model  ")
+        frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        vbox.set_margin_start(12)
+        vbox.set_margin_end(12)
+        vbox.set_margin_top(8)
+        vbox.set_margin_bottom(8)
+        frame.add(vbox)
+
+        # Primary: Model size
+        size_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        size_label = Gtk.Label(label="Size:")
+        size_label.set_xalign(0)
+        size_label.set_size_request(90, -1)
+        size_row.pack_start(size_label, False, False, 0)
+
+        self._model_size_combo = Gtk.ComboBoxText()
+        for model_id, display_name in MODEL_SIZES:
+            self._model_size_combo.append(model_id, display_name)
+        # Set active based on config
+        active_idx = 0
+        for i, (model_id, _) in enumerate(MODEL_SIZES):
+            if model_id == self._config.model.size:
+                active_idx = i
+                break
+        self._model_size_combo.set_active(active_idx)
+        size_row.pack_start(self._model_size_combo, True, True, 0)
+        vbox.pack_start(size_row, False, False, 0)
+
+        # Advanced expander
+        expander = Gtk.Expander(label="Advanced")
+        adv_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        adv_box.set_margin_start(8)
+        adv_box.set_margin_top(8)
+        expander.add(adv_box)
+
+        # Device
+        device_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        device_label = Gtk.Label(label="Device:")
+        device_label.set_xalign(0)
+        device_label.set_size_request(100, -1)
+        device_row.pack_start(device_label, False, False, 0)
+        self._model_device_combo = Gtk.ComboBoxText()
+        for dev_id, display_name in DEVICES:
+            self._model_device_combo.append(dev_id, display_name)
+        for i, (dev_id, _) in enumerate(DEVICES):
+            if dev_id == self._config.model.device:
+                self._model_device_combo.set_active(i)
+                break
+        device_row.pack_start(self._model_device_combo, True, True, 0)
+        adv_box.pack_start(device_row, False, False, 0)
+
+        # Compute type
+        compute_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        compute_label = Gtk.Label(label="Compute:")
+        compute_label.set_xalign(0)
+        compute_label.set_size_request(100, -1)
+        compute_row.pack_start(compute_label, False, False, 0)
+        self._compute_type_combo = Gtk.ComboBoxText()
+        for ct_id, display_name in COMPUTE_TYPES:
+            self._compute_type_combo.append(ct_id, display_name)
+        for i, (ct_id, _) in enumerate(COMPUTE_TYPES):
+            if ct_id == self._config.model.compute_type:
+                self._compute_type_combo.set_active(i)
+                break
+        compute_row.pack_start(self._compute_type_combo, True, True, 0)
+        adv_box.pack_start(compute_row, False, False, 0)
+
+        # Beam size
+        beam_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        beam_label = Gtk.Label(label="Beam size:")
+        beam_label.set_xalign(0)
+        beam_label.set_size_request(100, -1)
+        beam_row.pack_start(beam_label, False, False, 0)
+        self._beam_size_spin = Gtk.SpinButton.new_with_range(1, 5, 1)
+        self._beam_size_spin.set_value(self._config.model.beam_size)
+        beam_row.pack_start(self._beam_size_spin, True, True, 0)
+        adv_box.pack_start(beam_row, False, False, 0)
+
+        # Language
+        lang_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        lang_label = Gtk.Label(label="Language:")
+        lang_label.set_xalign(0)
+        lang_label.set_size_request(100, -1)
+        lang_row.pack_start(lang_label, False, False, 0)
+        self._language_combo = Gtk.ComboBoxText()
+        for lang_id, display_name in LANGUAGES:
+            self._language_combo.append(lang_id, display_name)
+        active_lang = 0
+        for i, (lang_id, _) in enumerate(LANGUAGES):
+            if lang_id == self._config.model.language:
+                active_lang = i
+                break
+        self._language_combo.set_active(active_lang)
+        lang_row.pack_start(self._language_combo, True, True, 0)
+        adv_box.pack_start(lang_row, False, False, 0)
+
+        # CPU threads
+        threads_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        threads_label = Gtk.Label(label="CPU threads:")
+        threads_label.set_xalign(0)
+        threads_label.set_size_request(100, -1)
+        threads_row.pack_start(threads_label, False, False, 0)
+        self._num_threads_spin = Gtk.SpinButton.new_with_range(1, 16, 1)
+        self._num_threads_spin.set_value(self._config.model.num_threads)
+        threads_row.pack_start(self._num_threads_spin, True, True, 0)
+        adv_box.pack_start(threads_row, False, False, 0)
+
+        vbox.pack_start(expander, False, False, 0)
+        return frame
 
 
 # Keep old name for compatibility
