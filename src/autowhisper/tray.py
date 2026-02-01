@@ -1016,6 +1016,7 @@ class TrayManager:
         self._on_settings_open = on_settings_open
         self._on_settings_close = on_settings_close
         self._config_path = config_path
+        self._config: Config | None = None
         self._mic_label = None
         self._speaker_label = None
         self._trigger_label = None
@@ -1032,6 +1033,10 @@ class TrayManager:
                 "Tray icon disabled: AppIndicator3 not available. "
                 "Install with: sudo apt install gir1.2-ayatanaappindicator3-0.1"
             )
+
+    def set_config(self, config: Config) -> None:
+        """Set the config object for settings dialog."""
+        self._config = config
 
     def start(self) -> None:
         """Start the tray icon."""
@@ -1125,13 +1130,14 @@ class TrayManager:
         if self._on_settings_open:
             self._on_settings_open()
 
-        # Show settings dialog with all settings
-        dialog = SettingsDialog(
-            self._trigger_hotkeys,
-            self._cancel_hotkeys,
-            self._input_device_id,
-            self._output_device_id,
-        )
+        if not self._config:
+            logger.error("No config available for settings dialog")
+            if self._on_settings_close:
+                self._on_settings_close()
+            return False
+
+        # Show settings dialog with config
+        dialog = SettingsDialog(self._config)
         response = dialog.run()
 
         if response == Gtk.ResponseType.OK:
