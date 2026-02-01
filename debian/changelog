@@ -1,21 +1,12 @@
-autowhisper (2.0.0-1) noble; urgency=medium
-
-  * Add unified CLI tool (autowhisper start/stop/doctor/config/model)
-  * Add system diagnostics with autowhisper doctor
-  * Add model management with autowhisper model list/download
-  * Simplify documentation
-  * Clean up codebase
-
- -- Isura Ranatunga <isura@primemanifold.com>  Sat, 01 Feb 2026 12:00:00 +0000
-
 autowhisper (0.1.0-1) noble; urgency=medium
 
   * Initial release
-  * GPU-accelerated voice-to-text daemon
-  * Sub-200ms latency on RTX GPUs
-  * Push-to-talk and toggle modes
-  * X11 text injection support
-  * Offline operation with Whisper models
-  * systemd service integration
+  * GPU-accelerated voice-to-text for Ubuntu
+  * Unified CLI: autowhisper start/stop/doctor/config/model
+  * System diagnostics with autowhisper doctor
+  * Model management with autowhisper model list/download
+  * Push-to-talk and toggle hotkey modes
+  * X11 text injection with clipboard fallback
+  * systemd user service integration
 
- -- Isura Ranatunga <isura@primemanifold.com>  Tue, 28 Jan 2025 11:00:00 +0000
+ -- Isura Ranatunga <isura@primemanifold.com>  Sat, 01 Feb 2026 12:00:00 +0000
