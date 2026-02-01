@@ -7,6 +7,8 @@ import threading
 from enum import Enum, auto
 from pathlib import Path
 
+from .config import Config, ModelConfig, AudioConfig, HotkeyConfig, OutputConfig, FeedbackConfig
+
 logger = logging.getLogger(__name__)
 
 # Icon directory (relative to this file)
@@ -74,15 +76,27 @@ VERSION = "0.1.0"
 def normalize_key(keyname: str) -> str | None:
     """Normalize key name to match pynput format."""
     key_map = {
+        # Modifiers
         "Shift_L": "shift", "Shift_R": "shift",
         "Control_L": "ctrl", "Control_R": "ctrl",
         "Alt_L": "alt", "Alt_R": "alt",
         "Super_L": "super", "Super_R": "super",
         "Meta_L": "super", "Meta_R": "super",
+        # Common keys
         "Escape": "esc",
         "Return": "enter",
         "space": "space",
         "Tab": "tab",
+        # Media keys (XF86Audio* from GTK -> pynput names)
+        "XF86AudioPlay": "media_play_pause",
+        "XF86AudioPause": "media_play_pause",
+        "XF86AudioStop": "media_play_pause",
+        "XF86AudioMute": "media_volume_mute",
+        "XF86AudioMicMute": "media_volume_mute",  # Treat mic mute same as mute
+        "XF86AudioNext": "media_next",
+        "XF86AudioPrev": "media_previous",
+        "XF86AudioRaiseVolume": "media_volume_up",
+        "XF86AudioLowerVolume": "media_volume_down",
     }
 
     if keyname in key_map:
@@ -95,6 +109,38 @@ def normalize_key(keyname: str) -> str | None:
         return keyname.lower()
 
     return None
+
+
+def display_key(keyname: str) -> str:
+    """Convert internal key name to user-friendly display name."""
+    display_map = {
+        # Media keys - show friendly names
+        "media_play_pause": "Play/Pause",
+        "media_volume_mute": "Mute",
+        "media_volume_up": "Vol+",
+        "media_volume_down": "Vol-",
+        "media_next": "Next",
+        "media_previous": "Prev",
+        # Common keys
+        "esc": "Esc",
+        "enter": "Enter",
+        "space": "Space",
+        "tab": "Tab",
+        # Modifiers
+        "shift": "Shift",
+        "ctrl": "Ctrl",
+        "alt": "Alt",
+        "super": "Super",
+    }
+    return display_map.get(keyname, keyname.capitalize() if len(keyname) > 1 else keyname.upper())
+
+
+def display_hotkey(hotkey: str) -> str:
+    """Convert hotkey string to user-friendly display format."""
+    if not hotkey:
+        return ""
+    parts = hotkey.split("+")
+    return "+".join(display_key(p) for p in parts)
 
 
 class HotkeyRow(Gtk.Box):
@@ -132,7 +178,7 @@ class HotkeyRow(Gtk.Box):
             self._shortcut_btn.set_label("Press keys...")
             self._shortcut_btn.get_style_context().add_class("suggested-action")
         elif self.hotkey:
-            self._shortcut_btn.set_label(self.hotkey)
+            self._shortcut_btn.set_label(display_hotkey(self.hotkey))
             self._shortcut_btn.get_style_context().remove_class("suggested-action")
         else:
             self._shortcut_btn.set_label("(click to set)")
@@ -176,7 +222,8 @@ class HotkeyRow(Gtk.Box):
         normalized = normalize_key(keyname)
         if normalized:
             self._keys_pressed.add(normalized)
-            self._shortcut_btn.set_label("+".join(sorted(self._keys_pressed)) + "...")
+            display = "+".join(display_key(k) for k in sorted(self._keys_pressed))
+            self._shortcut_btn.set_label(display + "...")
 
         return True
 
@@ -300,18 +347,14 @@ class HotkeyGroup(Gtk.Frame):
 class SettingsDialog(Gtk.Dialog):
     """Dialog for configuring AutoWhisper settings."""
 
-    def __init__(
-        self,
-        trigger_hotkeys: list[str],
-        cancel_hotkeys: list[str],
-        input_device: str | None,
-        output_device: str | None,
-    ):
+    def __init__(self, config: Config):
         super().__init__(
             title="AutoWhisper Settings",
             flags=Gtk.DialogFlags.MODAL,
         )
-        self.set_default_size(420, 500)
+        self.set_default_size(450, 600)
+
+        self._config = config
 
         # Add buttons
         self.add_button("Cancel", Gtk.ResponseType.CANCEL)
@@ -356,12 +399,9 @@ class SettingsDialog(Gtk.Dialog):
 
         self._mic_combo = Gtk.ComboBoxText()
         self._mic_combo.append("default", "System Default")
-        self._selected_input = input_device
         active_input = 0
         for i, (idx, name) in enumerate(self._input_devices):
             self._mic_combo.append(str(idx), self._truncate_name(name, 35))
-            if input_device and (str(idx) == input_device or name == input_device):
-                active_input = i + 1
         self._mic_combo.set_active(active_input)
         mic_row.pack_start(self._mic_combo, True, True, 0)
         audio_box.pack_start(mic_row, False, False, 0)
@@ -375,12 +415,9 @@ class SettingsDialog(Gtk.Dialog):
 
         self._spk_combo = Gtk.ComboBoxText()
         self._spk_combo.append("default", "System Default")
-        self._selected_output = output_device
         active_output = 0
         for i, (idx, name) in enumerate(self._output_devices):
             self._spk_combo.append(str(idx), self._truncate_name(name, 35))
-            if output_device and (str(idx) == output_device or name == output_device):
-                active_output = i + 1
         self._spk_combo.set_active(active_output)
         spk_row.pack_start(self._spk_combo, True, True, 0)
         audio_box.pack_start(spk_row, False, False, 0)
@@ -672,7 +709,7 @@ class TrayManager:
         """Format hotkey list for display."""
         if not hotkeys:
             return "(none)"
-        return ", ".join(hotkeys)
+        return ", ".join(display_hotkey(hk) for hk in hotkeys)
 
     def _save_settings(
         self,
