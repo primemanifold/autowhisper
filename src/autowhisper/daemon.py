@@ -9,8 +9,6 @@ import threading
 import time
 from enum import Enum, auto
 from pathlib import Path
-from typing import Optional
-
 from .audio import AudioManager
 from .config import Config
 from .feedback import FeedbackManager
@@ -85,6 +83,7 @@ class AutoWhisperDaemon:
         self._tray.set_output_device_id(self.config.audio.output_device)
         self._tray.set_hotkey(self.config.hotkeys.trigger)
         self._tray.set_cancel_hotkey(self.config.hotkeys.cancel)
+        self._tray.set_config(self.config)
         self._tray.start()
 
         logger.info("Initialization complete")
