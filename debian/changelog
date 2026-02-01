@@ -1,4 +1,4 @@
-autowhisper (0.1.0-1) noble; urgency=medium
+autowhisper (0.1.0-2) noble; urgency=medium
 
   * Initial release
   * GPU-accelerated voice-to-text for Ubuntu
