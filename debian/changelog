@@ -1,3 +1,12 @@
+autowhisper (0.2.1-1) noble; urgency=medium
+
+  * Fix: support nvidia drivers 535-580 including -open variants
+  * Fix: exclude pip-only packages from apt dependencies (torch, faster-whisper, etc.)
+  * Feature: replace append_newline with ending_action option
+  * ending_action supports: "none", "newline", "return_key" (sends Enter keypress)
+
+ -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Sun, 02 Feb 2026 00:00:00 +0000
+
 autowhisper (0.2.0-1) noble; urgency=medium
 
   * Settings UI expansion: expose all TOML config options
