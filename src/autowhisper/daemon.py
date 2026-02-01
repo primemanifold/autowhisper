@@ -81,6 +81,8 @@ class AutoWhisperDaemon:
         logger.info("Starting tray icon")
         self._tray.set_input_device(self._audio.input_device_name)
         self._tray.set_output_device(self._audio.output_device_name)
+        self._tray.set_input_device_id(self.config.audio.device)
+        self._tray.set_output_device_id(self.config.audio.output_device)
         self._tray.set_hotkey(self.config.hotkeys.trigger)
         self._tray.set_cancel_hotkey(self.config.hotkeys.cancel)
         self._tray.start()
@@ -215,15 +217,23 @@ class AutoWhisperDaemon:
     def _resume_hotkey(self) -> None:
         """Resume the hotkey listener (after settings dialog)."""
         logger.info("Resuming hotkey listener")
-        # Reload config to get new hotkey
+        # Reload config to get updated settings
         if self._config_path:
             try:
                 new_config = Config.load(self._config_path)
                 self.config.hotkeys = new_config.hotkeys
                 self._hotkey = HotkeyManager(self.config.hotkeys, self._event_queue)
-                # Update tray display
+                # Update tray display for hotkeys
                 self._tray.set_hotkey(self.config.hotkeys.trigger)
                 self._tray.set_cancel_hotkey(self.config.hotkeys.cancel)
+                # Update tray display for audio devices
+                self._tray.set_input_device_id(new_config.audio.device)
+                self._tray.set_output_device_id(new_config.audio.output_device)
+                # Note: Audio device changes require daemon restart
+                if (new_config.audio.device != self.config.audio.device or
+                    new_config.audio.output_device != self.config.audio.output_device):
+                    logger.info("Audio device changed - restart daemon to apply")
+                self.config.audio = new_config.audio
             except Exception as e:
                 logger.error(f"Failed to reload config: {e}")
         self._hotkey.start()

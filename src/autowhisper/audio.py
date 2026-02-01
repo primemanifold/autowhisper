@@ -13,6 +13,27 @@ from .config import AudioConfig
 logger = logging.getLogger(__name__)
 
 
+def list_audio_devices() -> dict:
+    """
+    List available audio input and output devices.
+
+    Returns:
+        Dict with 'input' and 'output' keys, each containing list of (index, name) tuples
+    """
+    devices = sd.query_devices()
+    inputs = []
+    outputs = []
+
+    for i, dev in enumerate(devices):
+        name = dev['name']
+        if dev['max_input_channels'] > 0:
+            inputs.append((i, name))
+        if dev['max_output_channels'] > 0:
+            outputs.append((i, name))
+
+    return {'input': inputs, 'output': outputs}
+
+
 class SileroVAD:
     """Silero VAD wrapper for voice activity detection."""
 

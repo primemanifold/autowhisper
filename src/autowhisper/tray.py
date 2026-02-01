@@ -297,21 +297,38 @@ class HotkeyGroup(Gtk.Frame):
         return any(r.is_capturing for r in self._rows)
 
 
-class HotkeySettingsDialog(Gtk.Dialog):
-    """Dialog for configuring hotkeys with grouped sections."""
+class SettingsDialog(Gtk.Dialog):
+    """Dialog for configuring AutoWhisper settings."""
 
-    def __init__(self, trigger_hotkeys: list[str], cancel_hotkeys: list[str]):
+    def __init__(
+        self,
+        trigger_hotkeys: list[str],
+        cancel_hotkeys: list[str],
+        input_device: str | None,
+        output_device: str | None,
+    ):
         super().__init__(
-            title="Keyboard Shortcuts",
+            title="AutoWhisper Settings",
             flags=Gtk.DialogFlags.MODAL,
         )
-        self.set_default_size(380, 400)
+        self.set_default_size(420, 500)
 
         # Add buttons
         self.add_button("Cancel", Gtk.ResponseType.CANCEL)
         self.add_button("Save", Gtk.ResponseType.OK)
 
-        # Content in scrolled window for flexibility
+        # Get available devices
+        try:
+            from .audio import list_audio_devices
+            devices = list_audio_devices()
+            self._input_devices = devices['input']
+            self._output_devices = devices['output']
+        except Exception as e:
+            logger.warning(f"Could not list audio devices: {e}")
+            self._input_devices = []
+            self._output_devices = []
+
+        # Content
         box = self.get_content_area()
         box.set_spacing(12)
         box.set_margin_start(16)
@@ -319,6 +336,58 @@ class HotkeySettingsDialog(Gtk.Dialog):
         box.set_margin_top(12)
         box.set_margin_bottom(8)
 
+        # === Audio Devices Section ===
+        audio_frame = Gtk.Frame()
+        audio_frame.set_label("  Audio Devices  ")
+        audio_frame.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+        audio_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        audio_box.set_margin_start(12)
+        audio_box.set_margin_end(12)
+        audio_box.set_margin_top(8)
+        audio_box.set_margin_bottom(8)
+        audio_frame.add(audio_box)
+
+        # Microphone selector
+        mic_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        mic_label = Gtk.Label(label="Microphone:")
+        mic_label.set_xalign(0)
+        mic_label.set_size_request(90, -1)
+        mic_row.pack_start(mic_label, False, False, 0)
+
+        self._mic_combo = Gtk.ComboBoxText()
+        self._mic_combo.append("default", "System Default")
+        self._selected_input = input_device
+        active_input = 0
+        for i, (idx, name) in enumerate(self._input_devices):
+            self._mic_combo.append(str(idx), self._truncate_name(name, 35))
+            if input_device and (str(idx) == input_device or name == input_device):
+                active_input = i + 1
+        self._mic_combo.set_active(active_input)
+        mic_row.pack_start(self._mic_combo, True, True, 0)
+        audio_box.pack_start(mic_row, False, False, 0)
+
+        # Speaker selector
+        spk_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        spk_label = Gtk.Label(label="Speaker:")
+        spk_label.set_xalign(0)
+        spk_label.set_size_request(90, -1)
+        spk_row.pack_start(spk_label, False, False, 0)
+
+        self._spk_combo = Gtk.ComboBoxText()
+        self._spk_combo.append("default", "System Default")
+        self._selected_output = output_device
+        active_output = 0
+        for i, (idx, name) in enumerate(self._output_devices):
+            self._spk_combo.append(str(idx), self._truncate_name(name, 35))
+            if output_device and (str(idx) == output_device or name == output_device):
+                active_output = i + 1
+        self._spk_combo.set_active(active_output)
+        spk_row.pack_start(self._spk_combo, True, True, 0)
+        audio_box.pack_start(spk_row, False, False, 0)
+
+        box.pack_start(audio_frame, False, False, 0)
+
+        # === Hotkeys Section ===
         # Recording shortcut group
         self._trigger_group = HotkeyGroup(
             "Recording (hold to speak)",
@@ -337,8 +406,9 @@ class HotkeySettingsDialog(Gtk.Dialog):
 
         # Hint
         hint = Gtk.Label()
-        hint.set_markup("<small>Click a button then press keys. Backspace clears, Escape cancels.</small>")
+        hint.set_markup("<small>Click a hotkey button then press keys. Backspace clears, Escape cancels.</small>")
         hint.set_opacity(0.6)
+        hint.set_line_wrap(True)
         box.pack_start(hint, False, False, 4)
 
         # Key capture events
@@ -347,6 +417,12 @@ class HotkeySettingsDialog(Gtk.Dialog):
 
         self.show_all()
 
+    def _truncate_name(self, name: str, max_len: int) -> str:
+        """Truncate device name for display."""
+        if len(name) <= max_len:
+            return name
+        return name[:max_len - 3] + "..."
+
     @property
     def trigger_hotkeys(self) -> list[str]:
         return self._trigger_group.hotkeys
@@ -354,6 +430,34 @@ class HotkeySettingsDialog(Gtk.Dialog):
     @property
     def cancel_hotkeys(self) -> list[str]:
         return self._cancel_group.hotkeys
+
+    @property
+    def input_device(self) -> str | None:
+        """Get selected input device (None for default)."""
+        active_id = self._mic_combo.get_active_id()
+        return None if active_id == "default" else active_id
+
+    @property
+    def output_device(self) -> str | None:
+        """Get selected output device (None for default)."""
+        active_id = self._spk_combo.get_active_id()
+        return None if active_id == "default" else active_id
+
+    @property
+    def input_device_name(self) -> str:
+        """Get selected input device name for display."""
+        active = self._mic_combo.get_active()
+        if active == 0:
+            return "Default"
+        return self._mic_combo.get_active_text()
+
+    @property
+    def output_device_name(self) -> str:
+        """Get selected output device name for display."""
+        active = self._spk_combo.get_active()
+        if active == 0:
+            return "Default"
+        return self._spk_combo.get_active_text()
 
     def _on_key_press(self, widget, event) -> bool:
         """Route key press to active group."""
@@ -376,6 +480,10 @@ class HotkeySettingsDialog(Gtk.Dialog):
         if self._cancel_group.handle_key_release():
             return True
         return False
+
+
+# Keep old name for compatibility
+HotkeySettingsDialog = SettingsDialog
 
 
 class TrayManager:
@@ -404,6 +512,8 @@ class TrayManager:
         self._cancel_label = None
         self._input_device = "Default"
         self._output_device = "Default"
+        self._input_device_id = None  # Config device ID
+        self._output_device_id = None  # Config device ID
         self._trigger_hotkeys = ["shift+super"]
         self._cancel_hotkeys = ["esc"]
 
@@ -505,12 +615,19 @@ class TrayManager:
         if self._on_settings_open:
             self._on_settings_open()
 
-        # Show settings dialog with hotkey lists
-        dialog = HotkeySettingsDialog(self._trigger_hotkeys, self._cancel_hotkeys)
+        # Show settings dialog with all settings
+        dialog = SettingsDialog(
+            self._trigger_hotkeys,
+            self._cancel_hotkeys,
+            self._input_device_id,
+            self._output_device_id,
+        )
         response = dialog.run()
 
         if response == Gtk.ResponseType.OK:
             changed = False
+
+            # Check hotkey changes
             if dialog.trigger_hotkeys != self._trigger_hotkeys:
                 self._trigger_hotkeys = dialog.trigger_hotkeys
                 self._update_trigger_label()
@@ -519,9 +636,29 @@ class TrayManager:
                 self._cancel_hotkeys = dialog.cancel_hotkeys
                 self._update_cancel_label()
                 changed = True
+
+            # Check device changes
+            if dialog.input_device != self._input_device_id:
+                self._input_device_id = dialog.input_device
+                self._input_device = dialog.input_device_name
+                self._update_mic_label(self._input_device)
+                changed = True
+                logger.info(f"Input device changed to: {self._input_device}")
+
+            if dialog.output_device != self._output_device_id:
+                self._output_device_id = dialog.output_device
+                self._output_device = dialog.output_device_name
+                self._update_speaker_label(self._output_device)
+                changed = True
+                logger.info(f"Output device changed to: {self._output_device}")
+
             if changed:
-                self._save_hotkeys(dialog.trigger_hotkeys, dialog.cancel_hotkeys)
-                logger.info(f"Hotkeys changed - trigger: {dialog.trigger_hotkeys}, cancel: {dialog.cancel_hotkeys}")
+                self._save_settings(
+                    dialog.trigger_hotkeys,
+                    dialog.cancel_hotkeys,
+                    dialog.input_device,
+                    dialog.output_device,
+                )
 
         dialog.destroy()
 
@@ -537,8 +674,14 @@ class TrayManager:
             return "(none)"
         return ", ".join(hotkeys)
 
-    def _save_hotkeys(self, trigger: list[str], cancel: list[str]) -> None:
-        """Save hotkeys to config file."""
+    def _save_settings(
+        self,
+        trigger: list[str],
+        cancel: list[str],
+        input_device: str | None,
+        output_device: str | None,
+    ) -> None:
+        """Save all settings to config file."""
         if not self._config_path:
             return
 
@@ -550,16 +693,29 @@ class TrayManager:
             else:
                 config = {}
 
+            # Save hotkeys
             if "hotkeys" not in config:
                 config["hotkeys"] = {}
             config["hotkeys"]["trigger"] = trigger
             config["hotkeys"]["cancel"] = cancel
 
+            # Save audio devices
+            if "audio" not in config:
+                config["audio"] = {}
+            if input_device:
+                config["audio"]["device"] = input_device
+            elif "device" in config["audio"]:
+                del config["audio"]["device"]
+            if output_device:
+                config["audio"]["output_device"] = output_device
+            elif "output_device" in config["audio"]:
+                del config["audio"]["output_device"]
+
             with open(config_path, "w") as f:
                 toml.dump(config, f)
-            logger.info(f"Saved hotkeys to {config_path}")
+            logger.info(f"Saved settings to {config_path}")
         except Exception as e:
-            logger.error(f"Failed to save hotkeys: {e}")
+            logger.error(f"Failed to save settings: {e}")
 
     def _update_trigger_label(self) -> bool:
         """Update trigger hotkey label (called from GTK thread)."""
@@ -660,6 +816,14 @@ class TrayManager:
         if self._speaker_label:
             self._speaker_label.set_label(f"Speaker: {device_name}")
         return False
+
+    def set_input_device_id(self, device_id: str | None) -> None:
+        """Set the input device ID (for config persistence)."""
+        self._input_device_id = device_id
+
+    def set_output_device_id(self, device_id: str | None) -> None:
+        """Set the output device ID (for config persistence)."""
+        self._output_device_id = device_id
 
     @property
     def enabled(self) -> bool:

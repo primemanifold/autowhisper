@@ -28,7 +28,8 @@ class AudioConfig:
     sample_rate: int = 16000
     channels: int = 1
     buffer_size: int = 512
-    device: Optional[str] = None
+    device: Optional[str] = None  # Input device (microphone)
+    output_device: Optional[str] = None  # Output device (speaker/feedback)
     vad_enabled: bool = True
     vad_threshold: float = 0.5
     silence_duration: float = 0.3

@@ -30,7 +30,11 @@ channels = 1
 buffer_size = 1024
 
 # Input device (comment out or use "default" for default microphone)
+# Use device index (number) from Settings dialog
 # device = "default"
+
+# Output device for audio feedback (comment out for default speaker)
+# output_device = "default"
 
 # Enable Voice Activity Detection (Silero VAD)
 vad_enabled = true
