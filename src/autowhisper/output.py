@@ -262,7 +262,7 @@ class OutputManager:
                     logger.warning("xsel failed to copy to clipboard")
                     return False
 
-            logger.debug(f"Copied {len(text)} characters to clipboard for later paste")
+            logger.debug(f"Copied {len(text)} characters to clipboard")
             return True
 
         except Exception as e:
@@ -271,42 +271,14 @@ class OutputManager:
 
     def _inject_clipboard(self, text: str) -> bool:
         """Copy text to clipboard and optionally paste."""
-        try:
-            # Copy to clipboard using xclip
-            if self._xclip_available:
-                proc = subprocess.Popen(
-                    ["xclip", "-selection", "clipboard"],
-                    stdin=subprocess.PIPE,
-                )
-                proc.communicate(input=text.encode("utf-8"), timeout=5)
-
-                if proc.returncode != 0:
-                    logger.warning("xclip failed")
-                    return False
-            else:
-                # Try using xsel as fallback
-                proc = subprocess.Popen(
-                    ["xsel", "--clipboard", "--input"],
-                    stdin=subprocess.PIPE,
-                )
-                proc.communicate(input=text.encode("utf-8"), timeout=5)
-
-                if proc.returncode != 0:
-                    logger.warning("xsel failed")
-                    return False
-
-            logger.debug(f"Copied {len(text)} characters to clipboard")
-
-            # Auto-paste if enabled
-            if self.config.auto_paste:
-                time.sleep(self.config.paste_delay)
-                return self._send_paste()
-
-            return True
-
-        except Exception as e:
-            logger.warning(f"Clipboard operation failed: {e}")
+        if not self._copy_to_clipboard(text):
             return False
+
+        if self.config.auto_paste:
+            time.sleep(self.config.paste_delay)
+            return self._send_paste()
+
+        return True
 
     def _send_paste(self) -> bool:
         """Send Ctrl+V paste command."""

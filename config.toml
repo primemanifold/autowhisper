@@ -1,20 +1,7 @@
 # AutoWhisper Configuration
-# Python/faster-whisper version with distil-large-v3
 
 [model]
-# Model Speed Comparison (RTX 5070 Laptop, bfloat16)
-# Model	            Mean	Min	Speed	vs Current	Accuracy
-# tiny.en	        78ms	19ms	    49x realtime	5.8x faster	✓
-# base.en	        143ms	90ms	    27x realtime	3.1x faster	✓
-# distil-small.en	198ms	138ms	    19x realtime	2.3x faster	✓
-# small.en	        211ms	100ms	    18x realtime	2.1x faster	✓
-# distil-medium.en	381ms	158ms	    10x realtime	1.2x faster	✓
-# distil-large-v3	448ms	276ms	    8.5x realtime	current	✓
-# medium.en	        527ms	321ms	    7.2x realtime	0.8x slower	✓
-# large-v3-turbo	657ms	346ms	    5.8x realtime	0.7x slower	✓
-# large-v3	        926ms	483ms	    4.1x realtime	0.5x slower	✓
-# Model: tiny, base, small, medium, large-v3, distil-large-v3 (recommended)
-#size = "distil-large-v3"
+# Model: tiny.en (fastest, 78ms), distil-small.en (balanced, 198ms), distil-large-v3 (best, 448ms)
 size = "distil-small.en"
 
 # Device: cuda, cpu, or auto

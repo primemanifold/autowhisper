@@ -55,7 +55,6 @@ class AutoWhisperDaemon:
         # Set up signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
-        signal.signal(signal.SIGHUP, self._reload_handler)
 
         # Write PID file
         self._write_pid_file()
@@ -181,15 +180,6 @@ class AutoWhisperDaemon:
         logger.info(f"Received {sig_name}, shutting down")
         self._state = DaemonState.SHUTDOWN
         self._shutdown_event.set()
-
-    def _reload_handler(self, signum: int, frame) -> None:
-        """Handle SIGHUP for config reload."""
-        logger.info("Received SIGHUP, reloading configuration")
-        try:
-            # TODO: Implement config reload
-            logger.warning("Config reload not yet implemented")
-        except Exception as e:
-            logger.error(f"Failed to reload config: {e}")
 
     def _write_pid_file(self) -> None:
         """Write PID file."""
