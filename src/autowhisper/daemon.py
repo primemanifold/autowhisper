@@ -15,6 +15,7 @@ from .feedback import FeedbackManager
 from .hotkey import HotkeyEvent, HotkeyManager
 from .inference import WhisperInference
 from .output import OutputManager
+from .pulseaudio import PulseAudioManager
 from .tray import TrayManager, TrayState
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,10 @@ class AutoWhisperDaemon:
         self._whisper = WhisperInference(config.model)
         self._output = OutputManager(config.output)
         self._feedback = FeedbackManager(config.feedback)
+        self._pulseaudio = PulseAudioManager(
+            enabled=config.audio.mute_other_apps,
+            beep_duration=config.feedback.duration,
+        )
         self._hotkey = HotkeyManager(config.hotkeys, self._event_queue)
         self._tray = TrayManager(
             config.tray.enabled,
@@ -75,6 +80,9 @@ class AutoWhisperDaemon:
 
         logger.info("Initializing output subsystem")
         self._output.initialize()
+
+        logger.info("Initializing PulseAudio manager")
+        self._pulseaudio.initialize()
 
         logger.info("Starting tray icon")
         self._tray.set_input_device(self._audio.input_device_name)
@@ -131,6 +139,7 @@ class AutoWhisperDaemon:
         self._state = DaemonState.RECORDING
         self._tray.set_state(TrayState.RECORDING)
         self._feedback.play_start()
+        self._pulseaudio.mute_other_apps(delay=True)
         self._audio.start_recording()
 
     def _handle_stop(self) -> None:
@@ -143,6 +152,7 @@ class AutoWhisperDaemon:
         self._state = DaemonState.PROCESSING
         self._tray.set_state(TrayState.PROCESSING)
         self._feedback.play_stop()
+        self._pulseaudio.unmute_other_apps()
 
         # Get recorded audio
         audio = self._audio.stop_recording()
@@ -189,6 +199,7 @@ class AutoWhisperDaemon:
         if self._state == DaemonState.RECORDING:
             logger.info("Canceling recording")
             self._audio.stop_recording()
+            self._pulseaudio.unmute_other_apps()
             self._feedback.play_error()
         elif self._state == DaemonState.PROCESSING:
             logger.info("Cannot cancel during processing")
@@ -270,6 +281,9 @@ class AutoWhisperDaemon:
         # Stop recording if active
         if self._audio.is_recording():
             self._audio.stop_recording()
+
+        # Clean up PulseAudio resources
+        self._pulseaudio.cleanup()
 
         # Remove PID file
         self._remove_pid_file()
