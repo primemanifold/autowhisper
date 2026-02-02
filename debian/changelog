@@ -1,3 +1,9 @@
+autowhisper (0.2.2-1) noble; urgency=medium
+
+  * Release 0.2.2
+
+ -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Sun, 01 Feb 2026 21:15:07 -0600
+
 autowhisper (0.2.1-1) noble; urgency=medium
 
   * Fix: support nvidia drivers 535-580 including -open variants
