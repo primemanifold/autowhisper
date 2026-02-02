@@ -48,6 +48,9 @@ silence_duration = 0.3
 # Maximum recording duration (seconds, safety limit)
 max_duration = 600.0
 
+# Mute other apps (Chrome, Spotify, etc.) during recording
+# mute_other_apps = false
+
 [hotkeys]
 # Mode: "push_to_talk" or "toggle"
 # push_to_talk: Hold key to record, release to transcribe
