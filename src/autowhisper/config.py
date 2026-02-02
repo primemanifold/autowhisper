@@ -34,6 +34,7 @@ class AudioConfig:
     vad_threshold: float = 0.5
     silence_duration: float = 0.3
     max_duration: float = 60.0
+    mute_other_apps: bool = False  # Mute other audio sources during recording
 
 
 @dataclass
