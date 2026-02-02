@@ -543,6 +543,7 @@ class SettingsDialog(Gtk.Dialog):
             "vad_threshold": self._vad_threshold_scale.get_value(),
             "silence_duration": self._silence_duration_spin.get_value(),
             "max_duration": self._max_duration_spin.get_value(),
+            "mute_other_apps": self._mute_other_apps_check.get_active(),
         }
 
     @property
@@ -764,6 +765,11 @@ class SettingsDialog(Gtk.Dialog):
         self._spk_combo.set_active(active_output)
         spk_row.pack_start(self._spk_combo, True, True, 0)
         vbox.pack_start(spk_row, False, False, 0)
+
+        # Mute other apps checkbox (primary setting, not in Advanced)
+        self._mute_other_apps_check = Gtk.CheckButton(label="Mute other apps during recording")
+        self._mute_other_apps_check.set_active(self._config.audio.mute_other_apps)
+        vbox.pack_start(self._mute_other_apps_check, False, False, 0)
 
         # Advanced expander
         expander = Gtk.Expander(label="Advanced")
