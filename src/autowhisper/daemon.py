@@ -239,10 +239,12 @@ class AutoWhisperDaemon:
                 # Update tray display for audio devices
                 self._tray.set_input_device_id(new_config.audio.device)
                 self._tray.set_output_device_id(new_config.audio.output_device)
-                # Note: Audio device changes require daemon restart
+                # Note: Some audio changes require daemon restart
                 if (new_config.audio.device != self.config.audio.device or
                     new_config.audio.output_device != self.config.audio.output_device):
                     logger.info("Audio device changed - restart daemon to apply")
+                if new_config.audio.mute_other_apps != self.config.audio.mute_other_apps:
+                    logger.info("Mute other apps changed - restart daemon to apply")
                 self.config.audio = new_config.audio
             except Exception as e:
                 logger.error(f"Failed to reload config: {e}")
