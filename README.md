@@ -4,43 +4,55 @@ GPU-accelerated voice-to-text for Ubuntu. Press a hotkey, speak, release — tex
 
 ## Install
 
-### From PPA (Recommended)
-
 ```bash
 sudo add-apt-repository ppa:primemanifold/autowhisper
 sudo apt update
 sudo apt install autowhisper
 ```
 
-### From Source
+## Quick Start
 
 ```bash
-git clone https://github.com/autowhisper/autowhisper.git
+autowhisper doctor              # check system requirements
+systemctl --user enable --now autowhisper
+```
+
+Press `Ctrl+Shift+Space`, speak, release. Text appears at your cursor.
+
+## Usage
+
+```bash
+autowhisper doctor              # diagnose system
+autowhisper config              # open settings GUI
+autowhisper model list          # show available models
+autowhisper model download <name>  # download a model
+```
+
+View logs:
+```bash
+journalctl --user -u autowhisper -f
+```
+
+## Install from Source
+
+```bash
+git clone https://github.com/rabotinc/autowhisper.git
 cd autowhisper
 python3 -m venv venv && source venv/bin/activate
 pip install -e .
-```
-
-## Run
-
-```bash
 python -m autowhisper --config config.toml
-```
-
-Press `Shift+Super`, speak, release. Text appears in the active window.
-
-## Run as Service
-
-```bash
-./scripts/setup-daemon.sh
-systemctl --user start autowhisper
-systemctl --user enable autowhisper  # start on login
 ```
 
 ## Configure
 
-Edit `config.toml`:
+Run `autowhisper config` to open the settings GUI, or edit the config file directly:
 
+```bash
+~/.config/autowhisper/config.toml   # user config
+/etc/autowhisper/config.toml        # system default
+```
+
+Example:
 ```toml
 [model]
 size = "distil-small.en"  # tiny.en (fastest) to distil-large-v3 (best)
@@ -48,16 +60,13 @@ compute_type = "bfloat16" # bfloat16 (RTX 50xx), float16 (RTX 20-40)
 
 [hotkeys]
 mode = "push_to_talk"     # or "toggle"
-trigger = "shift+super"
+trigger = "ctrl+shift+space"
 ```
-
-Run `./configure-hotkey.sh` to set hotkeys interactively.
 
 ## Troubleshooting
 
 ```bash
-./scripts/check-system.sh      # diagnose issues
-sudo ./scripts/fix-nvidia.sh   # fix GPU problems
+autowhisper doctor               # diagnose issues
 journalctl --user -u autowhisper -f  # view logs
 ```
 
