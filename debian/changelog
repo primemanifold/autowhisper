@@ -1,3 +1,13 @@
+autowhisper (0.2.5-1) noble; urgency=medium
+
+  * Release v0.2.5
+  * Perf: lazy venv installation - package install is now instant
+  * Perf: use uv instead of pip for ~10x faster dependency installation
+  * Add: autowhisper-setup script for manual environment setup
+  * Add: autowhisper-wrapper for first-run setup trigger
+
+ -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Wed, 04 Feb 2026 09:08:49 -0600
+
 autowhisper (0.2.4-1) noble; urgency=medium
 
   * Release 0.2.4
