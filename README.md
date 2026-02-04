@@ -43,6 +43,21 @@ pip install -e .
 python -m autowhisper --config config.toml
 ```
 
+### Removing a Source Install
+
+If you previously installed from source and want to switch to apt:
+
+```bash
+systemctl --user stop autowhisper
+systemctl --user disable autowhisper
+rm -rf ~/autowhisper  # or wherever you cloned it
+rm -f ~/.config/systemd/user/autowhisper.service
+systemctl --user daemon-reload
+sudo rm -f /usr/local/bin/autowhisper
+```
+
+Your config in `~/.config/autowhisper/` will be preserved.
+
 ## Configure
 
 Run `autowhisper config` to open the settings GUI, or edit the config file directly:
