@@ -21,6 +21,14 @@ override_dh_auto_install:
 	install -D -m 644 config.toml \
 		$(CURDIR)/debian/autowhisper/etc/autowhisper/config.toml
 
+	# Install pinned requirements for reproducible installs
+	install -D -m 644 requirements.lock \
+		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/requirements.lock
+
+	# Copy the built wheel for venv installation
+	install -D -m 644 $$(find .pybuild -name "autowhisper-*.whl" | head -1) \
+		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/autowhisper.whl
+
 	# Install documentation
 	install -D -m 644 README.md \
 		$(CURDIR)/debian/autowhisper/usr/share/doc/autowhisper/README.md

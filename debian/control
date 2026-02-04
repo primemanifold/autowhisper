@@ -36,17 +36,16 @@ Architecture: all
 Depends: ${python3:Depends},
          ${misc:Depends},
          python3,
+         python3-venv,
          python3-pip,
          libasound2,
          libx11-6,
          xdotool,
          xclip,
          pulseaudio,
-         nvidia-driver-535 | nvidia-driver-545 | nvidia-driver-550 | nvidia-driver-555 | nvidia-driver-560 | nvidia-driver-565 | nvidia-driver-570 | nvidia-driver-575 | nvidia-driver-580 | nvidia-driver-535-open | nvidia-driver-545-open | nvidia-driver-550-open | nvidia-driver-555-open | nvidia-driver-560-open | nvidia-driver-565-open | nvidia-driver-570-open | nvidia-driver-575-open | nvidia-driver-580-open,
-         nvidia-cuda-toolkit,
          python3-gi,
          gir1.2-ayatanappindicator3-0.1 | gir1.2-appindicator3-0.1
-Recommends: python3-torch
+Recommends: nvidia-cuda-toolkit
 Description: GPU-accelerated voice-to-text for Ubuntu
  AutoWhisper converts speech to text using NVIDIA GPU acceleration.
  Press a hotkey, speak, release - text appears in any window.

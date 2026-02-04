@@ -15,15 +15,14 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/autowhisper
 
 # Python environment
 Environment="PYTHONUNBUFFERED=1"
 
-# Run the Python daemon
+# Run the Python daemon from isolated venv
 # Note: DISPLAY, XAUTHORITY, XDG_RUNTIME_DIR, DBUS_SESSION_BUS_ADDRESS
 # are inherited from the user's graphical session automatically
-ExecStart=/opt/autowhisper/venv/bin/python -m autowhisper --config /opt/autowhisper/config.toml
+ExecStart=/opt/autowhisper/venv/bin/autowhisper run
 
 Restart=on-failure
 RestartSec=5s

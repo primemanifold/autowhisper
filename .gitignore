@@ -28,6 +28,16 @@ htmlcov/
 # Downloaded packages
 *.deb
 
+# Debian build artifacts
+debian/files
+debian/*.substvars
+debian/*.debhelper
+debian/debhelper-build-stamp
+debian/autowhisper/
+debian/.debhelper/
+.pybuild/
+build/
+
 # IDE
 .vscode/
 .idea/
