@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autowhisper"
-version = "0.2.2"
+version = "0.2.3"
 description = "Real-time speech to text with faster-whisper"
 readme = "README.md"
 license = {text = "Apache-2.0"}

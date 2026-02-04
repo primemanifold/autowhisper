@@ -1,15 +1,15 @@
-autowhisper (0.2.2-2) noble; urgency=medium
+autowhisper (0.2.3-1) noble; urgency=medium
 
-  * Fix: move nvidia-driver and cuda-toolkit to Recommends
-  * Allows installation with any nvidia driver version (current and future)
+  * Release v0.2.3
   * Add: isolated virtual environment at /opt/autowhisper/venv
-  * Add: automatic GPU detection for correct PyTorch version
+  * Add: automatic GPU detection for correct PyTorch version (RTX 50xx vs older)
   * Add: requirements.lock with pinned dependency versions for reproducibility
-  * Fix: systemd service uses venv Python for isolation
+  * Add: debian package testing documentation
+  * Change: nvidia-driver and cuda-toolkit moved to Recommends
+  * Fix: systemd service uses venv Python for full isolation
   * Fix: postinst auto-installs all dependencies into venv
-  * autowhisper doctor checks GPU availability at runtime
 
- -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Wed, 04 Feb 2026 03:03:45 -0600
+ -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Wed, 04 Feb 2026 04:04:16 -0600
 
 autowhisper (0.2.2-1) noble; urgency=medium
 
