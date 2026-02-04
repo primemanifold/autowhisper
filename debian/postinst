@@ -53,10 +53,11 @@ case "$1" in
 
         # Install dependencies and autowhisper wheel
         echo "Installing dependencies (this may take a few minutes)..."
+        WHEEL_FILE=$(find "$SHARE_DIR" -name "autowhisper-*.whl" | head -1)
         "$VENV_DIR/bin/pip" install \
             --extra-index-url "$PYTORCH_INDEX" \
             -r "$SHARE_DIR/requirements.lock" \
-            "$SHARE_DIR/autowhisper.whl" \
+            "$WHEEL_FILE" \
             --quiet
 
         # Create symlink for easy CLI access

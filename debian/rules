@@ -25,9 +25,9 @@ override_dh_auto_install:
 	install -D -m 644 requirements.lock \
 		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/requirements.lock
 
-	# Copy the built wheel for venv installation
-	install -D -m 644 $$(find .pybuild -name "autowhisper-*.whl" | head -1) \
-		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/autowhisper.whl
+	# Copy the built wheel for venv installation (preserve original filename for pip)
+	cp $$(find .pybuild -name "autowhisper-*.whl" | head -1) \
+		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/
 
 	# Install documentation
 	install -D -m 644 README.md \
