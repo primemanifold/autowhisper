@@ -29,6 +29,12 @@ override_dh_auto_install:
 	cp $$(find .pybuild -name "autowhisper-*.whl" | head -1) \
 		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/
 
+	# Install lazy setup scripts
+	install -D -m 755 debian/autowhisper-setup \
+		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/autowhisper-setup
+	install -D -m 755 debian/autowhisper-wrapper \
+		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/autowhisper-wrapper
+
 	# Install documentation
 	install -D -m 644 README.md \
 		$(CURDIR)/debian/autowhisper/usr/share/doc/autowhisper/README.md

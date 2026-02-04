@@ -2,29 +2,17 @@
 set -e
 
 VENV_DIR="/opt/autowhisper/venv"
-SHARE_DIR="/usr/share/autowhisper"
-
-# Detect GPU architecture to choose correct PyTorch index
-detect_pytorch_index() {
-    # Try to detect NVIDIA GPU
-    if command -v nvidia-smi &> /dev/null; then
-        GPU_NAME=$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)
-
-        # RTX 50xx series (Blackwell) needs nightly with CUDA 12.8
-        if echo "$GPU_NAME" | grep -qiE "RTX 50[0-9][0-9]|Blackwell"; then
-            echo "https://download.pytorch.org/whl/nightly/cu128"
-            return
-        fi
-    fi
-
-    # Default to stable CUDA 12.4 for older GPUs
-    echo "https://download.pytorch.org/whl/cu124"
-}
 
 case "$1" in
     configure)
         # Create models directory if it doesn't exist
         mkdir -p /usr/share/autowhisper/models
+
+        # Create venv directory (owned by root, setup script will handle permissions)
+        mkdir -p "$VENV_DIR"
+
+        # Install wrapper as the main CLI command
+        ln -sf /usr/share/autowhisper/autowhisper-wrapper /usr/local/bin/autowhisper
 
         # Check if whisper.cpp is available
         if command -v whisper-cli &> /dev/null; then
@@ -33,54 +21,24 @@ case "$1" in
 
         echo ""
         echo "================================================================"
-        echo "AutoWhisper: Setting up isolated Python environment..."
+        echo "AutoWhisper installed!"
         echo "================================================================"
         echo ""
-
-        # Create virtual environment
-        if [ ! -d "$VENV_DIR" ]; then
-            echo "Creating virtual environment at $VENV_DIR..."
-            python3 -m venv "$VENV_DIR"
-        fi
-
-        # Upgrade pip in venv
-        echo "Upgrading pip..."
-        "$VENV_DIR/bin/pip" install --upgrade pip --quiet
-
-        # Detect correct PyTorch index URL
-        PYTORCH_INDEX=$(detect_pytorch_index)
-        echo "Using PyTorch index: $PYTORCH_INDEX"
-
-        # Install dependencies and autowhisper wheel
-        echo "Installing dependencies (this may take a few minutes)..."
-        WHEEL_FILE=$(find "$SHARE_DIR" -name "autowhisper-*.whl" | head -1)
-        "$VENV_DIR/bin/pip" install \
-            --extra-index-url "$PYTORCH_INDEX" \
-            -r "$SHARE_DIR/requirements.lock" \
-            "$WHEEL_FILE" \
-            --quiet
-
-        # Create symlink for easy CLI access
-        ln -sf "$VENV_DIR/bin/autowhisper" /usr/local/bin/autowhisper 2>/dev/null || true
-
-        echo ""
-        echo "================================================================"
-        echo "AutoWhisper installed successfully!"
-        echo "================================================================"
+        echo "The Python environment will be set up on first run."
+        echo "This uses 'uv' for fast installation (~10x faster than pip)."
         echo ""
         echo "Quick start:"
         echo "  1. Check system:   autowhisper doctor"
         echo "  2. Enable service: systemctl --user enable --now autowhisper"
         echo "  3. Test hotkey:    Press Ctrl+Shift+Space and speak"
         echo ""
-        echo "Note: Models are downloaded automatically on first use."
+        echo "Note: First run will download dependencies (~2GB for PyTorch+CUDA)."
+        echo ""
+        echo "To set up now instead of on first run:"
+        echo "  /usr/share/autowhisper/autowhisper-setup"
         echo ""
         echo "Configuration: ~/.config/autowhisper/config.toml"
         echo "               /etc/autowhisper/config.toml (system default)"
-        echo ""
-        echo "View logs: journalctl --user -u autowhisper -f"
-        echo ""
-        echo "Virtual environment: $VENV_DIR"
         echo ""
         ;;
 
