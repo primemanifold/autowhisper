@@ -237,6 +237,7 @@ def check_model(result: DiagnosticResult) -> bool:
 
     try:
         from .config import find_config_file, Config
+        from .models import is_model_downloaded, MODELS
 
         config_path = find_config_file()
         config = Config.load(config_path)
@@ -244,11 +245,14 @@ def check_model(result: DiagnosticResult) -> bool:
 
         result.info(f"Configured model: {model_name}")
 
-        # Check HuggingFace cache for the model
-        cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
-        model_dirs = list(cache_dir.glob(f"*{model_name.replace('.', '*')}*"))
+        if model_name not in MODELS:
+            result.warn(
+                f"Unknown model: {model_name}",
+                f"Use one of: {', '.join(MODELS.keys())}",
+            )
+            return False
 
-        if model_dirs:
+        if is_model_downloaded(model_name):
             result.ok(f"Model {model_name} is downloaded")
             return True
         else:

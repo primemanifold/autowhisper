@@ -11,60 +11,73 @@ MODELS = {
         "description": "Fastest, good accuracy",
         "size": "~75MB",
         "speed": "78ms",
+        "repo": "Systran/faster-whisper-tiny.en",
     },
     "base.en": {
         "description": "Fast, better accuracy",
         "size": "~150MB",
         "speed": "143ms",
+        "repo": "Systran/faster-whisper-base.en",
     },
     "small.en": {
         "description": "Balanced",
         "size": "~500MB",
         "speed": "211ms",
+        "repo": "Systran/faster-whisper-small.en",
     },
     "distil-small.en": {
         "description": "Optimized small (recommended)",
         "size": "~400MB",
         "speed": "198ms",
+        "repo": "Systran/faster-distil-whisper-small.en",
     },
     "distil-medium.en": {
         "description": "Optimized medium",
         "size": "~800MB",
         "speed": "381ms",
+        "repo": "Systran/faster-distil-whisper-medium.en",
     },
     "distil-large-v3": {
         "description": "Best accuracy",
         "size": "~1.5GB",
         "speed": "448ms",
+        "repo": "Systran/faster-distil-whisper-large-v3",
     },
     "large-v3": {
         "description": "Maximum accuracy",
         "size": "~3GB",
         "speed": "926ms",
+        "repo": "Systran/faster-whisper-large-v3",
     },
 }
 
 
-def get_downloaded_models() -> list[str]:
-    """Get list of models already downloaded."""
+def get_hf_cache_dir_name(repo: str) -> str:
+    """Convert HuggingFace repo name to cache directory name.
+
+    HuggingFace caches repos in directories like:
+    models--Systran--faster-whisper-small.en
+    """
+    return "models--" + repo.replace("/", "--")
+
+
+def is_model_downloaded(model_name: str) -> bool:
+    """Check if a specific model is downloaded."""
+    if model_name not in MODELS:
+        return False
+
     cache_dir = Path.home() / ".cache" / "huggingface" / "hub"
     if not cache_dir.exists():
-        return []
+        return False
 
-    downloaded = []
-    for model_name in MODELS:
-        # Check for model directory patterns
-        patterns = [
-            f"*{model_name.replace('.', '-')}*",
-            f"*{model_name.replace('.', '_')}*",
-            f"*{model_name}*",
-        ]
-        for pattern in patterns:
-            if list(cache_dir.glob(pattern)):
-                downloaded.append(model_name)
-                break
+    repo = MODELS[model_name]["repo"]
+    cache_name = get_hf_cache_dir_name(repo)
+    return (cache_dir / cache_name).exists()
 
-    return downloaded
+
+def get_downloaded_models() -> list[str]:
+    """Get list of models already downloaded."""
+    return [name for name in MODELS if is_model_downloaded(name)]
 
 
 def list_models():
