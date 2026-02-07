@@ -71,7 +71,7 @@ class PulseAudioManager:
             logger.info("PulseAudio muting enabled")
             return True
         except Exception as e:
-            logger.warning(f"Failed to connect to PulseAudio: {e}. App muting disabled.")
+            logger.warning(f"PulseAudio connection failed: {e}. Muting disabled.")
             self._enabled = False
             return True
 
@@ -92,7 +92,7 @@ class PulseAudioManager:
         basename = os.path.basename(binary)
 
         if basename in self.EXCLUDED_APPS:
-            logger.debug(f"Excluding sink input '{sink_input.name}' (binary: {basename})")
+            logger.debug(f"Excluding '{sink_input.name}' (binary: {basename})")
             return True
 
         return False

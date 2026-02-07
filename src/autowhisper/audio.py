@@ -16,7 +16,8 @@ def list_audio_devices() -> dict:
     List available audio input and output devices.
 
     Returns:
-        Dict with 'input' and 'output' keys, each containing list of (index, name) tuples
+        Dict with 'input' and 'output' keys, each containing
+        list of (index, name) tuples
     """
     devices = sd.query_devices()
     inputs = []

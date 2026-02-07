@@ -85,8 +85,9 @@ def check_gpu(result: DiagnosticResult, fix: bool) -> dict:
             )
             if fix:
                 click.echo("    Attempting fix: reloading nvidia modules...")
+                modules = ["nvidia_uvm", "nvidia_drm", "nvidia_modeset", "nvidia"]
                 subprocess.run(
-                    ["sudo", "rmmod", "nvidia_uvm", "nvidia_drm", "nvidia_modeset", "nvidia"],
+                    ["sudo", "rmmod"] + modules,
                     capture_output=True,
                 )
                 subprocess.run(["sudo", "modprobe", "nvidia"], capture_output=True)
@@ -281,7 +282,8 @@ def check_service(result: DiagnosticResult, fix: bool) -> bool:
         return True
     else:
         # Check if service file exists
-        service_file = Path.home() / ".config" / "systemd" / "user" / "autowhisper.service"
+        systemd_dir = Path.home() / ".config" / "systemd" / "user"
+        service_file = systemd_dir / "autowhisper.service"
         if not service_file.exists():
             result.warn(
                 "Service not installed",

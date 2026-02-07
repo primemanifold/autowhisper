@@ -59,7 +59,7 @@ class OutputConfig:
     paste_delay: float = 0.05
     ending_action: str = "none"  # "none", "newline", or "return_key"
     lowercase: bool = False
-    also_copy_to_clipboard: bool = True  # Also store in clipboard when using inject method
+    also_copy_to_clipboard: bool = True  # Also store in clipboard (inject)
 
 
 @dataclass
@@ -120,7 +120,10 @@ class Config:
         output_data = dict(data.get("output", {}))
         # Migrate append_newline -> ending_action
         if "append_newline" in output_data and "ending_action" not in output_data:
-            output_data["ending_action"] = "newline" if output_data["append_newline"] else "none"
+            if output_data["append_newline"]:
+                output_data["ending_action"] = "newline"
+            else:
+                output_data["ending_action"] = "none"
         # Filter to valid fields only
         output_data = {
             k: v for k, v in output_data.items()

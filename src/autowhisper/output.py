@@ -44,7 +44,7 @@ class OutputManager:
 
         # Check for python-xlib
         try:
-            from Xlib import XK, X, display
+            import Xlib.display  # noqa: F401
             self._xlib_available = True
         except ImportError:
             self._xlib_available = False
@@ -322,7 +322,8 @@ class OutputManager:
                     logger.debug("Sent Return keypress via xdotool")
                     return True
                 else:
-                    logger.warning(f"xdotool key Return failed: {result.stderr.decode()}")
+                    err = result.stderr.decode()
+                    logger.warning(f"xdotool key Return failed: {err}")
                     return False
             else:
                 logger.warning("Cannot send Return key: xdotool not available")

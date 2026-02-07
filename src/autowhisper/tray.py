@@ -175,7 +175,8 @@ def display_key(keyname: str) -> str:
         "alt": "Alt",
         "super": "Super",
     }
-    return display_map.get(keyname, keyname.capitalize() if len(keyname) > 1 else keyname.upper())
+    default = keyname.capitalize() if len(keyname) > 1 else keyname.upper()
+    return display_map.get(keyname, default)
 
 
 def display_hotkey(hotkey: str) -> str:
@@ -347,7 +348,7 @@ class HotkeyGroup(Gtk.Frame):
 
     def _update_remove_buttons(self) -> None:
         """Update remove button states - can't remove last one."""
-        for i, row in enumerate(self._rows):
+        for row in self._rows:
             row.set_removable(len(self._rows) > 1)
 
     def _on_add(self, widget) -> None:
@@ -744,7 +745,8 @@ class SettingsDialog(Gtk.Dialog):
         active_input = 0
         for i, (idx, name) in enumerate(self._input_devices):
             self._mic_combo.append(str(idx), self._truncate_name(name, 35))
-            if self._config.audio.device and (str(idx) == str(self._config.audio.device) or name == self._config.audio.device):
+            cfg_dev = self._config.audio.device
+            if cfg_dev and (str(idx) == str(cfg_dev) or name == cfg_dev):
                 active_input = i + 1
         self._mic_combo.set_active(active_input)
         mic_row.pack_start(self._mic_combo, True, True, 0)
@@ -762,14 +764,15 @@ class SettingsDialog(Gtk.Dialog):
         active_output = 0
         for i, (idx, name) in enumerate(self._output_devices):
             self._spk_combo.append(str(idx), self._truncate_name(name, 35))
-            if self._config.audio.output_device and (str(idx) == str(self._config.audio.output_device) or name == self._config.audio.output_device):
+            cfg_dev = self._config.audio.output_device
+            if cfg_dev and (str(idx) == str(cfg_dev) or name == cfg_dev):
                 active_output = i + 1
         self._spk_combo.set_active(active_output)
         spk_row.pack_start(self._spk_combo, True, True, 0)
         vbox.pack_start(spk_row, False, False, 0)
 
         # Mute other apps checkbox (primary setting, not in Advanced)
-        self._mute_other_apps_check = Gtk.CheckButton(label="Mute other apps during recording")
+        self._mute_other_apps_check = Gtk.CheckButton(label="Mute other apps")
         self._mute_other_apps_check.set_active(self._config.audio.mute_other_apps)
         vbox.pack_start(self._mute_other_apps_check, False, False, 0)
 
@@ -781,7 +784,7 @@ class SettingsDialog(Gtk.Dialog):
         expander.add(adv_box)
 
         # VAD enabled
-        self._vad_enabled_check = Gtk.CheckButton(label="Voice Activity Detection (VAD)")
+        self._vad_enabled_check = Gtk.CheckButton(label="Voice Activity Detection")
         self._vad_enabled_check.set_active(self._config.audio.vad_enabled)
         adv_box.pack_start(self._vad_enabled_check, False, False, 0)
 
@@ -791,7 +794,9 @@ class SettingsDialog(Gtk.Dialog):
         vad_label.set_xalign(0)
         vad_label.set_size_request(110, -1)
         vad_row.pack_start(vad_label, False, False, 0)
-        self._vad_threshold_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.1)
+        self._vad_threshold_scale = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.1
+        )
         self._vad_threshold_scale.set_value(self._config.audio.vad_threshold)
         self._vad_threshold_scale.set_digits(1)
         vad_row.pack_start(self._vad_threshold_scale, True, True, 0)
@@ -874,12 +879,13 @@ class SettingsDialog(Gtk.Dialog):
         self._hotkey_mode_combo = Gtk.ComboBoxText()
         self._hotkey_mode_combo.append("push_to_talk", "Push to Talk (hold)")
         self._hotkey_mode_combo.append("toggle", "Toggle (press twice)")
-        self._hotkey_mode_combo.set_active(0 if self._config.hotkeys.mode == "push_to_talk" else 1)
+        is_push = self._config.hotkeys.mode == "push_to_talk"
+        self._hotkey_mode_combo.set_active(0 if is_push else 1)
         mode_row.pack_start(self._hotkey_mode_combo, True, True, 0)
         adv_box.pack_start(mode_row, False, False, 0)
 
         # Escape to cancel
-        self._escape_to_cancel_check = Gtk.CheckButton(label="Escape key cancels recording")
+        self._escape_to_cancel_check = Gtk.CheckButton(label="Escape cancels recording")
         self._escape_to_cancel_check.set_active(self._config.hotkeys.escape_to_cancel)
         adv_box.pack_start(self._escape_to_cancel_check, False, False, 0)
 
@@ -908,7 +914,8 @@ class SettingsDialog(Gtk.Dialog):
         self._output_method_combo = Gtk.ComboBoxText()
         self._output_method_combo.append("inject", "Type text (xdotool)")
         self._output_method_combo.append("clipboard", "Copy to clipboard")
-        self._output_method_combo.set_active(0 if self._config.output.method == "inject" else 1)
+        is_inject = self._config.output.method == "inject"
+        self._output_method_combo.set_active(0 if is_inject else 1)
         method_row.pack_start(self._output_method_combo, True, True, 0)
         vbox.pack_start(method_row, False, False, 0)
 
@@ -920,12 +927,12 @@ class SettingsDialog(Gtk.Dialog):
         expander.add(adv_box)
 
         # Also copy to clipboard (for inject mode)
-        self._also_copy_check = Gtk.CheckButton(label="Also copy to clipboard (inject mode)")
+        self._also_copy_check = Gtk.CheckButton(label="Also copy to clipboard")
         self._also_copy_check.set_active(self._config.output.also_copy_to_clipboard)
         adv_box.pack_start(self._also_copy_check, False, False, 0)
 
         # Auto paste (for clipboard mode)
-        self._auto_paste_check = Gtk.CheckButton(label="Auto-paste after copy (clipboard mode)")
+        self._auto_paste_check = Gtk.CheckButton(label="Auto-paste after copy")
         self._auto_paste_check.set_active(self._config.output.auto_paste)
         adv_box.pack_start(self._auto_paste_check, False, False, 0)
 
@@ -992,7 +999,9 @@ class SettingsDialog(Gtk.Dialog):
         vol_label.set_xalign(0)
         primary_row.pack_start(vol_label, False, False, 0)
 
-        self._feedback_volume_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.1)
+        self._feedback_volume_scale = Gtk.Scale.new_with_range(
+            Gtk.Orientation.HORIZONTAL, 0.0, 1.0, 0.1
+        )
         self._feedback_volume_scale.set_value(self._config.feedback.volume)
         self._feedback_volume_scale.set_digits(1)
         self._feedback_volume_scale.set_size_request(120, -1)
@@ -1147,12 +1156,14 @@ class TrayManager:
         menu.append(self._speaker_label)
 
         # Hotkey info - Recording
-        self._trigger_label = Gtk.MenuItem(label=f"Record: {self._format_hotkeys(self._trigger_hotkeys)}")
+        trigger_text = self._format_hotkeys(self._trigger_hotkeys)
+        self._trigger_label = Gtk.MenuItem(label=f"Record: {trigger_text}")
         self._trigger_label.set_sensitive(False)
         menu.append(self._trigger_label)
 
         # Hotkey info - Cancel
-        self._cancel_label = Gtk.MenuItem(label=f"Cancel: {self._format_hotkeys(self._cancel_hotkeys)}")
+        cancel_text = self._format_hotkeys(self._cancel_hotkeys)
+        self._cancel_label = Gtk.MenuItem(label=f"Cancel: {cancel_text}")
         self._cancel_label.set_sensitive(False)
         menu.append(self._cancel_label)
 
@@ -1305,13 +1316,15 @@ class TrayManager:
     def _update_trigger_label(self) -> bool:
         """Update trigger hotkey label (called from GTK thread)."""
         if self._trigger_label:
-            self._trigger_label.set_label(f"Record: {self._format_hotkeys(self._trigger_hotkeys)}")
+            text = self._format_hotkeys(self._trigger_hotkeys)
+            self._trigger_label.set_label(f"Record: {text}")
         return False
 
     def _update_cancel_label(self) -> bool:
         """Update cancel hotkey label (called from GTK thread)."""
         if self._cancel_label:
-            self._cancel_label.set_label(f"Cancel: {self._format_hotkeys(self._cancel_hotkeys)}")
+            text = self._format_hotkeys(self._cancel_hotkeys)
+            self._cancel_label.set_label(f"Cancel: {text}")
         return False
 
     def set_hotkey(self, hotkey: str | list[str]) -> None:

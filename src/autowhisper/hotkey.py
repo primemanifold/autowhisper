@@ -19,7 +19,9 @@ class HotkeyEvent(Enum):
     CANCEL = auto()
 
 
-MODIFIER_NAMES = {"ctrl", "control", "alt", "option", "shift", "super", "win", "cmd", "meta"}
+MODIFIER_NAMES = {
+    "ctrl", "control", "alt", "option", "shift", "super", "win", "cmd", "meta"
+}
 
 
 @dataclass
@@ -59,14 +61,18 @@ class KeyCombo:
                 normalized_parts.append(part)
 
         # Check if all parts are modifiers (e.g., shift+super)
-        all_modifiers = all(p in ("ctrl", "alt", "shift", "super") for p in normalized_parts)
+        valid_mods = ("ctrl", "alt", "shift", "super")
+        all_modifiers = all(p in valid_mods for p in normalized_parts)
 
         if all_modifiers:
             # Modifier-only combo like shift+super
             return cls(modifiers=set(normalized_parts), key=None, is_modifier_only=True)
         else:
             # Regular combo like ctrl+alt+v
-            modifiers = set(normalized_parts[:-1]) if len(normalized_parts) > 1 else set()
+            if len(normalized_parts) > 1:
+                modifiers = set(normalized_parts[:-1])
+            else:
+                modifiers = set()
             key = normalized_parts[-1]
             return cls(modifiers=modifiers, key=key, is_modifier_only=False)
 
@@ -84,7 +90,7 @@ class HotkeyManager:
 
         self._pressed_modifiers: set[str] = set()
         self._trigger_pressed = False
-        self._active_trigger: KeyCombo | None = None  # The combo that activated recording
+        self._active_trigger: KeyCombo | None = None  # Combo that activated recording
         self._listener: keyboard.Listener | None = None
         self._running = False
 
@@ -175,7 +181,7 @@ class HotkeyManager:
         modifier = self._get_modifier_name(key)
         if modifier:
             self._pressed_modifiers.add(modifier)
-            logger.debug(f"Modifier pressed: {modifier}, current: {self._pressed_modifiers}")
+            logger.debug(f"Mod down: {modifier}, pressed: {self._pressed_modifiers}")
 
             # Check if any trigger is modifier-only combo (like shift+super)
             matched = self._check_any_trigger()
@@ -231,7 +237,7 @@ class HotkeyManager:
         modifier = self._get_modifier_name(key)
         if modifier:
             self._pressed_modifiers.discard(modifier)
-            logger.debug(f"Modifier released: {modifier}, current: {self._pressed_modifiers}")
+            logger.debug(f"Modifier up: {modifier}, active: {self._pressed_modifiers}")
 
             # For push-to-talk with modifier-only combos
             if (

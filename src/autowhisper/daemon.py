@@ -178,7 +178,8 @@ class AutoWhisperDaemon:
             text = self._whisper.transcribe(audio)
 
             if text:
-                logger.info(f"Transcription: {text[:50]}{'...' if len(text) > 50 else ''}")
+                preview = text[:50] + "..." if len(text) > 50 else text
+                logger.info(f"Transcription: {preview}")
                 success = self._output.inject(text)
                 if not success:
                     logger.warning("Text injection failed")
@@ -242,7 +243,10 @@ class AutoWhisperDaemon:
                 if (new_config.audio.device != self.config.audio.device or
                     new_config.audio.output_device != self.config.audio.output_device):
                     logger.info("Audio device changed - restart daemon to apply")
-                if new_config.audio.mute_other_apps != self.config.audio.mute_other_apps:
+                new_mute = new_config.audio.mute_other_apps
+                old_mute = self.config.audio.mute_other_apps
+                mute_changed = new_mute != old_mute
+                if mute_changed:
                     logger.info("Mute other apps changed - restart daemon to apply")
                 self.config.audio = new_config.audio
             except Exception as e:
