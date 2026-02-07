@@ -1,58 +1,56 @@
 ---
-name: release
-description: Create a new release of AutoWhisper to the Launchpad PPA
-user-invocable: true
+description: Create a new release - bumps version, creates tag, and triggers CI for PPA upload
+argument-hint: "[patch|minor|major|X.Y.Z]"
+allowed-tools:
+  - Bash
+  - Read
+  - Grep
 ---
 
-# Release AutoWhisper
+# Release Skill
 
-Create a new release by analyzing changes and uploading to the PPA.
+Create a new AutoWhisper release. This will:
 
-## Process
+1. Bump version in `pyproject.toml`, `src/autowhisper/__init__.py`, and `debian/changelog`
+2. Commit the version bump
+3. Create an annotated git tag
+4. Push to origin (triggers CI for PPA upload and GitHub release)
 
-1. **Get current state:**
-   - Run `git describe --tags --abbrev=0` to find the last tag
-   - Run `git log <last-tag>..HEAD --oneline` to see commits since last release
-   - Read `pyproject.toml` to get current version
+## Usage
 
-2. **Analyze changes and suggest bump type:**
-   - Look for keywords in commit messages:
-     - "BREAKING" or "!" after type → major bump
-     - "feat", "feature", "add" → minor bump
-     - "fix", "patch", "docs", "chore" → patch bump
-   - Present findings to user with recommended bump
+The argument specifies the version bump type:
+- `patch` (default): 0.2.6 → 0.2.7
+- `minor`: 0.2.6 → 0.3.0
+- `major`: 0.2.6 → 1.0.0
+- `X.Y.Z`: Set explicit version (e.g., `1.0.0`)
 
-3. **Confirm with user:**
-   - Show: current version, suggested new version, commit summary
-   - Ask user to confirm or specify different version/bump type
-   - Use AskUserQuestion with options: [patch, minor, major, custom]
+## Instructions
 
-4. **Execute release:**
-   - Run `./scripts/release.sh <bump-type>`
-   - The script handles: version updates, commit, tag, build, sign, upload
-   - Monitor output and report results
+1. First, check the current version and git status:
 
-## Example Output
-
-```
-Analyzing changes since v0.1.0...
-
-Commits (5):
-  - fix: resolve audio capture on PipeWire
-  - feat: add model download progress bar
-  - docs: update README
-  - fix: handle missing config file
-  - chore: clean up unused imports
-
-Recommendation: minor bump (new feature detected)
-  Current: 0.1.0
-  New:     0.2.0
-
-[Asks user to confirm]
+```bash
+grep -Po '(?<=^version = ")[^"]+' pyproject.toml
+git status --short
 ```
 
-## Error Handling
+2. If the working directory is clean, run the release script with the specified bump type (default to `patch` if no argument provided):
 
-- If working directory is dirty, tell user to commit or stash first
-- If no tags exist, suggest starting with 0.1.0
-- If release script fails, show the error and suggest manual steps
+```bash
+./scripts/release.sh $ARGUMENTS
+```
+
+3. The script is interactive - it will:
+   - Show current and new version
+   - Ask for confirmation before proceeding
+   - Ask if you want to push after creating the tag
+
+4. After pushing, remind the user:
+   - CI will automatically build and upload to PPA
+   - Monitor at: https://github.com/rabotinc/autowhisper/actions
+   - PPA builds at: https://launchpad.net/~primemanifold/+archive/ubuntu/autowhisper/+packages
+
+## Important
+
+- Ensure `GPG_PRIVATE_KEY` secret is configured in GitHub repository settings
+- The working directory must be clean (no uncommitted changes)
+- Only run from the `core` or `main` branch
