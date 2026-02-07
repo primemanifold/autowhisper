@@ -1,10 +1,14 @@
 #!/usr/bin/make -f
 
 export DH_VERBOSE = 1
-export PYBUILD_NAME = autowhisper
 
 %:
-	dh $@ --with python3 --buildsystem=pybuild
+	dh $@ --buildsystem=cmake
+
+override_dh_auto_configure:
+	dh_auto_configure -- \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DAUTOWHISPER_ENABLE_TESTS=OFF
 
 override_dh_auto_test:
 	# Skip tests during package build
@@ -13,27 +17,13 @@ override_dh_auto_test:
 override_dh_auto_install:
 	dh_auto_install
 
-	# Install systemd user service template
+	# Install systemd user service
 	install -D -m 644 autowhisper.service \
 		$(CURDIR)/debian/autowhisper/usr/lib/systemd/user/autowhisper.service
 
 	# Install default config
 	install -D -m 644 config.toml \
 		$(CURDIR)/debian/autowhisper/etc/autowhisper/config.toml
-
-	# Install pinned requirements for reproducible installs
-	install -D -m 644 requirements.lock \
-		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/requirements.lock
-
-	# Copy the built wheel for venv installation (preserve original filename for pip)
-	cp $$(find .pybuild -name "autowhisper-*.whl" | head -1) \
-		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/
-
-	# Install lazy setup scripts
-	install -D -m 755 debian/autowhisper-setup \
-		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/autowhisper-setup
-	install -D -m 755 debian/autowhisper-wrapper \
-		$(CURDIR)/debian/autowhisper/usr/share/autowhisper/autowhisper-wrapper
 
 	# Install documentation
 	install -D -m 644 README.md \

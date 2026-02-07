@@ -32,10 +32,11 @@ void AutoWhisperDaemon::setup_signals() {
     g_daemon = this;
 
     struct sigaction sa{};
-    sa.sa_handler = [](int sig) {
+    // Only use async-signal-safe operations in the handler.
+    // spdlog, mutexes, and condition_variable::notify are NOT safe here.
+    sa.sa_handler = [](int) {
         if (g_daemon) {
-            spdlog::info("Received signal {}, shutting down", sig);
-            g_daemon->request_shutdown();
+            g_daemon->shutdown_requested_.store(true, std::memory_order_release);
         }
     };
     sigemptyset(&sa.sa_mask);

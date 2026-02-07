@@ -1,6 +1,8 @@
 # AutoWhisper
 
-GPU-accelerated voice-to-text for Ubuntu. Press a hotkey, speak, release — text appears.
+GPU-accelerated voice-to-text for Ubuntu. Press a hotkey, speak, release — text appears at your cursor.
+
+Native C++ application powered by [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Runs entirely offline.
 
 ## Install
 
@@ -17,7 +19,7 @@ autowhisper doctor              # check system requirements
 systemctl --user enable --now autowhisper
 ```
 
-Press `Ctrl+Shift+Space`, speak, release. Text appears at your cursor.
+Press `Shift+Super`, speak, release. Text appears at your cursor.
 
 ## Usage
 
@@ -26,6 +28,7 @@ autowhisper doctor              # diagnose system
 autowhisper config              # open settings GUI
 autowhisper model list          # show available models
 autowhisper model download <name>  # download a model
+autowhisper run                 # run in foreground
 ```
 
 View logs:
@@ -33,36 +36,48 @@ View logs:
 journalctl --user -u autowhisper -f
 ```
 
-## Install from Source
+## Build from Source
+
+### Dependencies (Ubuntu)
+
+```bash
+sudo apt install cmake g++ pkg-config \
+  libx11-dev libxtst-dev libxext-dev libxi-dev libxrandr-dev \
+  libgtk-3-dev libayatana-appindicator3-dev libpulse-dev libssl-dev
+```
+
+### Build
 
 ```bash
 git clone https://github.com/rabotinc/autowhisper.git
 cd autowhisper
-python3 -m venv venv && source venv/bin/activate
-pip install -e .
-python -m autowhisper --config config.toml
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
 ```
 
-### Removing a Source Install
+The binary is at `build/autowhisper`.
 
-If you previously installed from source and want to switch to apt:
+### Options
+
+| CMake Option | Default | Description |
+|---|---|---|
+| `AUTOWHISPER_ENABLE_CUDA` | OFF | Enable CUDA GPU acceleration via whisper.cpp |
+| `AUTOWHISPER_ENABLE_TESTS` | ON | Build the Catch2 test suite |
 
 ```bash
-systemctl --user stop autowhisper
-systemctl --user disable autowhisper
-rm -rf ~/autowhisper  # or wherever you cloned it
-rm -f ~/.config/systemd/user/autowhisper.service
-systemctl --user daemon-reload
-sudo rm -f /usr/local/bin/autowhisper
-```
+# Build with CUDA support
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DAUTOWHISPER_ENABLE_CUDA=ON
+cmake --build build -j$(nproc)
 
-Your config in `~/.config/autowhisper/` will be preserved.
+# Run tests
+cd build && ctest --output-on-failure
+```
 
 ## Configure
 
 Run `autowhisper config` to open the settings GUI, or edit the config file directly:
 
-```bash
+```
 ~/.config/autowhisper/config.toml   # user config
 /etc/autowhisper/config.toml        # system default
 ```
@@ -71,18 +86,16 @@ Example:
 ```toml
 [model]
 size = "distil-small.en"  # tiny.en (fastest) to distil-large-v3 (best)
-compute_type = "bfloat16" # bfloat16 (RTX 50xx), float16 (RTX 20-40)
+device = "cuda"           # cuda, cpu, or auto
+compute_type = "bfloat16" # bfloat16 (RTX 50xx), float16 (RTX 20-40xx)
 
 [hotkeys]
 mode = "push_to_talk"     # or "toggle"
-trigger = "ctrl+shift+space"
-```
+trigger = ["shift+super"]
 
-## Troubleshooting
-
-```bash
-autowhisper doctor               # diagnose issues
-journalctl --user -u autowhisper -f  # view logs
+[output]
+method = "inject"         # or "clipboard"
+ending_action = "none"    # none, newline, or return_key
 ```
 
 ## Models
@@ -92,6 +105,13 @@ journalctl --user -u autowhisper -f  # view logs
 | tiny.en | 78ms | Good |
 | distil-small.en | 198ms | Very Good |
 | distil-large-v3 | 448ms | Best |
+
+## Troubleshooting
+
+```bash
+autowhisper doctor                     # diagnose issues
+journalctl --user -u autowhisper -f    # view logs
+```
 
 ## License
 

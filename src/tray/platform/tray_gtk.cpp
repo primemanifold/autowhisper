@@ -44,31 +44,39 @@ struct TrayManager::Impl {
     TrayManager* manager = nullptr;
 
     std::string get_icon_path(TrayState state) const {
-        // Look for icons relative to executable
-        std::vector<std::string> search_paths = {
-            "icons",
-            "../icons",
-            "/usr/share/autowhisper/icons",
-            "/opt/autowhisper/icons",
-        };
+        std::vector<std::string> search_paths;
 
-        // Also check relative to source dir
-        const char* home = std::getenv("HOME");
-        if (home) {
-            search_paths.push_back(std::string(home) + "/autowhisper/src/autowhisper/icons");
-            search_paths.push_back(std::string(home) + "/autowhisper/icons");
-        }
+        // Relative to the executable (handles build/ and installed locations)
+        try {
+            auto exe_dir = fs::read_symlink("/proc/self/exe").parent_path();
+            search_paths.push_back((exe_dir / "icons").string());
+            search_paths.push_back((exe_dir.parent_path() / "icons").string());
+        } catch (...) {}
+
+        // Standard install locations
+        search_paths.push_back("/usr/share/autowhisper/icons");
+
+        // CWD-relative fallbacks
+        search_paths.push_back("icons");
+        search_paths.push_back("../icons");
 
         std::string name = ICON_NAMES[static_cast<int>(state)];
 
         for (const auto& dir : search_paths) {
             std::string svg = dir + "/" + name + ".svg";
-            if (fs::exists(svg)) return fs::absolute(svg).string();
+            if (fs::exists(svg)) {
+                spdlog::debug("Found icon: {}", svg);
+                return fs::absolute(svg).string();
+            }
 
             std::string png = dir + "/" + name + ".png";
-            if (fs::exists(png)) return fs::absolute(png).string();
+            if (fs::exists(png)) {
+                spdlog::debug("Found icon: {}", png);
+                return fs::absolute(png).string();
+            }
         }
 
+        spdlog::warn("Icon '{}' not found, using fallback", name);
         return "audio-input-microphone";
     }
 };

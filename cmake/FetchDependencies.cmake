@@ -58,3 +58,15 @@ FetchContent_MakeAvailable(miniaudio)
 # Create interface target for miniaudio
 add_library(miniaudio INTERFACE)
 target_include_directories(miniaudio INTERFACE ${miniaudio_SOURCE_DIR})
+
+# Catch2 - Testing framework (only when tests are enabled)
+if(AUTOWHISPER_ENABLE_TESTS)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        v3.5.2
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(Catch2)
+    list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+endif()

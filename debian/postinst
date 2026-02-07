@@ -1,41 +1,20 @@
 #!/bin/bash
 set -e
 
-VENV_DIR="/opt/autowhisper/venv"
-
 case "$1" in
     configure)
         # Create models directory if it doesn't exist
         mkdir -p /usr/share/autowhisper/models
-
-        # Create venv directory (owned by root, setup script will handle permissions)
-        mkdir -p "$VENV_DIR"
-
-        # Install wrapper as the main CLI command
-        ln -sf /usr/share/autowhisper/autowhisper-wrapper /usr/local/bin/autowhisper
-
-        # Check if whisper.cpp is available
-        if command -v whisper-cli &> /dev/null; then
-            echo "whisper.cpp detected"
-        fi
 
         echo ""
         echo "================================================================"
         echo "AutoWhisper installed!"
         echo "================================================================"
         echo ""
-        echo "The Python environment will be set up on first run."
-        echo "This uses 'uv' for fast installation (~10x faster than pip)."
-        echo ""
         echo "Quick start:"
         echo "  1. Check system:   autowhisper doctor"
         echo "  2. Enable service: systemctl --user enable --now autowhisper"
         echo "  3. Test hotkey:    Press Ctrl+Shift+Space and speak"
-        echo ""
-        echo "Note: First run will download dependencies (~2GB for PyTorch+CUDA)."
-        echo ""
-        echo "To set up now instead of on first run:"
-        echo "  /usr/share/autowhisper/autowhisper-setup"
         echo ""
         echo "Configuration: ~/.config/autowhisper/config.toml"
         echo "               /etc/autowhisper/config.toml (system default)"

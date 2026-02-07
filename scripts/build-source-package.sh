@@ -140,14 +140,7 @@ build_for_series() {
     # Copy source files, excluding build artifacts and git
     rsync -a \
         --exclude='.git' \
-        --exclude='.hotkey-venv' \
-        --exclude='__pycache__' \
-        --exclude='*.pyc' \
-        --exclude='.pytest_cache' \
-        --exclude='*.egg-info' \
-        --exclude='.ruff_cache' \
         --exclude='build' \
-        --exclude='dist' \
         "$REPO_ROOT/" "$pkg_dir/"
 
     # Update debian/changelog for this series

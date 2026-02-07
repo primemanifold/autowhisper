@@ -9,9 +9,15 @@
 #include <X11/extensions/XTest.h>
 
 #include <cstring>
+#include <sys/select.h>
 #include <thread>
+#include <unistd.h>
 
 namespace autowhisper {
+
+static struct XThreadInit {
+    XThreadInit() { XInitThreads(); }
+} s_x_thread_init;
 
 struct HotkeyManager::Impl {
     HotkeyManager* manager = nullptr;
@@ -19,6 +25,7 @@ struct HotkeyManager::Impl {
     Display* ctrl_display = nullptr;
     XRecordContext record_ctx = 0;
     std::thread listener_thread;
+    int wake_pipe[2] = {-1, -1};  // pipe to signal thread to stop
 
     static std::string keycode_to_modifier(Display* dpy, unsigned int keycode) {
         KeySym ks = XkbKeycodeToKeysym(dpy, keycode, 0, 0);
@@ -40,17 +47,14 @@ struct HotkeyManager::Impl {
         if (!name) return "";
 
         std::string result(name);
-        // Normalize some names
         if (result == "Escape") return "esc";
         if (result == "Return") return "return";
         if (result == "space") return "space";
 
-        // Lowercase single chars
         if (result.size() == 1) {
             result[0] = static_cast<char>(tolower(result[0]));
         }
 
-        // Lowercase function keys
         if (result.size() > 1 && result[0] == 'F' && isdigit(result[1])) {
             std::transform(result.begin(), result.end(), result.begin(), ::tolower);
         }
@@ -105,7 +109,6 @@ HotkeyManager::HotkeyManager(const HotkeyConfig& config, EventCallback callback)
       impl_(std::make_unique<Impl>()) {
     impl_->manager = this;
 
-    // Parse combos
     for (const auto& t : config.trigger) {
         trigger_combos_.push_back(KeyCombo::parse(t));
     }
@@ -137,12 +140,17 @@ void HotkeyManager::start() {
                  }(),
                  config_.mode);
 
+    // Create wake pipe for signaling the thread to stop
+    if (pipe(impl_->wake_pipe) != 0) {
+        spdlog::error("Failed to create wake pipe");
+        return;
+    }
+
     running_.store(true);
 
     impl_->listener_thread = std::thread([this]() {
-        // Open two displays: one for data, one for control
-        impl_->data_display = XOpenDisplay(nullptr);
         impl_->ctrl_display = XOpenDisplay(nullptr);
+        impl_->data_display = XOpenDisplay(nullptr);
 
         if (!impl_->data_display || !impl_->ctrl_display) {
             spdlog::error("Failed to open X11 display for hotkey listener");
@@ -150,7 +158,6 @@ void HotkeyManager::start() {
             return;
         }
 
-        // Check XRecord extension
         int major, minor;
         if (!XRecordQueryVersion(impl_->ctrl_display, &major, &minor)) {
             spdlog::error("XRecord extension not available");
@@ -162,7 +169,6 @@ void HotkeyManager::start() {
             return;
         }
 
-        // Set up recording
         XRecordRange* range = XRecordAllocRange();
         if (!range) {
             spdlog::error("Failed to allocate XRecord range");
@@ -193,9 +199,56 @@ void HotkeyManager::start() {
 
         XSync(impl_->ctrl_display, False);
 
-        // This blocks until XRecordDisableContext is called
-        XRecordEnableContext(impl_->data_display, impl_->record_ctx,
-                             Impl::record_callback, reinterpret_cast<XPointer>(impl_.get()));
+        // Use async API so we never block indefinitely
+        if (!XRecordEnableContextAsync(impl_->data_display, impl_->record_ctx,
+                                        Impl::record_callback,
+                                        reinterpret_cast<XPointer>(impl_.get()))) {
+            spdlog::error("Failed to enable XRecord context");
+            running_.store(false);
+            return;
+        }
+
+        int x11_fd = ConnectionNumber(impl_->data_display);
+        int pipe_fd = impl_->wake_pipe[0];
+        int max_fd = std::max(x11_fd, pipe_fd) + 1;
+
+        while (running_.load()) {
+            fd_set fds;
+            FD_ZERO(&fds);
+            FD_SET(x11_fd, &fds);
+            FD_SET(pipe_fd, &fds);
+
+            struct timeval tv;
+            tv.tv_sec = 0;
+            tv.tv_usec = 200000;  // 200ms
+
+            int ret = select(max_fd, &fds, nullptr, nullptr, &tv);
+
+            if (!running_.load()) break;
+
+            if (ret > 0 && FD_ISSET(pipe_fd, &fds)) {
+                spdlog::debug("Hotkey thread: pipe wakeup received");
+                break;
+            }
+
+            if (ret > 0 && FD_ISSET(x11_fd, &fds)) {
+                XRecordProcessReplies(impl_->data_display);
+            }
+        }
+
+        // Clean up XRecord
+        spdlog::debug("Hotkey thread: disabling XRecord context");
+        XRecordDisableContext(impl_->ctrl_display, impl_->record_ctx);
+        spdlog::debug("Hotkey thread: freeing XRecord context");
+        XRecordFreeContext(impl_->ctrl_display, impl_->record_ctx);
+        impl_->record_ctx = 0;
+
+        spdlog::debug("Hotkey thread: closing displays");
+        XCloseDisplay(impl_->data_display);
+        XCloseDisplay(impl_->ctrl_display);
+        impl_->data_display = nullptr;
+        impl_->ctrl_display = nullptr;
+        spdlog::debug("Hotkey thread: done");
     });
 }
 
@@ -205,25 +258,20 @@ void HotkeyManager::stop() {
     spdlog::info("Stopping hotkey listener");
     running_.store(false);
 
-    // Disable the record context to unblock XRecordEnableContext
-    if (impl_->ctrl_display && impl_->record_ctx) {
-        XRecordDisableContext(impl_->ctrl_display, impl_->record_ctx);
-        XRecordFreeContext(impl_->ctrl_display, impl_->record_ctx);
-        impl_->record_ctx = 0;
+    // Write to pipe to wake the select() immediately
+    if (impl_->wake_pipe[1] >= 0) {
+        char c = 1;
+        ssize_t n = write(impl_->wake_pipe[1], &c, 1);
+        (void)n;
     }
 
     if (impl_->listener_thread.joinable()) {
         impl_->listener_thread.join();
     }
 
-    if (impl_->data_display) {
-        XCloseDisplay(impl_->data_display);
-        impl_->data_display = nullptr;
-    }
-    if (impl_->ctrl_display) {
-        XCloseDisplay(impl_->ctrl_display);
-        impl_->ctrl_display = nullptr;
-    }
+    // Close pipe
+    if (impl_->wake_pipe[0] >= 0) { close(impl_->wake_pipe[0]); impl_->wake_pipe[0] = -1; }
+    if (impl_->wake_pipe[1] >= 0) { close(impl_->wake_pipe[1]); impl_->wake_pipe[1] = -1; }
 
     // Reset state
     pressed_modifiers_.clear();

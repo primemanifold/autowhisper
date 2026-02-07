@@ -16,7 +16,7 @@
 
 namespace autowhisper {
 
-// Model/compute/device/language option lists (matching Python version)
+// Model/compute/device/language option lists
 static const std::vector<std::pair<std::string, std::string>> MODEL_SIZES = {
     {"tiny.en", "Tiny (English) - Fastest"},
     {"base.en", "Base (English)"},

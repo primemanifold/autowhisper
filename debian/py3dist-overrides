@@ -1,8 +1,0 @@
-torch
-faster-whisper
-ctranslate2
-silero-vad
-sounddevice
-pulsectl
-pynput
-pystray

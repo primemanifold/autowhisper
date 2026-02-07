@@ -7,13 +7,7 @@ case "$1" in
         rm -rf /etc/autowhisper
         rm -rf /usr/share/autowhisper
 
-        # Remove virtual environment
-        rm -rf /opt/autowhisper
-
-        # Remove symlink
-        rm -f /usr/local/bin/autowhisper
-
-        echo "AutoWhisper configuration, models, and virtual environment removed."
+        echo "AutoWhisper configuration and models removed."
         ;;
 
     remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)

@@ -1,11 +1,5 @@
-tar-ignore=.hotkey-venv
-tar-ignore=.benchmarks
 tar-ignore=.git
-tar-ignore=.ruff_cache
 tar-ignore=.claude
-tar-ignore=venv
+tar-ignore=build
+tar-ignore=cmake-build-*
 tar-ignore=*.deb
-tar-ignore=__pycache__
-tar-ignore=*.pyc
-tar-ignore=.pytest_cache
-tar-ignore=*.egg-info
