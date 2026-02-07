@@ -99,7 +99,7 @@ def list_models():
         click.echo()
 
     click.echo("─" * 60)
-    click.echo(f"  ✓ = downloaded")
+    click.echo("  ✓ = downloaded")
     click.echo()
     click.echo("Download a model: autowhisper model download <name>")
     click.echo()

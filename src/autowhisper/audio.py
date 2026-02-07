@@ -2,8 +2,6 @@
 
 import logging
 import threading
-from collections import deque
-from typing import Callable, Optional
 
 import numpy as np
 import sounddevice as sd
@@ -97,9 +95,9 @@ class AudioManager:
         self.config = config
         self._buffer: list[np.ndarray] = []
         self._recording = False
-        self._stream: Optional[sd.InputStream] = None
+        self._stream: sd.InputStream | None = None
         self._lock = threading.Lock()
-        self._vad: Optional[SileroVAD] = None
+        self._vad: SileroVAD | None = None
         self._speech_detected = False
         self._silence_samples = 0
         self._max_samples = int(config.max_duration * config.sample_rate)

@@ -236,8 +236,8 @@ def check_model(result: DiagnosticResult) -> bool:
     header("Model")
 
     try:
-        from .config import find_config_file, Config
-        from .models import is_model_downloaded, MODELS
+        from .config import Config, find_config_file
+        from .models import MODELS, is_model_downloaded
 
         config_path = find_config_file()
         config = Config.load(config_path)

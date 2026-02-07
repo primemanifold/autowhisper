@@ -2,10 +2,8 @@
 
 import logging
 import queue
-import threading
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Callable, Optional, Set
 
 from pynput import keyboard
 
@@ -27,8 +25,8 @@ MODIFIER_NAMES = {"ctrl", "control", "alt", "option", "shift", "super", "win", "
 @dataclass
 class KeyCombo:
     """Represents a key combination."""
-    modifiers: Set[str]
-    key: Optional[str]  # None if combo is modifiers-only (like shift+super)
+    modifiers: set[str]
+    key: str | None  # None if combo is modifiers-only (like shift+super)
     is_modifier_only: bool = False
 
     @classmethod
@@ -84,10 +82,10 @@ class HotkeyManager:
         self._trigger_combos = [KeyCombo.parse(t) for t in config.trigger]
         self._cancel_combos = [KeyCombo.parse(c) for c in config.cancel]
 
-        self._pressed_modifiers: Set[str] = set()
+        self._pressed_modifiers: set[str] = set()
         self._trigger_pressed = False
-        self._active_trigger: Optional[KeyCombo] = None  # The combo that activated recording
-        self._listener: Optional[keyboard.Listener] = None
+        self._active_trigger: KeyCombo | None = None  # The combo that activated recording
+        self._listener: keyboard.Listener | None = None
         self._running = False
 
     def start(self) -> None:
@@ -120,7 +118,7 @@ class HotkeyManager:
             self._listener.stop()
             self._listener = None
 
-    def _get_modifier_name(self, key) -> Optional[str]:
+    def _get_modifier_name(self, key) -> str | None:
         """Convert a pynput key to a modifier name."""
         if hasattr(key, "name"):
             name = key.name.lower()
@@ -151,7 +149,7 @@ class HotkeyManager:
         # Check if key matches
         return key_name == combo.key or key_name == combo.key.replace("_", "")
 
-    def _check_any_trigger(self, key_name: str = None) -> Optional[KeyCombo]:
+    def _check_any_trigger(self, key_name: str = None) -> KeyCombo | None:
         """Check if any trigger combo matches. Returns matching combo or None."""
         for combo in self._trigger_combos:
             if combo.is_modifier_only:

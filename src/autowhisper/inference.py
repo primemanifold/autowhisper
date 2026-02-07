@@ -2,7 +2,6 @@
 
 import logging
 import time
-from typing import Optional
 
 import numpy as np
 
@@ -54,7 +53,7 @@ class WhisperInference:
     def transcribe(
         self,
         audio: np.ndarray,
-        language: Optional[str] = None,
+        language: str | None = None,
     ) -> str:
         """
         Transcribe audio to text.
@@ -95,7 +94,7 @@ class WhisperInference:
             best_of=1,  # Reduce sampling candidates (default 5)
             temperature=0.0,  # Single temperature, no fallback attempts
             compression_ratio_threshold=None,  # Skip compression check
-            log_prob_threshold=None,  # Skip log prob check  
+            log_prob_threshold=None,  # Skip log prob check
             no_speech_threshold=None,  # Skip no-speech check (VAD external)
             condition_on_previous_text=False,  # Faster, no context dependency
             vad_filter=False,  # We handle VAD externally

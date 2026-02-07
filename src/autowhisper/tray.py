@@ -7,7 +7,9 @@ import threading
 from enum import Enum, auto
 from pathlib import Path
 
-from .config import Config, ModelConfig, AudioConfig, HotkeyConfig, OutputConfig, FeedbackConfig
+from .config import (
+    Config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +24,7 @@ Gtk = None
 try:
     import gi
     gi.require_version('Gtk', '3.0')
-    from gi.repository import Gtk, GLib
+    from gi.repository import GLib, Gtk
 
     # Try Ayatana first (newer), then legacy AppIndicator
     try:

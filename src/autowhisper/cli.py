@@ -8,7 +8,7 @@ from pathlib import Path
 import click
 
 from . import __version__
-from .config import Config, find_config_file
+from .config import find_config_file
 
 SERVICE_NAME = "autowhisper"
 
@@ -106,7 +106,7 @@ def logs(follow: bool, lines: int):
 @click.option("-v", "--verbose", is_flag=True, help="Verbose logging")
 def run(config: str | None, device: str | None, model: str | None, verbose: bool):
     """Run AutoWhisper in foreground (for testing)."""
-    from .__main__ import main as daemon_main, setup_logging
+    from .__main__ import main as daemon_main
 
     # Build args for the daemon main
     sys.argv = ["autowhisper"]

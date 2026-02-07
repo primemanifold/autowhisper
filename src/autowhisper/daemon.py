@@ -4,11 +4,10 @@ import logging
 import os
 import queue
 import signal
-import sys
 import threading
-import time
 from enum import Enum, auto
 from pathlib import Path
+
 from .audio import AudioManager
 from .config import Config
 from .feedback import FeedbackManager

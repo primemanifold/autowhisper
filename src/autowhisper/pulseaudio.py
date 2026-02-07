@@ -4,7 +4,6 @@ import logging
 import os
 import threading
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +39,10 @@ class PulseAudioManager:
         """
         self._enabled = enabled
         self._beep_duration = beep_duration
-        self._pulse: Optional["pulsectl.Pulse"] = None
+        self._pulse: pulsectl.Pulse | None = None
         self._muted_inputs: list[MutedSinkInput] = []
         self._lock = threading.Lock()
-        self._mute_timer: Optional[threading.Timer] = None
+        self._mute_timer: threading.Timer | None = None
         self._initialized = False
 
     def initialize(self) -> bool:

@@ -3,7 +3,6 @@
 import logging
 import subprocess
 import time
-from typing import Optional
 
 from .config import OutputConfig
 
@@ -15,9 +14,9 @@ class OutputManager:
 
     def __init__(self, config: OutputConfig):
         self.config = config
-        self._xdotool_available: Optional[bool] = None
-        self._xclip_available: Optional[bool] = None
-        self._xlib_available: Optional[bool] = None
+        self._xdotool_available: bool | None = None
+        self._xclip_available: bool | None = None
+        self._xlib_available: bool | None = None
 
     def initialize(self) -> None:
         """Check available output methods."""
@@ -45,7 +44,7 @@ class OutputManager:
 
         # Check for python-xlib
         try:
-            from Xlib import X, XK, display
+            from Xlib import XK, X, display
             self._xlib_available = True
         except ImportError:
             self._xlib_available = False
@@ -112,7 +111,7 @@ class OutputManager:
     def _inject_xlib(self, text: str) -> bool:
         """Inject text using python-xlib (direct X11)."""
         try:
-            from Xlib import X, XK, display, ext
+            from Xlib import XK, X, display
             from Xlib.protocol import event
 
             d = display.Display()

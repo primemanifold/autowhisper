@@ -1,10 +1,8 @@
 """Configuration management for AutoWhisper."""
 
 import logging
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 import toml
 
@@ -28,8 +26,8 @@ class AudioConfig:
     sample_rate: int = 16000
     channels: int = 1
     buffer_size: int = 512
-    device: Optional[str] = None  # Input device (microphone)
-    output_device: Optional[str] = None  # Output device (speaker/feedback)
+    device: str | None = None  # Input device (microphone)
+    output_device: str | None = None  # Output device (speaker/feedback)
     vad_enabled: bool = True
     vad_threshold: float = 0.5
     silence_duration: float = 0.3
@@ -79,7 +77,7 @@ class FeedbackConfig:
 class DaemonConfig:
     """Daemon configuration."""
     log_level: str = "info"
-    log_file: Optional[str] = None
+    log_file: str | None = None
     pid_file: str = "/tmp/autowhisper.pid"
     work_dir: str = "/opt/autowhisper"
 
@@ -108,7 +106,7 @@ class Config:
         if not path.exists():
             raise FileNotFoundError(f"Config file not found: {path}")
 
-        with open(path, "r") as f:
+        with open(path) as f:
             data = toml.load(f)
 
         config = cls._from_dict(data)

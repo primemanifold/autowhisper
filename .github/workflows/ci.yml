@@ -2,9 +2,11 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, core]
   pull_request:
-    branches: [main]
+    branches: [main, core]
+  release:
+    types: [published]
 
 jobs:
   lint:
@@ -44,6 +46,7 @@ jobs:
 
   build-deb:
     runs-on: ubuntu-24.04
+    if: github.event_name == 'release'
     steps:
       - uses: actions/checkout@v4
 
@@ -91,6 +94,7 @@ jobs:
 
   build-source:
     runs-on: ubuntu-24.04
+    if: github.event_name == 'release'
     steps:
       - uses: actions/checkout@v4
 
