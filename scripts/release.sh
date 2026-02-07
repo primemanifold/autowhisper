@@ -1,16 +1,18 @@
 #!/bin/bash
 # Release script for AutoWhisper
 # Usage: ./scripts/release.sh [patch|minor|major|X.Y.Z]
+#
+# This script handles the local release workflow:
+# 1. Bump version in source files
+# 2. Update debian/changelog
+# 3. Commit changes
+# 4. Create annotated tag
+# 5. Push to origin (triggers CI for PPA upload)
 
 set -e
 
 # Configuration
-GPG_KEY="9D95F673AAED28443AAF932A0252321A2401D829"
-PPA="ppa:primemanifold/autowhisper"
 MAINTAINER="AutoWhisper Contributors <autowhisper@users.noreply.github.com>"
-
-# Ubuntu series to build for
-UBUNTU_SERIES=("noble")
 
 # Colors
 RED='\033[0;31m'
@@ -28,10 +30,6 @@ header() { echo -e "${BLUE}=== $1 ===${NC}"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$REPO_ROOT"
-
-# Check prerequisites
-command -v debuild >/dev/null 2>&1 || error "debuild not found. Install: sudo apt install devscripts"
-command -v dput >/dev/null 2>&1 || error "dput not found. Install: sudo apt install dput"
 
 # Check git status
 if [[ -n $(git status --porcelain) ]]; then
@@ -67,7 +65,7 @@ bump_version() {
     esac
 }
 
-# Update version in source files (not changelog - that's done per-series)
+# Update version in source files
 update_source_versions() {
     local new_version="$1"
 
@@ -79,60 +77,25 @@ update_source_versions() {
     # src/autowhisper/__init__.py
     sed -i "s/__version__ = \".*\"/__version__ = \"$new_version\"/" src/autowhisper/__init__.py
 
-    info "Versions updated in pyproject.toml, __init__.py"
+    info "  - pyproject.toml"
+    info "  - src/autowhisper/__init__.py"
 }
 
-# Build source package for a specific Ubuntu series
-build_for_series() {
-    local version="$1"
-    local series="$2"
-    local revision="$3"
-    local build_dir="$4"
-
-    header "Building for Ubuntu $series"
-
-    local pkg_dir="$build_dir/autowhisper-${version}-${series}"
-
-    # Clone current state
-    git clone --depth 1 "$REPO_ROOT" "$pkg_dir" 2>/dev/null
-    rm -rf "$pkg_dir/.git" "$pkg_dir/.hotkey-venv"
-
-    # Update debian/changelog for this series
+# Update debian/changelog
+update_debian_changelog() {
+    local new_version="$1"
     local date_str=$(date -R)
-    cat > "$pkg_dir/debian/changelog" << EOF
-autowhisper (${version}-${revision}~${series}1) ${series}; urgency=medium
 
-  * Release ${version}
+    info "Updating debian/changelog..."
+
+    local changelog_entry="autowhisper (${new_version}-1) noble; urgency=medium
+
+  * Release ${new_version}
 
  -- ${MAINTAINER}  ${date_str}
-EOF
-
-    # Create orig tarball (only needed once per version)
-    cd "$build_dir"
-    if [[ ! -f "autowhisper_${version}.orig.tar.gz" ]]; then
-        tar czf "autowhisper_${version}.orig.tar.gz" -C "$pkg_dir" . --transform "s,^\.,autowhisper-${version},"
-    fi
-
-    # Build source package
-    cd "$pkg_dir"
-    debuild -S -sa -d -k"$GPG_KEY" 2>&1 | tail -5
-
-    info "Built: autowhisper_${version}-${revision}~${series}1_source.changes"
-}
-
-# Upload all packages to PPA
-upload_all() {
-    local build_dir="$1"
-
-    header "Uploading to PPA"
-
-    for changes in "$build_dir"/*_source.changes; do
-        if [[ -f "$changes" ]]; then
-            info "Uploading $(basename "$changes")..."
-            dput "$PPA" "$changes"
-            echo ""
-        fi
-    done
+"
+    echo -e "${changelog_entry}\n$(cat debian/changelog)" > debian/changelog
+    info "  - debian/changelog"
 }
 
 # Main
@@ -145,8 +108,13 @@ main() {
     header "AutoWhisper Release"
     echo "Current version: $current_version"
     echo "New version:     $new_version"
-    echo "PPA:             $PPA"
-    echo "Ubuntu series:   ${UBUNTU_SERIES[*]}"
+    echo ""
+    echo "This will:"
+    echo "  1. Bump version in source files"
+    echo "  2. Update debian/changelog"
+    echo "  3. Commit changes"
+    echo "  4. Create tag v${new_version}"
+    echo "  5. Push to origin (triggers CI for PPA upload)"
     echo ""
 
     # Confirm
@@ -160,15 +128,8 @@ main() {
     # Update source versions
     update_source_versions "$new_version"
 
-    # Update main changelog (for git history)
-    local date_str=$(date -R)
-    local changelog_entry="autowhisper (${new_version}-1) noble; urgency=medium
-
-  * Release ${new_version}
-
- -- ${MAINTAINER}  ${date_str}
-"
-    echo -e "${changelog_entry}\n$(cat debian/changelog)" > debian/changelog
+    # Update debian changelog
+    update_debian_changelog "$new_version"
 
     # Commit changes
     info "Committing version bump..."
@@ -179,42 +140,37 @@ main() {
     info "Creating tag v${new_version}..."
     git tag -a "v${new_version}" -m "Release ${new_version}"
 
-    # Create build directory
-    local build_dir=$(mktemp -d)
-    info "Build directory: $build_dir"
-
-    # Build for each series
-    local revision=1
-    for series in "${UBUNTU_SERIES[@]}"; do
-        build_for_series "$new_version" "$series" "$revision" "$build_dir"
-    done
-
-    # List built packages
     echo ""
-    header "Built Packages"
-    ls -la "$build_dir"/*_source.changes 2>/dev/null || warn "No packages built"
-
-    # Upload
+    header "Release Prepared"
     echo ""
-    read -p "Upload all packages to PPA? [y/N] " -n 1 -r
+    echo "Local changes are ready. To complete the release:"
+    echo ""
+    echo "  git push origin $(git branch --show-current)"
+    echo "  git push origin v${new_version}"
+    echo ""
+    echo "This will trigger CI to:"
+    echo "  - Build signed source package"
+    echo "  - Upload to PPA"
+    echo "  - Create GitHub release"
+    echo ""
+
+    # Offer to push
+    read -p "Push now? [y/N] " -n 1 -r
     echo ""
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        upload_all "$build_dir"
-
-        # Push to origin
+        local branch=$(git branch --show-current)
         info "Pushing to origin..."
-        git push origin main
+        git push origin "$branch"
         git push origin "v${new_version}"
 
         echo ""
-        info "Release v${new_version} complete!"
-        echo "Monitor builds at: https://launchpad.net/~primemanifold/+archive/ubuntu/autowhisper/+packages"
+        info "Release v${new_version} pushed!"
+        echo ""
+        echo "Monitor the release:"
+        echo "  - CI: https://github.com/$(git remote get-url origin | sed 's/.*github.com[:/]\(.*\)\.git/\1/')/actions"
+        echo "  - PPA: https://launchpad.net/~primemanifold/+archive/ubuntu/autowhisper/+packages"
     else
-        warn "Skipped PPA upload."
-        echo "Packages are in: $build_dir"
-        echo "Don't forget to push:"
-        echo "  git push origin main"
-        echo "  git push origin v${new_version}"
+        warn "Push skipped. Don't forget to push when ready!"
     fi
 }
 

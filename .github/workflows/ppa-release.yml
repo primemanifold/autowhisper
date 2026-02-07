@@ -1,0 +1,178 @@
+name: Release to PPA
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  GPG_KEY_ID: 9D95F673AAED28443AAF932A0252321A2401D829
+  PPA: ppa:primemanifold/autowhisper
+  UBUNTU_SERIES: noble
+
+jobs:
+  release-ppa:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write  # For creating GitHub releases
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          echo "version=$TAG_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Tag version: $TAG_VERSION"
+
+      - name: Verify version matches pyproject.toml
+        run: |
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          FILE_VERSION=$(grep -Po '(?<=^version = ")[^"]+' pyproject.toml)
+          echo "Tag version:  $TAG_VERSION"
+          echo "File version: $FILE_VERSION"
+          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
+            echo "::error::Version mismatch: tag=$TAG_VERSION, pyproject.toml=$FILE_VERSION"
+            exit 1
+          fi
+          echo "✓ Version verified: $TAG_VERSION"
+
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | base64 -d | gpg --batch --import
+
+          # Configure gpg-agent for non-interactive signing
+          mkdir -p ~/.gnupg
+          echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
+          echo "default-cache-ttl 3600" >> ~/.gnupg/gpg-agent.conf
+          echo "max-cache-ttl 3600" >> ~/.gnupg/gpg-agent.conf
+          gpg-connect-agent reloadagent /bye
+
+          # Verify key is imported
+          gpg --list-secret-keys "${{ env.GPG_KEY_ID }}"
+          echo "✓ GPG key imported successfully"
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            debhelper \
+            devscripts \
+            dh-python \
+            pybuild-plugin-pyproject \
+            python3-all \
+            python3-setuptools \
+            dput \
+            rsync
+
+      - name: Build signed source package
+        id: build
+        env:
+          GPG_KEY: ${{ env.GPG_KEY_ID }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUILD_DIR="${{ runner.temp }}/ppa-build"
+          mkdir -p "$BUILD_DIR"
+
+          ./scripts/build-source-package.sh "$VERSION" \
+            --series "${{ env.UBUNTU_SERIES }}" \
+            --output-dir "$BUILD_DIR"
+
+          # Find the changes file
+          CHANGES_FILE=$(ls "$BUILD_DIR"/*_source.changes 2>/dev/null | head -1)
+          if [ -z "$CHANGES_FILE" ]; then
+            echo "::error::No changes file found"
+            exit 1
+          fi
+
+          echo "changes_file=$CHANGES_FILE" >> "$GITHUB_OUTPUT"
+          echo "build_dir=$BUILD_DIR" >> "$GITHUB_OUTPUT"
+          echo "✓ Source package built: $CHANGES_FILE"
+
+      - name: Verify package signature
+        run: |
+          CHANGES_FILE="${{ steps.build.outputs.changes_file }}"
+          echo "Verifying signature on: $CHANGES_FILE"
+          gpg --verify "$CHANGES_FILE"
+          echo "✓ Package signature verified"
+
+      - name: Configure dput
+        run: |
+          cat > ~/.dput.cf << 'EOF'
+          [ppa]
+          fqdn = ppa.launchpad.net
+          method = ftp
+          incoming = ~primemanifold/autowhisper/ubuntu
+          login = anonymous
+          allow_unsigned_uploads = 0
+          EOF
+          echo "✓ dput configured"
+
+      - name: Upload to PPA
+        run: |
+          CHANGES_FILE="${{ steps.build.outputs.changes_file }}"
+          echo "Uploading to ${{ env.PPA }}..."
+          dput ppa "$CHANGES_FILE"
+          echo "✓ Package uploaded to PPA"
+
+      - name: Collect release artifacts
+        id: artifacts
+        run: |
+          BUILD_DIR="${{ steps.build.outputs.build_dir }}"
+          ARTIFACTS_DIR="${{ runner.temp }}/artifacts"
+          mkdir -p "$ARTIFACTS_DIR"
+
+          # Copy source package files
+          cp "$BUILD_DIR"/*.dsc "$ARTIFACTS_DIR/" 2>/dev/null || true
+          cp "$BUILD_DIR"/*.tar.* "$ARTIFACTS_DIR/" 2>/dev/null || true
+          cp "$BUILD_DIR"/*_source.changes "$ARTIFACTS_DIR/" 2>/dev/null || true
+
+          echo "artifacts_dir=$ARTIFACTS_DIR" >> "$GITHUB_OUTPUT"
+          ls -la "$ARTIFACTS_DIR"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: AutoWhisper v${{ steps.version.outputs.version }}
+          body: |
+            ## AutoWhisper v${{ steps.version.outputs.version }}
+
+            ### Installation
+
+            **Ubuntu (PPA):**
+            ```bash
+            sudo add-apt-repository ppa:primemanifold/autowhisper
+            sudo apt update
+            sudo apt install autowhisper
+            ```
+
+            ### Changes
+
+            See [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+
+            ---
+            *Package uploaded to [Launchpad PPA](https://launchpad.net/~primemanifold/+archive/ubuntu/autowhisper)*
+          files: |
+            ${{ steps.artifacts.outputs.artifacts_dir }}/*.dsc
+            ${{ steps.artifacts.outputs.artifacts_dir }}/*.tar.*
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "## Release Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Version:** $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Tag:** ${{ github.ref_name }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **PPA:** ${{ env.PPA }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Series:** ${{ env.UBUNTU_SERIES }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Next Steps" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "1. Monitor build at: https://launchpad.net/~primemanifold/+archive/ubuntu/autowhisper/+packages" >> "$GITHUB_STEP_SUMMARY"
+          echo "2. Check GitHub Release: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}" >> "$GITHUB_STEP_SUMMARY"
