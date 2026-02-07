@@ -1,0 +1,10 @@
+# Platform detection
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(LINUX TRUE)
+    message(STATUS "Platform: Linux")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(APPLE TRUE)
+    message(STATUS "Platform: macOS")
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    message(STATUS "Platform: Windows")
+endif()
