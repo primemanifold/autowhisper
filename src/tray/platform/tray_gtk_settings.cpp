@@ -710,12 +710,15 @@ void show_settings_dialog(TrayManager* mgr, const Config& config,
 
     GtkWidget* dialog = gtk_dialog_new_with_buttons(
         "AutoWhisper Settings", nullptr,
-        static_cast<GtkDialogFlags>(GTK_DIALOG_MODAL),
+        static_cast<GtkDialogFlags>(0),  // not modal — no parent to be modal relative to
         "Cancel", GTK_RESPONSE_CANCEL,
         "Save", GTK_RESPONSE_OK,
         nullptr);
     gtk_window_set_default_size(GTK_WINDOW(dialog), 450, -1);
     gtk_window_set_resizable(GTK_WINDOW(dialog), TRUE);
+    gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_CENTER);
+    gtk_window_set_type_hint(GTK_WINDOW(dialog), GDK_WINDOW_TYPE_HINT_NORMAL);
+    gtk_window_set_skip_taskbar_hint(GTK_WINDOW(dialog), FALSE);
 
     GtkWidget* content = gtk_dialog_get_content_area(GTK_DIALOG(dialog));
 
@@ -767,6 +770,7 @@ void show_settings_dialog(TrayManager* mgr, const Config& config,
         }), data);
 
     gtk_widget_show_all(dialog);
+    gtk_window_present(GTK_WINDOW(dialog));
 
     int response = gtk_dialog_run(GTK_DIALOG(dialog));
 

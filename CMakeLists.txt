@@ -154,6 +154,7 @@ autowhisper_set_warnings(autowhisper)
 
 # Install
 install(TARGETS autowhisper RUNTIME DESTINATION bin)
+install(DIRECTORY icons/ DESTINATION share/autowhisper/icons)
 
 # Tests
 if(AUTOWHISPER_ENABLE_TESTS)

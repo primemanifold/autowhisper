@@ -53,7 +53,11 @@ struct TrayManager::Impl {
             search_paths.push_back((exe_dir.parent_path() / "icons").string());
         } catch (...) {}
 
-        // Standard install locations
+        // Standard install locations (relative to prefix: /usr or /usr/local)
+        try {
+            auto prefix = fs::read_symlink("/proc/self/exe").parent_path().parent_path();
+            search_paths.push_back((prefix / "share" / "autowhisper" / "icons").string());
+        } catch (...) {}
         search_paths.push_back("/usr/share/autowhisper/icons");
 
         // CWD-relative fallbacks

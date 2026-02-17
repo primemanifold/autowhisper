@@ -78,21 +78,21 @@ struct HotkeyManager::Impl {
         int type = hook->data[0];
 
         if (type == KeyPress) {
-            std::string mod = keycode_to_modifier(impl->data_display, keycode);
+            std::string mod = keycode_to_modifier(impl->ctrl_display, keycode);
             if (!mod.empty()) {
                 impl->manager->on_modifier_press(mod);
             } else {
-                std::string name = keycode_to_name(impl->data_display, keycode);
+                std::string name = keycode_to_name(impl->ctrl_display, keycode);
                 if (!name.empty()) {
                     impl->manager->on_key_press(name);
                 }
             }
         } else if (type == KeyRelease) {
-            std::string mod = keycode_to_modifier(impl->data_display, keycode);
+            std::string mod = keycode_to_modifier(impl->ctrl_display, keycode);
             if (!mod.empty()) {
                 impl->manager->on_modifier_release(mod);
             } else {
-                std::string name = keycode_to_name(impl->data_display, keycode);
+                std::string name = keycode_to_name(impl->ctrl_display, keycode);
                 if (!name.empty()) {
                     impl->manager->on_key_release(name);
                 }
@@ -207,6 +207,11 @@ void HotkeyManager::start() {
             running_.store(false);
             return;
         }
+
+        // Flush the enable request to the X server — without this,
+        // the request sits in Xlib's output buffer and the server
+        // never starts delivering XRecord events.
+        XFlush(impl_->data_display);
 
         int x11_fd = ConnectionNumber(impl_->data_display);
         int pipe_fd = impl_->wake_pipe[0];
