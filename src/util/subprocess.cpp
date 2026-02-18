@@ -40,6 +40,34 @@ inline bool set_nonblocking(int fd) {
     return fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0;
 }
 
+inline void terminate_child(pid_t pid) {
+    if (pid <= 0) return;
+    kill(pid, SIGKILL);
+    waitpid(pid, nullptr, 0);
+}
+
+inline bool wait_for_child_with_deadline(pid_t pid,
+                                         const std::chrono::steady_clock::time_point& deadline,
+                                         int* status_out) {
+    for (;;) {
+        int status = 0;
+        pid_t rc = waitpid(pid, &status, WNOHANG);
+        if (rc == pid) {
+            if (status_out) *status_out = status;
+            return true;
+        }
+        if (rc < 0) {
+            if (errno == EINTR) continue;
+            return false;
+        }
+
+        if (std::chrono::steady_clock::now() >= deadline) {
+            return false;
+        }
+        usleep(10000);
+    }
+}
+
 }  // namespace
 
 ProcessResult run_command(const std::vector<std::string>& args, int timeout_seconds) {
@@ -97,27 +125,46 @@ ProcessResult run_command(const std::vector<std::string>& args, int timeout_seco
     fds[1].fd = stderr_pipe[0];
     fds[1].events = POLLIN;
 
-    int timeout_ms = timeout_seconds * 1000;
+    auto deadline = std::chrono::steady_clock::now() +
+                    std::chrono::seconds(timeout_seconds);
     std::array<char, 4096> buf;
 
     bool stdout_done = false;
     bool stderr_done = false;
 
     while (!stdout_done || !stderr_done) {
+        auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now()).count();
+        if (remaining <= 0) {
+            terminate_child(pid);
+            close(stdout_pipe[0]);
+            close(stderr_pipe[0]);
+            result.exit_code = -1;
+            result.stderr_str = "timeout";
+            return result;
+        }
+
         int nfds = 0;
         struct pollfd active_fds[2];
         if (!stdout_done) { active_fds[nfds] = fds[0]; nfds++; }
         if (!stderr_done) { active_fds[nfds] = fds[1]; nfds++; }
 
-        int ret = poll(active_fds, nfds, timeout_ms);
-        if (ret <= 0) {
-            // Timeout or error
-            kill(pid, SIGKILL);
-            waitpid(pid, nullptr, 0);
+        int ret = poll(active_fds, nfds, static_cast<int>(remaining));
+        if (ret == 0) {
+            terminate_child(pid);
             close(stdout_pipe[0]);
             close(stderr_pipe[0]);
             result.exit_code = -1;
             result.stderr_str = "timeout";
+            return result;
+        }
+        if (ret < 0) {
+            if (errno == EINTR) continue;
+            terminate_child(pid);
+            close(stdout_pipe[0]);
+            close(stderr_pipe[0]);
+            result.exit_code = -1;
+            result.stderr_str = "poll_error";
             return result;
         }
 
@@ -152,8 +199,13 @@ ProcessResult run_command(const std::vector<std::string>& args, int timeout_seco
     close(stdout_pipe[0]);
     close(stderr_pipe[0]);
 
-    int status;
-    waitpid(pid, &status, 0);
+    int status = 0;
+    if (!wait_for_child_with_deadline(pid, deadline, &status)) {
+        terminate_child(pid);
+        result.exit_code = -1;
+        result.stderr_str = "timeout";
+        return result;
+    }
     if (WIFEXITED(status)) {
         result.exit_code = WEXITSTATUS(status);
     }
@@ -238,30 +290,25 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
     }
 
     while (!stdin_done || !stdout_done || !stderr_done) {
+        auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now()).count();
+        if (remaining <= 0) {
+            terminate_child(pid);
+            close_fd(stdin_pipe[1]);
+            close_fd(stdout_pipe[0]);
+            close_fd(stderr_pipe[0]);
+            result.exit_code = -1;
+            result.stderr_str = "timeout";
+            return result;
+        }
+
         // Once stdin is written, use short poll intervals so we can
         // check whether the child has exited.  Programs like xclip fork
         // a background process that keeps our pipe FDs open; without
         // this we'd block until the full timeout.
-        int poll_ms;
-        if (stdin_done) {
-            auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
-                deadline - std::chrono::steady_clock::now()).count();
-            if (remaining <= 0) {
-                kill(pid, SIGKILL);
-                waitpid(pid, nullptr, 0);
-                close_fd(stdin_pipe[1]);
-                close_fd(stdout_pipe[0]);
-                close_fd(stderr_pipe[0]);
-                result.exit_code = -1;
-                result.stderr_str = "timeout";
-                return result;
-            }
-            poll_ms = std::min<int>(50, static_cast<int>(remaining));
-        } else {
-            auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
-                deadline - std::chrono::steady_clock::now()).count();
-            poll_ms = std::max<int>(0, static_cast<int>(remaining));
-        }
+        int poll_ms = stdin_done
+            ? std::min<int>(50, static_cast<int>(remaining))
+            : static_cast<int>(remaining);
 
         struct pollfd active_fds[3];
         int nfds = 0;
@@ -289,7 +336,13 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
 
         int ret = poll(active_fds, nfds, poll_ms);
         if (ret < 0 && errno != EINTR) {
-            break;
+            terminate_child(pid);
+            close_fd(stdin_pipe[1]);
+            close_fd(stdout_pipe[0]);
+            close_fd(stderr_pipe[0]);
+            result.exit_code = -1;
+            result.stderr_str = "poll_error";
+            return result;
         }
 
         // Process any available data
@@ -395,8 +448,13 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
     close_fd(stdout_pipe[0]);
     close_fd(stderr_pipe[0]);
 
-    int status;
-    waitpid(pid, &status, 0);
+    int status = 0;
+    if (!wait_for_child_with_deadline(pid, deadline, &status)) {
+        terminate_child(pid);
+        result.exit_code = -1;
+        result.stderr_str = "timeout";
+        return result;
+    }
     if (WIFEXITED(status)) {
         result.exit_code = WEXITSTATUS(status);
     }

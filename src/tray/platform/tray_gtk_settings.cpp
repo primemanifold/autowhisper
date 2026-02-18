@@ -6,6 +6,8 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cctype>
+#include <cerrno>
 #include <filesystem>
 #include <fstream>
 #include <set>
@@ -74,7 +76,7 @@ static std::string normalize_gdk_key(const std::string& keyname) {
     if (keyname == "Super_L" || keyname == "Super_R") return "super";
     if (keyname == "Meta_L" || keyname == "Meta_R") return "super";
     if (keyname == "Escape") return "esc";
-    if (keyname == "Return") return "enter";
+    if (keyname == "Return") return "return";
     if (keyname == "space") return "space";
     if (keyname == "Tab") return "tab";
 
@@ -508,11 +510,64 @@ static GtkWidget* build_hotkeys_section(SettingsDialogData* data, const Config& 
 // Forward declaration — defined later in the file
 static std::string get_combo_active_id(GtkWidget* combo);
 
+static bool file_has_min_size(const std::string& path, std::uintmax_t min_size) {
+    try {
+        return !path.empty() &&
+               fs::exists(path) &&
+               fs::is_regular_file(path) &&
+               fs::file_size(path) >= min_size;
+    } catch (const std::exception& e) {
+        spdlog::warn("Filesystem check failed for '{}': {}", path, e.what());
+        return false;
+    }
+}
+
+static void remove_file_if_exists(const std::string& path) {
+    if (path.empty()) return;
+    try {
+        if (fs::exists(path)) {
+            fs::remove(path);
+        }
+    } catch (const std::exception& e) {
+        spdlog::warn("Failed to remove file '{}': {}", path, e.what());
+    }
+}
+
+static void terminate_download_process(SettingsDialogData* data) {
+    if (data->download_pid <= 0) return;
+
+    pid_t pid = data->download_pid;
+    data->download_pid = -1;
+
+    if (kill(pid, SIGTERM) != 0 && errno != ESRCH) {
+        spdlog::warn("Failed to terminate download process {}: {}", pid, errno);
+    }
+
+    int status = 0;
+    for (int i = 0; i < 50; i++) {
+        pid_t rc = waitpid(pid, &status, WNOHANG);
+        if (rc == pid) return;
+        if (rc < 0) {
+            if (errno == EINTR) continue;
+            return;
+        }
+        usleep(10000);
+    }
+
+    kill(pid, SIGKILL);
+    waitpid(pid, &status, 0);
+}
+
 static void update_model_status(SettingsDialogData* data) {
     std::string model_name = get_combo_active_id(data->model_size_combo);
     if (model_name.empty()) return;
 
-    bool downloaded = is_model_downloaded(model_name);
+    bool downloaded = false;
+    try {
+        downloaded = is_model_downloaded(model_name);
+    } catch (const std::exception& e) {
+        spdlog::warn("Failed to check model status for '{}': {}", model_name, e.what());
+    }
     bool downloading = (data->download_pid > 0);
 
     if (downloaded) {
@@ -545,15 +600,9 @@ static void cleanup_download(SettingsDialogData* data) {
         close(data->download_stderr_fd);
         data->download_stderr_fd = -1;
     }
-    if (data->download_pid > 0) {
-        kill(data->download_pid, SIGTERM);
-        waitpid(data->download_pid, nullptr, 0);
-        data->download_pid = -1;
-    }
-    if (!data->download_dest.empty() && fs::exists(data->download_dest)) {
-        fs::remove(data->download_dest);
-        data->download_dest.clear();
-    }
+    terminate_download_process(data);
+    remove_file_if_exists(data->download_dest);
+    data->download_dest.clear();
 }
 
 static gboolean on_download_progress(GIOChannel* channel, GIOCondition condition, gpointer user_data) {
@@ -599,7 +648,7 @@ static gboolean on_download_progress(GIOChannel* channel, GIOCondition condition
         }
     }
 
-    if (condition & G_IO_HUP) {
+    if (condition & (G_IO_HUP | G_IO_ERR | G_IO_NVAL)) {
         // Child process ended — reap it
         int status = 0;
         if (data->download_pid > 0) {
@@ -607,9 +656,7 @@ static gboolean on_download_progress(GIOChannel* channel, GIOCondition condition
         }
 
         bool success = WIFEXITED(status) && WEXITSTATUS(status) == 0
-                        && !data->download_dest.empty()
-                        && fs::exists(data->download_dest)
-                        && fs::file_size(data->download_dest) > 1000;
+                        && file_has_min_size(data->download_dest, 1000);
 
         // Clean up IO watch and pipe
         data->download_watch_id = 0;
@@ -624,9 +671,7 @@ static gboolean on_download_progress(GIOChannel* channel, GIOCondition condition
             update_model_status(data);
         } else {
             // Remove partial file
-            if (!data->download_dest.empty() && fs::exists(data->download_dest)) {
-                fs::remove(data->download_dest);
-            }
+            remove_file_if_exists(data->download_dest);
             data->download_dest.clear();
             gtk_label_set_markup(GTK_LABEL(data->model_status_label),
                 "<span foreground='#F44336'>Download failed</span>");
@@ -647,12 +692,19 @@ static void start_model_download(SettingsDialogData* data) {
     if (!info) return;
 
     std::string cache_dir = get_cache_dir();
-    fs::create_directories(cache_dir);
+    try {
+        fs::create_directories(cache_dir);
+    } catch (const std::exception& e) {
+        spdlog::error("Failed to create model cache directory '{}': {}", cache_dir, e.what());
+        gtk_label_set_markup(GTK_LABEL(data->model_status_label),
+            "<span foreground='#F44336'>Download failed</span>");
+        return;
+    }
 
     std::string dest = cache_dir + "/" + info->ggml_file;
 
     // Already downloaded
-    if (fs::exists(dest) && fs::file_size(dest) > 1000) {
+    if (file_has_min_size(dest, 1000)) {
         update_model_status(data);
         return;
     }
@@ -696,7 +748,7 @@ static void start_model_download(SettingsDialogData* data) {
     g_io_channel_set_flags(channel, G_IO_FLAG_NONBLOCK, nullptr);
 
     data->download_watch_id = g_io_add_watch(channel,
-        static_cast<GIOCondition>(G_IO_IN | G_IO_HUP),
+        static_cast<GIOCondition>(G_IO_IN | G_IO_HUP | G_IO_ERR | G_IO_NVAL),
         on_download_progress, data);
 
     g_io_channel_unref(channel);

@@ -19,4 +19,21 @@ TEST_CASE("run_command_with_input enforces timeout", "[subprocess]") {
     REQUIRE(result.stderr_str == "timeout");
 }
 
+TEST_CASE("run_command enforces wall-clock timeout for noisy processes", "[subprocess]") {
+    auto result = autowhisper::run_command(
+        {"bash", "-lc", "for i in $(seq 1 40); do echo tick; sleep 0.1; done"},
+        1);
+
+    REQUIRE(result.exit_code == -1);
+    REQUIRE(result.stderr_str == "timeout");
+}
+
+TEST_CASE("run_command_with_input times out when child never drains stdin", "[subprocess]") {
+    std::string large_input(2 * 1024 * 1024, 'x');
+    auto result = autowhisper::run_command_with_input({"sleep", "2"}, large_input, 1);
+
+    REQUIRE(result.exit_code == -1);
+    REQUIRE(result.stderr_str == "timeout");
+}
+
 #endif

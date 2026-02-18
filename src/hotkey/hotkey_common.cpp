@@ -98,11 +98,21 @@ bool HotkeyManager::check_any_cancel(const std::string& key_name) const {
 
 bool HotkeyManager::check_combo(const KeyCombo& combo, const std::string& key_name) const {
     if (combo.modifiers != pressed_modifiers_) return false;
+
+    auto normalize_alias = [](const std::string& key) -> std::string {
+        if (key == "enter") return "return";
+        if (key == "escape") return "esc";
+        return key;
+    };
+
+    std::string combo_key = normalize_alias(combo.key);
+    std::string incoming_key = normalize_alias(key_name);
+
     // Try exact match and underscore-removed match
-    std::string key_no_underscore = combo.key;
+    std::string key_no_underscore = combo_key;
     key_no_underscore.erase(std::remove(key_no_underscore.begin(), key_no_underscore.end(), '_'),
                              key_no_underscore.end());
-    return key_name == combo.key || key_name == key_no_underscore;
+    return incoming_key == combo_key || incoming_key == key_no_underscore;
 }
 
 void HotkeyManager::on_modifier_press(const std::string& modifier) {
