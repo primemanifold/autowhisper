@@ -65,13 +65,21 @@ The binary is at `build/autowhisper`.
 | `AUTOWHISPER_ENABLE_TESTS` | ON | Build the Catch2 test suite |
 
 ```bash
-# Build with CUDA support
-cmake -B build -DCMAKE_BUILD_TYPE=Release -DAUTOWHISPER_ENABLE_CUDA=ON
+# Build with CUDA support (requires CUDA toolkit 12.x)
+sudo apt install cuda-toolkit-12-8  # or any 12.x version
+cmake -B build -DCMAKE_BUILD_TYPE=Release \
+  -DAUTOWHISPER_ENABLE_CUDA=ON \
+  -DCMAKE_CUDA_ARCHITECTURES=native \
+  -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.8/bin/nvcc
 cmake --build build -j$(nproc)
 
 # Run tests
 cd build && ctest --output-on-failure
 ```
+
+> **Note:** CUDA 13.x is not yet supported (whisper.cpp v1.7.3 uses deprecated CUDA
+> runtime APIs removed in CUDA 13). Use CUDA 12.8 or 12.9 — the NVIDIA driver is
+> backwards-compatible, so a newer driver works fine with an older toolkit.
 
 ## Configure
 
