@@ -171,7 +171,7 @@ std::string WhisperInference::transcribe(const std::vector<float>& audio,
 
     auto end = std::chrono::high_resolution_clock::now();
     float elapsed = std::chrono::duration<float>(end - start).count();
-    float audio_duration = static_cast<float>(audio.size()) / 16000.0f;
+    float audio_duration = static_cast<float>(audio.size()) / WHISPER_SAMPLE_RATE;
     float rtf = (audio_duration > 0) ? elapsed / audio_duration : 0.0f;
 
     spdlog::debug("Transcription: {:.3f}s for {:.2f}s audio (RTF: {:.2f}x realtime)",

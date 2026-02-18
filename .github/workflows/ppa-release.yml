@@ -84,9 +84,14 @@ jobs:
           BUILD_DIR="${{ runner.temp }}/ppa-build"
           mkdir -p "$BUILD_DIR"
 
-          ./scripts/build-source-package.sh "$VERSION" \
-            --series "${{ env.UBUNTU_SERIES }}" \
-            --output-dir "$BUILD_DIR"
+          # Build signed source package
+          dpkg-buildpackage -S -sa -k"$GPG_KEY"
+
+          # Move artifacts to build dir
+          mv ../autowhisper_*.dsc "$BUILD_DIR/" 2>/dev/null || true
+          mv ../autowhisper_*.tar.* "$BUILD_DIR/" 2>/dev/null || true
+          mv ../autowhisper_*_source.changes "$BUILD_DIR/" 2>/dev/null || true
+          mv ../autowhisper_*_source.buildinfo "$BUILD_DIR/" 2>/dev/null || true
 
           # Find the changes file
           CHANGES_FILE=$(ls "$BUILD_DIR"/*_source.changes 2>/dev/null | head -1)

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -220,7 +221,8 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
     set_nonblocking(stdout_pipe[0]);
     set_nonblocking(stderr_pipe[0]);
 
-    int timeout_ms = timeout_seconds * 1000;
+    auto deadline = std::chrono::steady_clock::now() +
+                    std::chrono::seconds(timeout_seconds);
     std::array<char, 4096> buf;
 
     size_t written = 0;
@@ -228,12 +230,39 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
     bool stdin_done = (total == 0);
     bool stdout_done = false;
     bool stderr_done = false;
+    bool child_exited = false;
+    int child_status = 0;
 
     if (stdin_done) {
         close_fd(stdin_pipe[1]);
     }
 
     while (!stdin_done || !stdout_done || !stderr_done) {
+        // Once stdin is written, use short poll intervals so we can
+        // check whether the child has exited.  Programs like xclip fork
+        // a background process that keeps our pipe FDs open; without
+        // this we'd block until the full timeout.
+        int poll_ms;
+        if (stdin_done) {
+            auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+                deadline - std::chrono::steady_clock::now()).count();
+            if (remaining <= 0) {
+                kill(pid, SIGKILL);
+                waitpid(pid, nullptr, 0);
+                close_fd(stdin_pipe[1]);
+                close_fd(stdout_pipe[0]);
+                close_fd(stderr_pipe[0]);
+                result.exit_code = -1;
+                result.stderr_str = "timeout";
+                return result;
+            }
+            poll_ms = std::min<int>(50, static_cast<int>(remaining));
+        } else {
+            auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+                deadline - std::chrono::steady_clock::now()).count();
+            poll_ms = std::max<int>(0, static_cast<int>(remaining));
+        }
+
         struct pollfd active_fds[3];
         int nfds = 0;
 
@@ -258,19 +287,13 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
 
         if (nfds == 0) break;
 
-        int ret = poll(active_fds, nfds, timeout_ms);
-        if (ret <= 0) {
-            kill(pid, SIGKILL);
-            waitpid(pid, nullptr, 0);
-            close_fd(stdin_pipe[1]);
-            close_fd(stdout_pipe[0]);
-            close_fd(stderr_pipe[0]);
-            result.exit_code = -1;
-            result.stderr_str = "timeout";
-            return result;
+        int ret = poll(active_fds, nfds, poll_ms);
+        if (ret < 0 && errno != EINTR) {
+            break;
         }
 
-        for (int i = 0; i < nfds; i++) {
+        // Process any available data
+        for (int i = 0; i < nfds && ret > 0; i++) {
             int fd = active_fds[i].fd;
             short revents = active_fds[i].revents;
 
@@ -335,6 +358,22 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
                     }
                     break;
                 }
+            }
+        }
+
+        // Check if child has exited — if so, we're done even if a
+        // grandchild still holds our pipe FDs open.
+        if (stdin_done && !child_exited) {
+            pid_t wpid = waitpid(pid, &child_status, WNOHANG);
+            if (wpid == pid) {
+                child_exited = true;
+                if (WIFEXITED(child_status)) {
+                    result.exit_code = WEXITSTATUS(child_status);
+                }
+                close_fd(stdin_pipe[1]);
+                close_fd(stdout_pipe[0]);
+                close_fd(stderr_pipe[0]);
+                return result;
             }
         }
     }

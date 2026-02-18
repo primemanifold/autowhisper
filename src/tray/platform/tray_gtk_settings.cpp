@@ -771,7 +771,6 @@ void show_settings_dialog(TrayManager* mgr, const Config& config,
 
     gtk_widget_show_all(dialog);
     gtk_window_present(GTK_WINDOW(dialog));
-
     int response = gtk_dialog_run(GTK_DIALOG(dialog));
 
     if (response == GTK_RESPONSE_OK) {
