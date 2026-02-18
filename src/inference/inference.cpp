@@ -128,7 +128,8 @@ std::string WhisperInference::transcribe(const std::vector<float>& audio,
     wparams.print_realtime = false;
     wparams.print_timestamps = false;
     wparams.no_timestamps = true;
-    wparams.single_segment = false;
+    wparams.single_segment = true;
+    wparams.no_context = true;
 
     // Language
     std::string lang = language.empty() ? config_.language : language;
