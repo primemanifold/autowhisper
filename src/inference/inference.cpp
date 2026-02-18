@@ -79,6 +79,7 @@ void WhisperInference::load() {
     // Enable GPU if requested
     if (config_.device == "cuda" || config_.device == "auto") {
         cparams.use_gpu = true;
+        cparams.flash_attn = true;
     } else {
         cparams.use_gpu = false;
     }
@@ -147,6 +148,9 @@ std::string WhisperInference::transcribe(const std::vector<float>& audio,
     }
 
     wparams.temperature = 0.0f;
+    wparams.temperature_inc = 0.0f;   // Disable temperature fallback passes
+    wparams.entropy_thold = -1.0f;    // Skip compression ratio check
+    wparams.logprob_thold = -1.0f;    // Skip log probability check
     wparams.no_speech_thold = 0.6f;
 
     // Run inference
