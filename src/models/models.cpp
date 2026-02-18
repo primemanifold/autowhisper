@@ -33,13 +33,13 @@ const ModelInfo MODELS[] = {
 
 const int MODEL_COUNT = sizeof(MODELS) / sizeof(MODELS[0]);
 
-static std::string get_cache_dir() {
+std::string get_cache_dir() {
     const char* home = std::getenv("HOME");
     if (!home) home = "/tmp";
     return std::string(home) + "/.cache/whisper";
 }
 
-static const ModelInfo* find_model(const std::string& name) {
+const ModelInfo* find_model(const std::string& name) {
     for (int i = 0; i < MODEL_COUNT; i++) {
         if (MODELS[i].name == name) return &MODELS[i];
     }

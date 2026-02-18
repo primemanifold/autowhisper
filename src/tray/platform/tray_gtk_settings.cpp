@@ -1,18 +1,26 @@
 #include "tray/tray.h"
 #include "audio/audio.h"
 #include "config/config.h"
+#include "models/models.h"
 
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <set>
 #include <sstream>
 #include <string>
 #include <vector>
 
+#include <signal.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
+
+namespace fs = std::filesystem;
 
 namespace autowhisper {
 
@@ -337,6 +345,17 @@ struct SettingsDialogData {
     GtkWidget* freq_stop_spin;
     GtkWidget* freq_error_spin;
     GtkWidget* feedback_dur_spin;
+
+    // Model download
+    GtkWidget* model_status_label;
+    GtkWidget* download_btn;
+    GtkWidget* cancel_btn;
+    GtkWidget* progress_bar;
+    GtkWidget* download_box;
+    pid_t download_pid = -1;
+    int download_stderr_fd = -1;
+    guint download_watch_id = 0;
+    std::string download_dest;
 };
 
 static GtkWidget* build_combo(const std::vector<std::pair<std::string, std::string>>& items,
@@ -486,6 +505,217 @@ static GtkWidget* build_hotkeys_section(SettingsDialogData* data, const Config& 
     return frame;
 }
 
+// Forward declaration — defined later in the file
+static std::string get_combo_active_id(GtkWidget* combo);
+
+static void update_model_status(SettingsDialogData* data) {
+    std::string model_name = get_combo_active_id(data->model_size_combo);
+    if (model_name.empty()) return;
+
+    bool downloaded = is_model_downloaded(model_name);
+    bool downloading = (data->download_pid > 0);
+
+    if (downloaded) {
+        gtk_label_set_markup(GTK_LABEL(data->model_status_label),
+            "<span foreground='#4CAF50'>\xe2\x9c\x93 Downloaded</span>");
+        gtk_widget_hide(data->download_box);
+    } else if (downloading) {
+        // During download, keep showing the progress UI
+        const ModelInfo* info = find_model(model_name);
+        std::string text = "Downloading... " + std::string(info ? info->size : "");
+        gtk_label_set_text(GTK_LABEL(data->model_status_label), text.c_str());
+    } else {
+        const ModelInfo* info = find_model(model_name);
+        std::string text = "Not downloaded";
+        if (info) text += std::string(" \xe2\x80\x94 ") + info->size;
+        gtk_label_set_text(GTK_LABEL(data->model_status_label), text.c_str());
+        gtk_widget_show(data->download_box);
+        gtk_widget_show(data->download_btn);
+        gtk_widget_hide(data->progress_bar);
+        gtk_widget_hide(data->cancel_btn);
+    }
+}
+
+static void cleanup_download(SettingsDialogData* data) {
+    if (data->download_watch_id > 0) {
+        g_source_remove(data->download_watch_id);
+        data->download_watch_id = 0;
+    }
+    if (data->download_stderr_fd >= 0) {
+        close(data->download_stderr_fd);
+        data->download_stderr_fd = -1;
+    }
+    if (data->download_pid > 0) {
+        kill(data->download_pid, SIGTERM);
+        waitpid(data->download_pid, nullptr, 0);
+        data->download_pid = -1;
+    }
+    if (!data->download_dest.empty() && fs::exists(data->download_dest)) {
+        fs::remove(data->download_dest);
+        data->download_dest.clear();
+    }
+}
+
+static gboolean on_download_progress(GIOChannel* channel, GIOCondition condition, gpointer user_data) {
+    auto* data = static_cast<SettingsDialogData*>(user_data);
+
+    if (condition & G_IO_IN) {
+        gchar buf[512];
+        gsize bytes_read = 0;
+        GError* error = nullptr;
+
+        GIOStatus status = g_io_channel_read_chars(channel, buf, sizeof(buf) - 1, &bytes_read, &error);
+        if (error) {
+            g_error_free(error);
+        }
+        if (status == G_IO_STATUS_NORMAL && bytes_read > 0) {
+            buf[bytes_read] = '\0';
+            // curl progress-bar output uses \r and lines like "###  45.2%"
+            // Find the last percentage in the buffer
+            std::string output(buf, bytes_read);
+            double pct = -1.0;
+            // Look for patterns like "45.2%" or "100.0%"
+            size_t pos = output.rfind('%');
+            while (pos != std::string::npos && pos > 0) {
+                // Walk back to find the number before %
+                size_t start = pos - 1;
+                while (start > 0 && (isdigit(output[start - 1]) || output[start - 1] == '.')) {
+                    start--;
+                }
+                std::string num_str = output.substr(start, pos - start);
+                try {
+                    pct = std::stod(num_str);
+                } catch (...) {}
+                if (pct >= 0.0) break;
+                pos = output.rfind('%', pos - 1);
+            }
+
+            if (pct >= 0.0 && pct <= 100.0) {
+                gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(data->progress_bar), pct / 100.0);
+                char pct_text[32];
+                snprintf(pct_text, sizeof(pct_text), "%.0f%%", pct);
+                gtk_progress_bar_set_text(GTK_PROGRESS_BAR(data->progress_bar), pct_text);
+            }
+        }
+    }
+
+    if (condition & G_IO_HUP) {
+        // Child process ended — reap it
+        int status = 0;
+        if (data->download_pid > 0) {
+            waitpid(data->download_pid, &status, 0);
+        }
+
+        bool success = WIFEXITED(status) && WEXITSTATUS(status) == 0
+                        && !data->download_dest.empty()
+                        && fs::exists(data->download_dest)
+                        && fs::file_size(data->download_dest) > 1000;
+
+        // Clean up IO watch and pipe
+        data->download_watch_id = 0;
+        if (data->download_stderr_fd >= 0) {
+            close(data->download_stderr_fd);
+            data->download_stderr_fd = -1;
+        }
+        data->download_pid = -1;
+
+        if (success) {
+            data->download_dest.clear();
+            update_model_status(data);
+        } else {
+            // Remove partial file
+            if (!data->download_dest.empty() && fs::exists(data->download_dest)) {
+                fs::remove(data->download_dest);
+            }
+            data->download_dest.clear();
+            gtk_label_set_markup(GTK_LABEL(data->model_status_label),
+                "<span foreground='#F44336'>Download failed</span>");
+            gtk_widget_show(data->download_btn);
+            gtk_widget_hide(data->progress_bar);
+            gtk_widget_hide(data->cancel_btn);
+        }
+
+        return FALSE;  // Remove the watch
+    }
+
+    return TRUE;  // Keep the watch
+}
+
+static void start_model_download(SettingsDialogData* data) {
+    std::string model_name = get_combo_active_id(data->model_size_combo);
+    const ModelInfo* info = find_model(model_name);
+    if (!info) return;
+
+    std::string cache_dir = get_cache_dir();
+    fs::create_directories(cache_dir);
+
+    std::string dest = cache_dir + "/" + info->ggml_file;
+
+    // Already downloaded
+    if (fs::exists(dest) && fs::file_size(dest) > 1000) {
+        update_model_status(data);
+        return;
+    }
+
+    int pipe_fds[2];
+    if (pipe(pipe_fds) != 0) {
+        spdlog::error("Failed to create pipe for download");
+        return;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        spdlog::error("Failed to fork for download");
+        return;
+    }
+
+    if (pid == 0) {
+        // Child process
+        close(pipe_fds[0]);  // Close read end
+        dup2(pipe_fds[1], STDERR_FILENO);
+        close(pipe_fds[1]);
+        close(STDOUT_FILENO);
+
+        execlp("curl", "curl", "-L", "-o", dest.c_str(), "--progress-bar", info->url, nullptr);
+        _exit(127);  // exec failed
+    }
+
+    // Parent process
+    close(pipe_fds[1]);  // Close write end
+
+    data->download_pid = pid;
+    data->download_stderr_fd = pipe_fds[0];
+    data->download_dest = dest;
+
+    // Set up GTK IO watch on the pipe
+    GIOChannel* channel = g_io_channel_unix_new(pipe_fds[0]);
+    g_io_channel_set_encoding(channel, nullptr, nullptr);
+    g_io_channel_set_buffered(channel, FALSE);
+    g_io_channel_set_flags(channel, G_IO_FLAG_NONBLOCK, nullptr);
+
+    data->download_watch_id = g_io_add_watch(channel,
+        static_cast<GIOCondition>(G_IO_IN | G_IO_HUP),
+        on_download_progress, data);
+
+    g_io_channel_unref(channel);
+
+    // Update UI: show progress bar + cancel, hide download button
+    gtk_widget_hide(data->download_btn);
+    gtk_widget_show(data->progress_bar);
+    gtk_widget_show(data->cancel_btn);
+    gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(data->progress_bar), 0.0);
+    gtk_progress_bar_set_text(GTK_PROGRESS_BAR(data->progress_bar), "0%");
+
+    update_model_status(data);
+}
+
+static void cancel_model_download(SettingsDialogData* data) {
+    cleanup_download(data);
+    update_model_status(data);
+}
+
 static GtkWidget* build_model_section(SettingsDialogData* data, const Config& config) {
     GtkWidget* frame = gtk_frame_new("  Model  ");
     gtk_frame_set_shadow_type(GTK_FRAME(frame), GTK_SHADOW_ETCHED_IN);
@@ -499,6 +729,57 @@ static GtkWidget* build_model_section(SettingsDialogData* data, const Config& co
 
     data->model_size_combo = build_combo(MODEL_SIZES, config.model.size);
     gtk_box_pack_start(GTK_BOX(vbox), build_labeled_row("Size:", data->model_size_combo), FALSE, FALSE, 0);
+
+    // Model status label
+    data->model_status_label = gtk_label_new("");
+    gtk_label_set_xalign(GTK_LABEL(data->model_status_label), 0);
+    gtk_widget_set_margin_start(data->model_status_label, 98);  // Align with combo
+    gtk_box_pack_start(GTK_BOX(vbox), data->model_status_label, FALSE, FALSE, 0);
+
+    // Download box (contains download button, progress bar, cancel button)
+    data->download_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_widget_set_margin_start(data->download_box, 98);
+
+    data->download_btn = gtk_button_new_with_label("Download");
+    gtk_box_pack_start(GTK_BOX(data->download_box), data->download_btn, FALSE, FALSE, 0);
+
+    data->progress_bar = gtk_progress_bar_new();
+    gtk_progress_bar_set_show_text(GTK_PROGRESS_BAR(data->progress_bar), TRUE);
+    gtk_widget_set_size_request(data->progress_bar, 200, -1);
+    gtk_box_pack_start(GTK_BOX(data->download_box), data->progress_bar, TRUE, TRUE, 0);
+    gtk_widget_set_no_show_all(data->progress_bar, TRUE);
+
+    data->cancel_btn = gtk_button_new_with_label("Cancel");
+    gtk_box_pack_start(GTK_BOX(data->download_box), data->cancel_btn, FALSE, FALSE, 0);
+    gtk_widget_set_no_show_all(data->cancel_btn, TRUE);
+
+    gtk_box_pack_start(GTK_BOX(vbox), data->download_box, FALSE, FALSE, 0);
+
+    // Connect signals
+    g_signal_connect(data->model_size_combo, "changed",
+        G_CALLBACK(+[](GtkComboBox*, gpointer user_data) {
+            auto* d = static_cast<SettingsDialogData*>(user_data);
+            // If a download is in progress for a different model, cancel it
+            if (d->download_pid > 0) {
+                cancel_model_download(d);
+            }
+            update_model_status(d);
+        }), data);
+
+    g_signal_connect(data->download_btn, "clicked",
+        G_CALLBACK(+[](GtkButton*, gpointer user_data) {
+            auto* d = static_cast<SettingsDialogData*>(user_data);
+            start_model_download(d);
+        }), data);
+
+    g_signal_connect(data->cancel_btn, "clicked",
+        G_CALLBACK(+[](GtkButton*, gpointer user_data) {
+            auto* d = static_cast<SettingsDialogData*>(user_data);
+            cancel_model_download(d);
+        }), data);
+
+    // Set initial status
+    update_model_status(data);
 
     // Advanced
     GtkWidget* expander = gtk_expander_new("Advanced");
@@ -788,6 +1069,11 @@ void show_settings_dialog(TrayManager* mgr, const Config& config,
         if (model_changed) {
             spdlog::info("Model settings changed - restart required");
         }
+    }
+
+    // Kill any in-progress download before destroying the dialog
+    if (data->download_pid > 0) {
+        cleanup_download(data);
     }
 
     gtk_widget_destroy(dialog);
