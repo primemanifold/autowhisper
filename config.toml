@@ -1,129 +1,47 @@
-# AutoWhisper Configuration
-
-[model]
-# Model: tiny.en (fastest, 78ms), distil-small.en (balanced, 198ms), distil-large-v3 (best, 448ms)
-size = "distil-small.en"
-
-# Device: cuda, cpu, or auto
-device = "cuda"
-
-# Compute type: bfloat16 (fastest for RTX 50xx), float16, int8_float16, int8, float32
-compute_type = "bfloat16"
-
-# Beam size (1 = fastest, 5 = more accurate)
-beam_size = 1
-
-# Language: "en", "es", "fr", etc. or "auto"
-language = "en"
-
-# Number of threads for CPU operations
-num_threads = 4
-
 [audio]
-# Sample rate (16000 = Whisper native, don't change)
-sample_rate = 16000
-
-# Channels (1 = mono, required by Whisper)
-channels = 1
-
-# Buffer size in samples (1024 = ~64ms latency, reduces callback overhead)
 buffer_size = 1024
-
-# Input device (comment out or use "default" for default microphone)
-# Use device index (number) from Settings dialog
-# device = "default"
-
-# Output device for audio feedback (comment out for default speaker)
-# output_device = "default"
-
-# Enable Voice Activity Detection (Silero VAD)
+channels = 1
+max_duration = 600.0
+mute_other_apps = false
+sample_rate = 16000
+silence_duration = 0.30000001192092896
 vad_enabled = true
-
-# VAD threshold (0.0 to 1.0, higher = stricter)
 vad_threshold = 0.5
 
-# Silence duration to trim (seconds)
-silence_duration = 0.3
-
-# Maximum recording duration (seconds, safety limit)
-max_duration = 600.0
-
-# Mute other apps (Chrome, Spotify, etc.) during recording
-# mute_other_apps = false
-
-[hotkeys]
-# Mode: "push_to_talk" or "toggle"
-# push_to_talk: Hold key to record, release to transcribe
-# toggle: Press once to start, again to stop
-mode = "push_to_talk"
-
-# Trigger hotkeys (start/stop recording)
-# Format: ["ctrl+alt+v", "shift+super"], etc.
-# Note: shift+super often conflicts with desktop shortcuts
-trigger = ["shift+super"]
-
-# Cancel hotkeys (abort current recording)
-cancel = ["esc"]
-
-# Allow Escape key to cancel recording (in addition to cancel hotkey)
-escape_to_cancel = true
-
-[output]
-# Method: "inject" (xdotool/X11) or "clipboard"
-method = "inject"
-
-# Also store text in clipboard when using inject method
-# Allows you to paste again later with Ctrl+V
-also_copy_to_clipboard = true
-
-# Auto-paste after clipboard copy (only used when method = "clipboard")
-auto_paste = true
-
-# Delay before paste (seconds)
-paste_delay = 0.05
-
-# Ending action after text: "none", "newline", or "return_key"
-# - none: no action after text
-# - newline: append newline character to text
-# - return_key: send Return/Enter keypress (submits in apps like Claude Code)
-ending_action = "none"
-
-# Lowercase output
-lowercase = false
+[daemon]
+log_level = 'info'
+pid_file = '/tmp/autowhisper.pid'
+work_dir = '/opt/autowhisper'
 
 [feedback]
-# Enable audio feedback beeps
+duration = 0.10000000149011612
 enabled = true
-
-# Start beep frequency (Hz)
-frequency_start = 800
-
-# Stop beep frequency (Hz)
-frequency_stop = 400
-
-# Error beep frequency (Hz)
 frequency_error = 600
+frequency_start = 800
+frequency_stop = 400
+volume = 0.30000001192092896
 
-# Beep duration (seconds)
-duration = 0.1
+[hotkeys]
+cancel = [ 'esc' ]
+escape_to_cancel = true
+mode = 'push_to_talk'
+trigger = [ 'shift+super' ]
 
-# Beep volume (0.0 - 1.0)
-volume = 0.3
+[model]
+beam_size = 1
+compute_type = 'bfloat16'
+device = 'cuda'
+language = 'en'
+num_threads = 4
+size = 'distil-small.en'
 
-[daemon]
-# Log level: trace, debug, info, warn, error
-log_level = "info"
-
-# Log file path (comment out to use stderr/journald only)
-# log_file = "/var/log/autowhisper.log"
-
-# PID file location
-pid_file = "/tmp/autowhisper.pid"
-
-# Working directory
-work_dir = "/opt/autowhisper"
+[output]
+also_copy_to_clipboard = true
+auto_paste = true
+ending_action = 'none'
+lowercase = false
+method = 'inject'
+paste_delay = 0.05000000074505806
 
 [tray]
-# Enable system tray icon
-# Shows recording status: green (ready), red (recording), amber (processing)
 enabled = true
