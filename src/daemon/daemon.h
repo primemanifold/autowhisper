@@ -47,6 +47,7 @@ private:
     std::mutex queue_mutex_;
     std::condition_variable queue_cv_;
     std::atomic<bool> shutdown_requested_{false};
+    std::atomic<bool> hotkey_reconfigure_requested_{false};
 
     // Components
     std::unique_ptr<AudioManager> audio_;
@@ -67,6 +68,7 @@ private:
     void request_shutdown();
     void pause_hotkey();
     void resume_hotkey();
+    void reconfigure_hotkey();
     void write_pid_file();
     void remove_pid_file();
     void cleanup();

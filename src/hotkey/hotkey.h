@@ -38,6 +38,7 @@ public:
 
     void start();
     void stop();
+    void signal_stop();  // Non-blocking: signal thread to exit without joining
 
 private:
     HotkeyConfig config_;

@@ -112,8 +112,16 @@ void AutoWhisperDaemon::process_events() {
 
     // Wait with timeout for shutdown check
     queue_cv_.wait_for(lock, std::chrono::milliseconds(100), [this]() {
-        return !event_queue_.empty() || shutdown_requested_.load();
+        return !event_queue_.empty() ||
+               shutdown_requested_.load() ||
+               hotkey_reconfigure_requested_.load(std::memory_order_acquire);
     });
+
+    if (hotkey_reconfigure_requested_.exchange(false, std::memory_order_acq_rel)) {
+        lock.unlock();
+        reconfigure_hotkey();
+        return;
+    }
 
     if (event_queue_.empty()) return;
 
@@ -239,34 +247,37 @@ void AutoWhisperDaemon::request_shutdown() {
 
 void AutoWhisperDaemon::pause_hotkey() {
     spdlog::info("Pausing hotkey listener");
-    hotkey_->stop();
+    if (hotkey_) {
+        hotkey_->signal_stop();
+    }
 }
 
 void AutoWhisperDaemon::resume_hotkey() {
-    spdlog::info("Resuming hotkey listener");
+    spdlog::info("Scheduling hotkey listener resume");
+    hotkey_reconfigure_requested_.store(true, std::memory_order_release);
+    queue_cv_.notify_all();
+}
 
+void AutoWhisperDaemon::reconfigure_hotkey() {
+    spdlog::info("Resuming hotkey listener");
     if (!config_path_.empty()) {
         try {
             Config new_config = Config::load(config_path_);
-
-            bool hotkeys_changed = (new_config.hotkeys.trigger != config_.hotkeys.trigger ||
-                                    new_config.hotkeys.cancel != config_.hotkeys.cancel ||
-                                    new_config.hotkeys.mode != config_.hotkeys.mode);
-
             config_.hotkeys = new_config.hotkeys;
             config_.audio = new_config.audio;
-
-            if (hotkeys_changed) {
-                hotkey_ = std::make_unique<HotkeyManager>(config_.hotkeys,
-                    [this](HotkeyEvent e) { on_hotkey_event(e); });
-                tray_->set_hotkey(config_.hotkeys.trigger);
-                tray_->set_cancel_hotkey(config_.hotkeys.cancel);
-            }
         } catch (const std::exception& e) {
             spdlog::error("Failed to reload config: {}", e.what());
         }
     }
 
+    if (hotkey_) {
+        hotkey_->stop();
+    }
+
+    hotkey_ = std::make_unique<HotkeyManager>(config_.hotkeys,
+        [this](HotkeyEvent e) { on_hotkey_event(e); });
+    tray_->set_hotkey(config_.hotkeys.trigger);
+    tray_->set_cancel_hotkey(config_.hotkeys.cancel);
     hotkey_->start();
 }
 

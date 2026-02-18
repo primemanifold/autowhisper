@@ -257,10 +257,10 @@ void HotkeyManager::start() {
     });
 }
 
-void HotkeyManager::stop() {
+void HotkeyManager::signal_stop() {
     if (!running_.load()) return;
 
-    spdlog::info("Stopping hotkey listener");
+    spdlog::info("Signaling hotkey listener to stop");
     running_.store(false);
 
     // Write to pipe to wake the select() immediately
@@ -269,6 +269,10 @@ void HotkeyManager::stop() {
         ssize_t n = write(impl_->wake_pipe[1], &c, 1);
         (void)n;
     }
+}
+
+void HotkeyManager::stop() {
+    signal_stop();
 
     if (impl_->listener_thread.joinable()) {
         impl_->listener_thread.join();
@@ -278,7 +282,7 @@ void HotkeyManager::stop() {
     if (impl_->wake_pipe[0] >= 0) { close(impl_->wake_pipe[0]); impl_->wake_pipe[0] = -1; }
     if (impl_->wake_pipe[1] >= 0) { close(impl_->wake_pipe[1]); impl_->wake_pipe[1] = -1; }
 
-    // Reset state
+    // Safe after listener thread has exited.
     pressed_modifiers_.clear();
     trigger_pressed_ = false;
     active_trigger_.reset();

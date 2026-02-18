@@ -166,6 +166,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_config.cpp
         tests/cpp/test_keycombo.cpp
         tests/cpp/test_models.cpp
+        tests/cpp/test_subprocess.cpp
         tests/cpp/test_tray_display.cpp
     )
     target_link_libraries(autowhisper_tests PRIVATE

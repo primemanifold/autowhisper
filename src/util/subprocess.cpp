@@ -2,6 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -9,6 +10,8 @@
 #include <filesystem>
 
 #ifndef _WIN32
+#include <errno.h>
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <signal.h>
@@ -21,6 +24,23 @@ namespace autowhisper {
 
 #ifndef _WIN32
 
+namespace {
+
+inline void close_fd(int& fd) {
+    if (fd >= 0) {
+        close(fd);
+        fd = -1;
+    }
+}
+
+inline bool set_nonblocking(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags < 0) return false;
+    return fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0;
+}
+
+}  // namespace
+
 ProcessResult run_command(const std::vector<std::string>& args, int timeout_seconds) {
     ProcessResult result;
     if (args.empty()) return result;
@@ -28,7 +48,12 @@ ProcessResult run_command(const std::vector<std::string>& args, int timeout_seco
     int stdout_pipe[2];
     int stderr_pipe[2];
 
-    if (pipe(stdout_pipe) != 0 || pipe(stderr_pipe) != 0) {
+    if (pipe(stdout_pipe) != 0) {
+        spdlog::warn("Failed to create pipes");
+        return result;
+    }
+    if (pipe(stderr_pipe) != 0) {
+        close(stdout_pipe[0]); close(stdout_pipe[1]);
         spdlog::warn("Failed to create pipes");
         return result;
     }
@@ -145,7 +170,16 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
     int stdout_pipe[2];
     int stderr_pipe[2];
 
-    if (pipe(stdin_pipe) != 0 || pipe(stdout_pipe) != 0 || pipe(stderr_pipe) != 0) {
+    if (pipe(stdin_pipe) != 0) {
+        return result;
+    }
+    if (pipe(stdout_pipe) != 0) {
+        close(stdin_pipe[0]); close(stdin_pipe[1]);
+        return result;
+    }
+    if (pipe(stderr_pipe) != 0) {
+        close(stdin_pipe[0]); close(stdin_pipe[1]);
+        close(stdout_pipe[0]); close(stdout_pipe[1]);
         return result;
     }
 
@@ -178,26 +212,136 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
         _exit(127);
     }
 
-    close(stdin_pipe[0]);
-    close(stdout_pipe[1]);
-    close(stderr_pipe[1]);
+    close_fd(stdin_pipe[0]);
+    close_fd(stdout_pipe[1]);
+    close_fd(stderr_pipe[1]);
 
-    // Write input
-    write(stdin_pipe[1], input.data(), input.size());
-    close(stdin_pipe[1]);
+    set_nonblocking(stdin_pipe[1]);
+    set_nonblocking(stdout_pipe[0]);
+    set_nonblocking(stderr_pipe[0]);
 
-    // Read output
+    int timeout_ms = timeout_seconds * 1000;
     std::array<char, 4096> buf;
-    ssize_t n;
-    while ((n = read(stdout_pipe[0], buf.data(), buf.size())) > 0) {
-        result.stdout_str.append(buf.data(), n);
-    }
-    while ((n = read(stderr_pipe[0], buf.data(), buf.size())) > 0) {
-        result.stderr_str.append(buf.data(), n);
+
+    size_t written = 0;
+    const size_t total = input.size();
+    bool stdin_done = (total == 0);
+    bool stdout_done = false;
+    bool stderr_done = false;
+
+    if (stdin_done) {
+        close_fd(stdin_pipe[1]);
     }
 
-    close(stdout_pipe[0]);
-    close(stderr_pipe[0]);
+    while (!stdin_done || !stdout_done || !stderr_done) {
+        struct pollfd active_fds[3];
+        int nfds = 0;
+
+        if (!stdin_done && stdin_pipe[1] >= 0) {
+            active_fds[nfds].fd = stdin_pipe[1];
+            active_fds[nfds].events = POLLOUT;
+            active_fds[nfds].revents = 0;
+            nfds++;
+        }
+        if (!stdout_done && stdout_pipe[0] >= 0) {
+            active_fds[nfds].fd = stdout_pipe[0];
+            active_fds[nfds].events = POLLIN;
+            active_fds[nfds].revents = 0;
+            nfds++;
+        }
+        if (!stderr_done && stderr_pipe[0] >= 0) {
+            active_fds[nfds].fd = stderr_pipe[0];
+            active_fds[nfds].events = POLLIN;
+            active_fds[nfds].revents = 0;
+            nfds++;
+        }
+
+        if (nfds == 0) break;
+
+        int ret = poll(active_fds, nfds, timeout_ms);
+        if (ret <= 0) {
+            kill(pid, SIGKILL);
+            waitpid(pid, nullptr, 0);
+            close_fd(stdin_pipe[1]);
+            close_fd(stdout_pipe[0]);
+            close_fd(stderr_pipe[0]);
+            result.exit_code = -1;
+            result.stderr_str = "timeout";
+            return result;
+        }
+
+        for (int i = 0; i < nfds; i++) {
+            int fd = active_fds[i].fd;
+            short revents = active_fds[i].revents;
+
+            if (fd == stdin_pipe[1]) {
+                if (revents & (POLLOUT | POLLERR | POLLHUP)) {
+                    if (written < total) {
+                        const size_t chunk = std::min<size_t>(4096, total - written);
+                        ssize_t n = write(stdin_pipe[1], input.data() + written, chunk);
+                        if (n > 0) {
+                            written += static_cast<size_t>(n);
+                        } else if (n < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+                            continue;
+                        } else {
+                            written = total;
+                        }
+                    }
+
+                    if (written >= total) {
+                        close_fd(stdin_pipe[1]);
+                        stdin_done = true;
+                    }
+                }
+                continue;
+            }
+
+            if (revents & (POLLIN | POLLERR | POLLHUP)) {
+                for (;;) {
+                    ssize_t n = read(fd, buf.data(), buf.size());
+                    if (n > 0) {
+                        if (fd == stdout_pipe[0]) {
+                            result.stdout_str.append(buf.data(), n);
+                        } else {
+                            result.stderr_str.append(buf.data(), n);
+                        }
+                        continue;
+                    }
+
+                    if (n == 0) {
+                        if (fd == stdout_pipe[0]) {
+                            close_fd(stdout_pipe[0]);
+                            stdout_done = true;
+                        } else {
+                            close_fd(stderr_pipe[0]);
+                            stderr_done = true;
+                        }
+                        break;
+                    }
+
+                    if (errno == EINTR) {
+                        continue;
+                    }
+                    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                        break;
+                    }
+
+                    if (fd == stdout_pipe[0]) {
+                        close_fd(stdout_pipe[0]);
+                        stdout_done = true;
+                    } else {
+                        close_fd(stderr_pipe[0]);
+                        stderr_done = true;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    close_fd(stdin_pipe[1]);
+    close_fd(stdout_pipe[0]);
+    close_fd(stderr_pipe[0]);
 
     int status;
     waitpid(pid, &status, 0);
