@@ -361,14 +361,27 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
             }
         }
 
-        // Check if child has exited — if so, we're done even if a
-        // grandchild still holds our pipe FDs open.
+        // Check if child has exited — if so, drain remaining pipe
+        // data and return.  This prevents hanging when programs like
+        // xclip fork a background process that inherits our pipe FDs.
         if (stdin_done && !child_exited) {
             pid_t wpid = waitpid(pid, &child_status, WNOHANG);
             if (wpid == pid) {
                 child_exited = true;
                 if (WIFEXITED(child_status)) {
                     result.exit_code = WEXITSTATUS(child_status);
+                }
+                // Drain any remaining data from pipes
+                ssize_t n;
+                if (stdout_pipe[0] >= 0) {
+                    while ((n = read(stdout_pipe[0], buf.data(), buf.size())) > 0) {
+                        result.stdout_str.append(buf.data(), n);
+                    }
+                }
+                if (stderr_pipe[0] >= 0) {
+                    while ((n = read(stderr_pipe[0], buf.data(), buf.size())) > 0) {
+                        result.stderr_str.append(buf.data(), n);
+                    }
                 }
                 close_fd(stdin_pipe[1]);
                 close_fd(stdout_pipe[0]);
