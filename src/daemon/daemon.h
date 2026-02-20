@@ -48,6 +48,7 @@ private:
     std::condition_variable queue_cv_;
     std::atomic<bool> shutdown_requested_{false};
     std::atomic<bool> hotkey_reconfigure_requested_{false};
+    std::atomic<bool> hotkeys_paused_{false};
 
     // Components
     std::unique_ptr<AudioManager> audio_;

@@ -230,6 +230,11 @@ void AutoWhisperDaemon::handle_cancel() {
 }
 
 void AutoWhisperDaemon::on_hotkey_event(HotkeyEvent event) {
+    if (hotkeys_paused_.load(std::memory_order_acquire)) {
+        spdlog::debug("Dropping hotkey event while settings dialog is open");
+        return;
+    }
+
     std::lock_guard<std::mutex> lock(queue_mutex_);
     if (event_queue_.size() < 100) {
         event_queue_.push(event);
@@ -246,9 +251,12 @@ void AutoWhisperDaemon::request_shutdown() {
 }
 
 void AutoWhisperDaemon::pause_hotkey() {
-    spdlog::info("Pausing hotkey listener");
-    if (hotkey_) {
-        hotkey_->signal_stop();
+    spdlog::info("Pausing hotkey handling");
+    hotkeys_paused_.store(true, std::memory_order_release);
+
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    while (!event_queue_.empty()) {
+        event_queue_.pop();
     }
 }
 
@@ -279,6 +287,7 @@ void AutoWhisperDaemon::reconfigure_hotkey() {
     tray_->set_hotkey(config_.hotkeys.trigger);
     tray_->set_cancel_hotkey(config_.hotkeys.cancel);
     hotkey_->start();
+    hotkeys_paused_.store(false, std::memory_order_release);
 }
 
 void AutoWhisperDaemon::write_pid_file() {
