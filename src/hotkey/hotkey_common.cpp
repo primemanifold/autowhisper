@@ -55,6 +55,14 @@ KeyCombo KeyCombo::parse(const std::string& combo_str) {
         result.modifiers = std::set<std::string>(normalized.begin(), normalized.end());
         result.is_modifier_only = true;
     } else {
+        // For modifier+key combos, every token except the last must be a modifier.
+        // Otherwise combos like "a+b" silently become impossible to trigger.
+        for (size_t i = 0; i + 1 < normalized.size(); ++i) {
+            if (valid_mods.find(normalized[i]) == valid_mods.end()) {
+                throw std::runtime_error("Invalid key combination: " + combo_str);
+            }
+        }
+
         if (normalized.size() > 1) {
             result.modifiers = std::set<std::string>(normalized.begin(), normalized.end() - 1);
         }

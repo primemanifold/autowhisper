@@ -180,6 +180,11 @@ TEST_CASE("KeyCombo::parse throws on empty string", "[hotkey][parse]") {
     REQUIRE_THROWS_WITH(KeyCombo::parse(""), ContainsSubstring("Invalid key combination"));
 }
 
+TEST_CASE("KeyCombo::parse throws when non-modifiers appear before the key", "[hotkey][parse]") {
+    REQUIRE_THROWS_WITH(KeyCombo::parse("a+b"), ContainsSubstring("Invalid key combination"));
+    REQUIRE_THROWS_WITH(KeyCombo::parse("ctrl+a+b"), ContainsSubstring("Invalid key combination"));
+}
+
 // ============================================================
 // Edge cases
 // ============================================================
