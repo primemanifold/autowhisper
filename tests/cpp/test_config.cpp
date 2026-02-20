@@ -234,6 +234,65 @@ TEST_CASE("Config::validate rejects out-of-range volume", "[config][validate]") 
 // Load / Save / I/O
 // ============================================================
 
+
+TEST_CASE("Config::validate rejects invalid numeric ranges", "[config][validate]") {
+    auto cfg = Config::default_config();
+
+    SECTION("invalid beam_size") {
+        cfg.model.beam_size = 0;
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid beam_size"));
+    }
+
+    SECTION("invalid num_threads") {
+        cfg.model.num_threads = -1;
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid num_threads"));
+    }
+
+    SECTION("invalid channels") {
+        cfg.audio.channels = 0;
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid channels"));
+    }
+
+    SECTION("invalid vad_threshold") {
+        cfg.audio.vad_threshold = 1.5f;
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid vad_threshold"));
+    }
+
+    SECTION("invalid paste_delay") {
+        cfg.output.paste_delay = -0.1f;
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid paste_delay"));
+    }
+
+    SECTION("invalid feedback frequency") {
+        cfg.feedback.frequency_error = 0;
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid feedback frequencies"));
+    }
+
+    SECTION("invalid feedback duration") {
+        cfg.feedback.duration = 0.0f;
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid feedback duration"));
+    }
+}
+
+TEST_CASE("Config::validate rejects invalid hotkey and daemon settings", "[config][validate]") {
+    auto cfg = Config::default_config();
+
+    SECTION("empty trigger list") {
+        cfg.hotkeys.trigger.clear();
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid hotkeys.trigger"));
+    }
+
+    SECTION("empty cancel key entry") {
+        cfg.hotkeys.cancel = {""};
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid hotkeys.cancel"));
+    }
+
+    SECTION("invalid daemon log level") {
+        cfg.daemon.log_level = "verbose";
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid daemon.log_level"));
+    }
+}
+
 TEST_CASE("Config::load throws on missing file", "[config][io]") {
     REQUIRE_THROWS_WITH(Config::load("/nonexistent/path/config.toml"),
                          ContainsSubstring("not found"));
@@ -378,6 +437,27 @@ trigger = ["ctrl+space", "shift+super"]
         REQUIRE(cfg.hotkeys.trigger.size() == 2);
         CHECK(cfg.hotkeys.trigger[0] == "ctrl+space");
         CHECK(cfg.hotkeys.trigger[1] == "shift+super");
+    }
+}
+
+
+TEST_CASE("Config::load treats daemon.log_file default/empty as unset", "[config][io]") {
+    SECTION("default sentinel") {
+        TempFile tmp(R"(
+[daemon]
+log_file = "default"
+)");
+        auto cfg = Config::load(tmp.path.string());
+        CHECK_FALSE(cfg.daemon.log_file.has_value());
+    }
+
+    SECTION("empty string") {
+        TempFile tmp(R"(
+[daemon]
+log_file = ""
+)");
+        auto cfg = Config::load(tmp.path.string());
+        CHECK_FALSE(cfg.daemon.log_file.has_value());
     }
 }
 

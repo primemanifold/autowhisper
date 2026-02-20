@@ -99,7 +99,13 @@ int download_model(const std::string& name) {
 
     // Create cache directory
     std::string cache_dir = get_cache_dir();
-    fs::create_directories(cache_dir);
+    std::error_code ec;
+    fs::create_directories(cache_dir, ec);
+    if (ec) {
+        std::cerr << "\033[31mFailed to create cache directory: " << cache_dir
+                  << " (" << ec.message() << ")\033[0m\n";
+        return 1;
+    }
 
     std::string dest = cache_dir + "/" + info->ggml_file;
 
@@ -123,15 +129,23 @@ int download_model(const std::string& name) {
         return 1;
     }
 
-    if (rc == 0 && fs::exists(dest) && fs::file_size(dest) > 1000) {
+    std::error_code stat_ec;
+    const bool is_valid_file = fs::is_regular_file(dest, stat_ec) &&
+                               fs::file_size(dest, stat_ec) > 1000;
+    if (rc == 0 && !stat_ec && is_valid_file) {
         std::cout << "\n\033[32m\xe2\x9c\x93 Model " << name << " ready!\033[0m\n\n";
         return 0;
-    } else {
-        // Clean up partial download
-        if (fs::exists(dest)) fs::remove(dest);
-        std::cerr << "\033[31mDownload failed\033[0m\n";
-        return 1;
     }
+
+    // Clean up partial download
+    std::error_code rm_ec;
+    fs::remove(dest, rm_ec);
+    if (stat_ec) {
+        spdlog::warn("Failed to inspect downloaded model {}: {}", dest, stat_ec.message());
+    }
+    std::cerr << "\033[31mDownload failed\033[0m\n";
+    return 1;
+
 }
 
 } // namespace autowhisper

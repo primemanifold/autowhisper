@@ -4,9 +4,11 @@
 #include <toml++/toml.hpp>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <limits>
 #include <set>
 #include <stdexcept>
 
@@ -147,9 +149,7 @@ Config Config::load(const std::string& path) {
         config.daemon.log_level = get_or(*daemon, "log_level", config.daemon.log_level);
         config.daemon.pid_file = get_or(*daemon, "pid_file", config.daemon.pid_file);
         config.daemon.work_dir = get_or(*daemon, "work_dir", config.daemon.work_dir);
-        if (auto lf = daemon->at_path("log_file").value<std::string>()) {
-            config.daemon.log_file = *lf;
-        }
+        config.daemon.log_file = get_optional_string(*daemon, "log_file");
     }
 
     // [tray]
@@ -191,6 +191,32 @@ void Config::validate() const {
         throw std::runtime_error("Invalid compute_type: " + model.compute_type);
     }
 
+    if (model.beam_size <= 0 || model.beam_size > 10) {
+        throw std::runtime_error("Invalid beam_size: must be between 1 and 10");
+    }
+    if (model.num_threads <= 0 || model.num_threads > 256) {
+        throw std::runtime_error("Invalid num_threads: must be between 1 and 256");
+    }
+
+    if (audio.sample_rate <= 0) {
+        throw std::runtime_error("Invalid sample_rate: must be > 0");
+    }
+    if (audio.channels <= 0 || audio.channels > 8) {
+        throw std::runtime_error("Invalid channels: must be between 1 and 8");
+    }
+    if (audio.buffer_size <= 0) {
+        throw std::runtime_error("Invalid buffer_size: must be > 0");
+    }
+    if (!std::isfinite(audio.vad_threshold) || audio.vad_threshold < 0.0f || audio.vad_threshold > 1.0f) {
+        throw std::runtime_error("Invalid vad_threshold: must be between 0.0 and 1.0");
+    }
+    if (!std::isfinite(audio.silence_duration) || audio.silence_duration <= 0.0f) {
+        throw std::runtime_error("Invalid silence_duration: must be > 0");
+    }
+    if (!std::isfinite(audio.max_duration) || audio.max_duration <= 0.0f) {
+        throw std::runtime_error("Invalid max_duration: must be > 0");
+    }
+
     if (audio.sample_rate != 16000) {
         spdlog::warn("Sample rate {} is not Whisper's native 16kHz", audio.sample_rate);
     }
@@ -199,10 +225,27 @@ void Config::validate() const {
     if (hotkeys.mode != "push_to_talk" && hotkeys.mode != "toggle") {
         throw std::runtime_error("Invalid hotkey mode: " + hotkeys.mode);
     }
+    if (hotkeys.trigger.empty()) {
+        throw std::runtime_error("Invalid hotkeys.trigger: at least one trigger is required");
+    }
+    for (const auto& key : hotkeys.trigger) {
+        if (key.empty()) {
+            throw std::runtime_error("Invalid hotkeys.trigger: empty key entry");
+        }
+    }
+    for (const auto& key : hotkeys.cancel) {
+        if (key.empty()) {
+            throw std::runtime_error("Invalid hotkeys.cancel: empty key entry");
+        }
+    }
 
     // Validate output method
     if (output.method != "inject" && output.method != "clipboard") {
         throw std::runtime_error("Invalid output method: " + output.method);
+    }
+    if (!std::isfinite(output.paste_delay) || output.paste_delay < 0.0f ||
+        output.paste_delay > static_cast<float>(std::numeric_limits<int>::max())) {
+        throw std::runtime_error("Invalid paste_delay: must be >= 0");
     }
 
     // Validate ending action
@@ -212,12 +255,34 @@ void Config::validate() const {
     }
 
     // Validate volume
-    if (feedback.volume < 0.0f || feedback.volume > 1.0f) {
+    if (!std::isfinite(feedback.volume) || feedback.volume < 0.0f || feedback.volume > 1.0f) {
         throw std::runtime_error("Invalid volume: must be between 0.0 and 1.0");
+    }
+    if (feedback.frequency_start <= 0 || feedback.frequency_stop <= 0 ||
+        feedback.frequency_error <= 0) {
+        throw std::runtime_error("Invalid feedback frequencies: must be > 0");
+    }
+    if (!std::isfinite(feedback.duration) || feedback.duration <= 0.0f) {
+        throw std::runtime_error("Invalid feedback duration: must be > 0");
+    }
+
+    static const std::set<std::string> valid_log_levels = {
+        "trace", "debug", "info", "warn", "error", "critical", "off",
+    };
+    if (valid_log_levels.find(daemon.log_level) == valid_log_levels.end()) {
+        throw std::runtime_error("Invalid daemon.log_level: " + daemon.log_level);
+    }
+    if (daemon.pid_file.empty()) {
+        throw std::runtime_error("Invalid daemon.pid_file: cannot be empty");
+    }
+    if (daemon.work_dir.empty()) {
+        throw std::runtime_error("Invalid daemon.work_dir: cannot be empty");
     }
 }
 
 void Config::save(const std::string& path) const {
+    validate();
+
     toml::table tbl;
 
     // [model]
@@ -290,6 +355,16 @@ void Config::save(const std::string& path) const {
     });
 
     // Write to file
+    const fs::path out_path(path);
+    const fs::path parent = out_path.parent_path();
+    if (!parent.empty()) {
+        std::error_code ec;
+        fs::create_directories(parent, ec);
+        if (ec) {
+            throw std::runtime_error("Cannot create config directory: " + parent.string());
+        }
+    }
+
     std::ofstream ofs(path);
     if (!ofs) {
         throw std::runtime_error("Cannot open config file for writing: " + path);
@@ -307,7 +382,7 @@ std::string find_config_file() {
     };
 
     for (const auto& path : search_paths) {
-        if (fs::exists(path)) {
+        if (fs::is_regular_file(path)) {
             return path;
         }
     }
