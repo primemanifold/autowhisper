@@ -1,22 +1,13 @@
 include(FetchContent)
 
-# whisper.cpp - Speech recognition inference
-FetchContent_Declare(
-    whisper
-    GIT_REPOSITORY https://github.com/ggerganov/whisper.cpp.git
-    GIT_TAG        v1.7.3
-    GIT_SHALLOW    TRUE
-)
-
-# Options for whisper.cpp
+# whisper.cpp - Speech recognition inference (vendored as git submodule)
 set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 if(AUTOWHISPER_ENABLE_CUDA)
     set(GGML_CUDA ON CACHE BOOL "" FORCE)
 endif()
-
-FetchContent_MakeAvailable(whisper)
+add_subdirectory(${CMAKE_SOURCE_DIR}/deps/whisper.cpp whisper)
 
 # toml++ - TOML configuration parsing
 FetchContent_Declare(
