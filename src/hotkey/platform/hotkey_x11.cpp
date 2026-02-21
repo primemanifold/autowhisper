@@ -241,19 +241,21 @@ void HotkeyManager::start() {
             }
         }
 
-        // Clean up XRecord
-        spdlog::debug("Hotkey thread: disabling XRecord context");
-        XRecordDisableContext(impl_->ctrl_display, impl_->record_ctx);
-        spdlog::debug("Hotkey thread: freeing XRecord context");
-        XRecordFreeContext(impl_->ctrl_display, impl_->record_ctx);
-        impl_->record_ctx = 0;
-
-        spdlog::debug("Hotkey thread: closing displays");
+        // Clean up XRecord.  With the async API the data_display
+        // connection may be waiting for server replies, so
+        // XRecordDisableContext can block.  Closing the displays is
+        // sufficient — the X server tears down the record context
+        // automatically when the connection drops.
         XCloseDisplay(impl_->data_display);
-        XCloseDisplay(impl_->ctrl_display);
         impl_->data_display = nullptr;
+
+        if (impl_->record_ctx) {
+            XRecordFreeContext(impl_->ctrl_display, impl_->record_ctx);
+            impl_->record_ctx = 0;
+        }
+
+        XCloseDisplay(impl_->ctrl_display);
         impl_->ctrl_display = nullptr;
-        spdlog::debug("Hotkey thread: done");
     });
 }
 
@@ -272,7 +274,16 @@ void HotkeyManager::signal_stop() {
 }
 
 void HotkeyManager::stop() {
-    signal_stop();
+    running_.store(false);
+
+    // Always write to wake pipe — signal_stop() may have been called
+    // earlier without the thread having drained the pipe yet, or the
+    // thread may be blocked in select() and needs another nudge.
+    if (impl_->wake_pipe[1] >= 0) {
+        char c = 1;
+        ssize_t n = write(impl_->wake_pipe[1], &c, 1);
+        (void)n;
+    }
 
     if (impl_->listener_thread.joinable()) {
         impl_->listener_thread.join();
