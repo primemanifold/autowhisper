@@ -68,7 +68,7 @@ void setup_cli(CLI::App& app) {
 
     // --- Config commands ---
     auto* config_cmd = app.add_subcommand("config", "View and edit configuration");
-    config_cmd->require_subcommand();
+    config_cmd->callback([]() { std::exit(cmd_config_edit()); });
 
     auto* config_show = config_cmd->add_subcommand("show", "Show current configuration");
     config_show->callback([]() { std::exit(cmd_config_show()); });

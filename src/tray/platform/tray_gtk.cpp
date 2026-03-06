@@ -25,20 +25,12 @@ static const char* STATE_TITLES[] = {
     "AutoWhisper - Error",
 };
 
-// Forward declaration for settings dialog
-void show_settings_dialog(TrayManager* mgr, const Config& config,
-                           const std::string& config_path,
-                           std::function<void()> on_open,
-                           std::function<void()> on_close);
-
 struct TrayManager::Impl {
 #if defined(HAVE_AYATANA_APPINDICATOR) || defined(HAVE_APPINDICATOR)
     AppIndicator* indicator = nullptr;
 #endif
     GMainLoop* gtk_loop = nullptr;
     std::thread gtk_thread;
-    GtkWidget* mic_label = nullptr;
-    GtkWidget* speaker_label = nullptr;
     GtkWidget* trigger_label = nullptr;
     GtkWidget* cancel_label = nullptr;
     TrayManager* manager = nullptr;
@@ -86,13 +78,9 @@ struct TrayManager::Impl {
 };
 
 TrayManager::TrayManager(bool enabled, QuitCallback on_quit,
-                          SettingsOpenCallback on_settings_open,
-                          SettingsCloseCallback on_settings_close,
                           const std::string& config_path)
     : enabled_(enabled),
       on_quit_(std::move(on_quit)),
-      on_settings_open_(std::move(on_settings_open)),
-      on_settings_close_(std::move(on_settings_close)),
       config_path_(config_path),
       impl_(std::make_unique<Impl>()) {
     impl_->manager = this;
@@ -135,18 +123,6 @@ void TrayManager::start() {
 
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
 
-        // Mic info
-        std::string mic_text = "Mic: " + input_device_;
-        impl_->mic_label = gtk_menu_item_new_with_label(mic_text.c_str());
-        gtk_widget_set_sensitive(impl_->mic_label, FALSE);
-        gtk_menu_shell_append(GTK_MENU_SHELL(menu), impl_->mic_label);
-
-        // Speaker info
-        std::string spk_text = "Speaker: " + output_device_;
-        impl_->speaker_label = gtk_menu_item_new_with_label(spk_text.c_str());
-        gtk_widget_set_sensitive(impl_->speaker_label, FALSE);
-        gtk_menu_shell_append(GTK_MENU_SHELL(menu), impl_->speaker_label);
-
         // Hotkey info
         std::string trigger_text = "Record: " + format_hotkeys(trigger_hotkeys_);
         impl_->trigger_label = gtk_menu_item_new_with_label(trigger_text.c_str());
@@ -160,18 +136,19 @@ void TrayManager::start() {
 
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
 
-        // Settings
-        GtkWidget* settings_item = gtk_menu_item_new_with_label("Settings...");
-        g_signal_connect(settings_item, "activate",
+        // Open Config
+        GtkWidget* config_item = gtk_menu_item_new_with_label("Open Config");
+        g_signal_connect(config_item, "activate",
             G_CALLBACK(+[](GtkMenuItem*, gpointer data) {
-                g_idle_add(+[](gpointer data) -> gboolean {
-                    auto* mgr = static_cast<TrayManager*>(data);
-                    show_settings_dialog(mgr, mgr->config_, mgr->config_path_,
-                                          mgr->on_settings_open_, mgr->on_settings_close_);
-                    return FALSE;
-                }, data);
+                auto* mgr = static_cast<TrayManager*>(data);
+                if (!mgr->config_path_.empty()) {
+                    std::string cmd = "xdg-open " + mgr->config_path_;
+                    if (system(cmd.c_str()) != 0) {
+                        spdlog::warn("Failed to open config with xdg-open");
+                    }
+                }
             }), this);
-        gtk_menu_shell_append(GTK_MENU_SHELL(menu), settings_item);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), config_item);
 
         // Quit
         GtkWidget* quit_item = gtk_menu_item_new_with_label("Quit");
@@ -243,17 +220,6 @@ void TrayManager::set_state(TrayState state) {
 
 void TrayManager::set_input_device(const std::string& name) {
     input_device_ = name;
-#if defined(HAVE_AYATANA_APPINDICATOR) || defined(HAVE_APPINDICATOR)
-    if (impl_->mic_label && enabled_) {
-        auto* label_text = g_strdup(("Mic: " + name).c_str());
-        g_idle_add(+[](gpointer data) -> gboolean {
-            auto* text = static_cast<char*>(data);
-            // This is a simplified approach - in real code we'd store the widget pointer
-            g_free(text);
-            return FALSE;
-        }, label_text);
-    }
-#endif
 }
 
 void TrayManager::set_output_device(const std::string& name) {
@@ -262,25 +228,10 @@ void TrayManager::set_output_device(const std::string& name) {
 
 void TrayManager::set_hotkey(const std::vector<std::string>& hotkeys) {
     trigger_hotkeys_ = hotkeys;
-#if defined(HAVE_AYATANA_APPINDICATOR) || defined(HAVE_APPINDICATOR)
-    if (impl_->trigger_label && enabled_) {
-        std::string text = "Record: " + format_hotkeys(hotkeys);
-        auto* label_text = g_strdup(text.c_str());
-        g_idle_add(+[](gpointer data) -> gboolean {
-            auto* text = static_cast<char*>(data);
-            g_free(text);
-            return FALSE;
-        }, label_text);
-    }
-#endif
 }
 
 void TrayManager::set_cancel_hotkey(const std::vector<std::string>& hotkeys) {
     cancel_hotkeys_ = hotkeys;
-}
-
-void TrayManager::set_config(const Config& config) {
-    config_ = config;
 }
 
 } // namespace autowhisper

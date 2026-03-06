@@ -81,15 +81,12 @@ void AutoWhisperDaemon::initialize() {
     spdlog::info("Initializing tray icon");
     tray_ = std::make_unique<TrayManager>(
         config_.tray.enabled,
-        [this]() { request_shutdown(); },   // on_quit
-        [this]() { pause_hotkey(); },       // on_settings_open
-        [this]() { resume_hotkey(); },      // on_settings_close
+        [this]() { request_shutdown(); },
         config_path_);
     tray_->set_input_device(audio_->input_device_name());
     tray_->set_output_device(audio_->output_device_name());
     tray_->set_hotkey(config_.hotkeys.trigger);
     tray_->set_cancel_hotkey(config_.hotkeys.cancel);
-    tray_->set_config(config_);
     tray_->start();
 
     spdlog::info("Initialization complete");
@@ -110,18 +107,9 @@ void AutoWhisperDaemon::run() {
 void AutoWhisperDaemon::process_events() {
     std::unique_lock<std::mutex> lock(queue_mutex_);
 
-    // Wait with timeout for shutdown check
     queue_cv_.wait_for(lock, std::chrono::milliseconds(100), [this]() {
-        return !event_queue_.empty() ||
-               shutdown_requested_.load() ||
-               hotkey_reconfigure_requested_.load(std::memory_order_acquire);
+        return !event_queue_.empty() || shutdown_requested_.load();
     });
-
-    if (hotkey_reconfigure_requested_.exchange(false, std::memory_order_acq_rel)) {
-        lock.unlock();
-        reconfigure_hotkey();
-        return;
-    }
 
     if (event_queue_.empty()) return;
 
@@ -230,11 +218,6 @@ void AutoWhisperDaemon::handle_cancel() {
 }
 
 void AutoWhisperDaemon::on_hotkey_event(HotkeyEvent event) {
-    if (hotkeys_paused_.load(std::memory_order_acquire)) {
-        spdlog::debug("Dropping hotkey event while settings dialog is open");
-        return;
-    }
-
     std::lock_guard<std::mutex> lock(queue_mutex_);
     if (event_queue_.size() < 100) {
         event_queue_.push(event);
@@ -248,46 +231,6 @@ void AutoWhisperDaemon::request_shutdown() {
     state_.store(DaemonState::SHUTDOWN);
     shutdown_requested_.store(true);
     queue_cv_.notify_all();
-}
-
-void AutoWhisperDaemon::pause_hotkey() {
-    spdlog::info("Pausing hotkey handling");
-    hotkeys_paused_.store(true, std::memory_order_release);
-
-    std::lock_guard<std::mutex> lock(queue_mutex_);
-    while (!event_queue_.empty()) {
-        event_queue_.pop();
-    }
-}
-
-void AutoWhisperDaemon::resume_hotkey() {
-    spdlog::info("Scheduling hotkey listener resume");
-    hotkey_reconfigure_requested_.store(true, std::memory_order_release);
-    queue_cv_.notify_all();
-}
-
-void AutoWhisperDaemon::reconfigure_hotkey() {
-    spdlog::info("Resuming hotkey listener");
-    if (!config_path_.empty()) {
-        try {
-            Config new_config = Config::load(config_path_);
-            config_.hotkeys = new_config.hotkeys;
-            config_.audio = new_config.audio;
-        } catch (const std::exception& e) {
-            spdlog::error("Failed to reload config: {}", e.what());
-        }
-    }
-
-    if (hotkey_) {
-        hotkey_->stop();
-    }
-
-    hotkey_ = std::make_unique<HotkeyManager>(config_.hotkeys,
-        [this](HotkeyEvent e) { on_hotkey_event(e); });
-    tray_->set_hotkey(config_.hotkeys.trigger);
-    tray_->set_cancel_hotkey(config_.hotkeys.cancel);
-    hotkey_->start();
-    hotkeys_paused_.store(false, std::memory_order_release);
 }
 
 void AutoWhisperDaemon::write_pid_file() {

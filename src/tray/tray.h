@@ -19,13 +19,9 @@ enum class TrayState {
 class TrayManager {
 public:
     using QuitCallback = std::function<void()>;
-    using SettingsOpenCallback = std::function<void()>;
-    using SettingsCloseCallback = std::function<void()>;
 
     TrayManager(bool enabled,
                 QuitCallback on_quit,
-                SettingsOpenCallback on_settings_open,
-                SettingsCloseCallback on_settings_close,
                 const std::string& config_path = "");
     ~TrayManager();
 
@@ -39,7 +35,6 @@ public:
     void set_output_device(const std::string& name);
     void set_hotkey(const std::vector<std::string>& hotkeys);
     void set_cancel_hotkey(const std::vector<std::string>& hotkeys);
-    void set_config(const Config& config);
 
     bool enabled() const { return enabled_; }
     TrayState state() const { return state_; }
@@ -48,10 +43,7 @@ private:
     bool enabled_;
     TrayState state_ = TrayState::IDLE;
     QuitCallback on_quit_;
-    SettingsOpenCallback on_settings_open_;
-    SettingsCloseCallback on_settings_close_;
     std::string config_path_;
-    Config config_;
 
     std::string input_device_ = "Default";
     std::string output_device_ = "Default";

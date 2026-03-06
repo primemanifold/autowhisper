@@ -70,7 +70,6 @@ if(LINUX)
         src/hotkey/platform/hotkey_x11.cpp
         src/output/platform/output_x11.cpp
         src/tray/platform/tray_gtk.cpp
-        src/tray/platform/tray_gtk_settings.cpp
         src/pulseaudio/pulseaudio.cpp
     )
 elseif(APPLE)
