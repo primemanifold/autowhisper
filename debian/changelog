@@ -1,9 +1,18 @@
+autowhisper (0.4.0-1) noble; urgency=medium
+
+  * Bump version to 0.4.0
+  * Replace FetchContent with git submodules for all dependencies
+  * Fix all repository URLs to primemanifold org
+  * CI triggers on core branch only
+
+ -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Fri, 06 Mar 2026 12:00:00 -0600
+
 autowhisper (0.3.0-1) noble; urgency=medium
 
   * Complete C++ rewrite using whisper.cpp
   * Native binary replaces Python/faster-whisper implementation
   * CMake build system (C++20)
-  * Dependencies fetched via FetchContent (whisper.cpp, toml++, CLI11, spdlog, miniaudio)
+  * Dependencies vendored as git submodules (whisper.cpp, toml++, CLI11, spdlog, miniaudio)
   * Cross-platform architecture (Linux/X11, macOS, Windows stubs)
   * Catch2 test suite
 

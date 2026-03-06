@@ -39,6 +39,6 @@ echo
 echo "Legacy Python installation removed."
 echo
 echo "Next steps — install the C++ version via PPA:"
-echo "  sudo add-apt-repository ppa:isuran/autowhisper"
+echo "  sudo add-apt-repository ppa:primemanifold/autowhisper"
 echo "  sudo apt update && sudo apt install autowhisper"
 echo "  systemctl --user enable --now autowhisper"

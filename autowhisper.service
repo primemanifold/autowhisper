@@ -8,7 +8,7 @@
 
 [Unit]
 Description=AutoWhisper GPU-Accelerated Voice-to-Text
-Documentation=https://github.com/autowhisper/autowhisper
+Documentation=https://github.com/primemanifold/autowhisper
 # Only start after graphical session is ready
 After=graphical-session.target
 PartOf=graphical-session.target

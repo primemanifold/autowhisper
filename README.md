@@ -49,7 +49,7 @@ sudo apt install cmake g++ pkg-config \
 ### Build
 
 ```bash
-git clone https://github.com/rabotinc/autowhisper.git
+git clone https://github.com/primemanifold/autowhisper.git
 cd autowhisper
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
