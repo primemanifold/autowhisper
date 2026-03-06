@@ -1,6 +1,4 @@
-include(FetchContent)
-
-# whisper.cpp - Speech recognition inference (vendored as git submodule)
+# whisper.cpp v1.7.3 - Speech recognition inference
 set(WHISPER_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(WHISPER_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
@@ -9,55 +7,22 @@ if(AUTOWHISPER_ENABLE_CUDA)
 endif()
 add_subdirectory(${CMAKE_SOURCE_DIR}/deps/whisper.cpp whisper)
 
-# toml++ - TOML configuration parsing
-FetchContent_Declare(
-    tomlplusplus
-    GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
-    GIT_TAG        v3.4.0
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(tomlplusplus)
+# toml++ v3.4.0 - TOML configuration parsing
+add_subdirectory(${CMAKE_SOURCE_DIR}/deps/tomlplusplus)
 
-# CLI11 - Command line parsing
-FetchContent_Declare(
-    cli11
-    GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
-    GIT_TAG        v2.4.2
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(cli11)
+# CLI11 v2.4.2 - Command line parsing
+add_subdirectory(${CMAKE_SOURCE_DIR}/deps/CLI11)
 
-# spdlog - Logging
-FetchContent_Declare(
-    spdlog
-    GIT_REPOSITORY https://github.com/gabime/spdlog.git
-    GIT_TAG        v1.14.1
-    GIT_SHALLOW    TRUE
-)
+# spdlog v1.14.1 - Logging
 set(SPDLOG_FMT_EXTERNAL OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(spdlog)
+add_subdirectory(${CMAKE_SOURCE_DIR}/deps/spdlog)
 
-# miniaudio - Audio capture/playback (header-only, vendored)
-FetchContent_Declare(
-    miniaudio
-    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
-    GIT_TAG        0.11.21
-    GIT_SHALLOW    TRUE
-)
-FetchContent_MakeAvailable(miniaudio)
-
-# Create interface target for miniaudio
+# miniaudio 0.11.21 - Audio capture/playback (header-only)
 add_library(miniaudio INTERFACE)
-target_include_directories(miniaudio INTERFACE ${miniaudio_SOURCE_DIR})
+target_include_directories(miniaudio INTERFACE ${CMAKE_SOURCE_DIR}/deps/miniaudio)
 
-# Catch2 - Testing framework (only when tests are enabled)
+# Catch2 v3.5.2 - Testing framework (only when tests are enabled)
 if(AUTOWHISPER_ENABLE_TESTS)
-    FetchContent_Declare(
-        Catch2
-        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-        GIT_TAG        v3.5.2
-        GIT_SHALLOW    TRUE
-    )
-    FetchContent_MakeAvailable(Catch2)
-    list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/deps/Catch2)
+    list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/deps/Catch2/extras)
 endif()
