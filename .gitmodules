@@ -1,18 +1,24 @@
 [submodule "deps/tomlplusplus"]
 	path = deps/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
+	shallow = true
 [submodule "deps/CLI11"]
 	path = deps/CLI11
 	url = https://github.com/CLIUtils/CLI11.git
+	shallow = true
 [submodule "deps/spdlog"]
 	path = deps/spdlog
 	url = https://github.com/gabime/spdlog.git
+	shallow = true
 [submodule "deps/miniaudio"]
 	path = deps/miniaudio
 	url = https://github.com/mackron/miniaudio.git
+	shallow = true
 [submodule "deps/Catch2"]
 	path = deps/Catch2
 	url = https://github.com/catchorg/Catch2.git
+	shallow = true
 [submodule "deps/whisper.cpp"]
 	path = deps/whisper.cpp
 	url = https://github.com/ggerganov/whisper.cpp.git
+	shallow = true
