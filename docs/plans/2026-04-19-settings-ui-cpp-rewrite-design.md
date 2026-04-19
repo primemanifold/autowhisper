@@ -38,14 +38,24 @@ autowhisper config ui [--config PATH] [--no-browser]
   ├─ weakly-canonicalize config path (std::filesystem::weakly_canonical)
   ├─ FNV-64(canonical_path) → sidecar path
   ├─ open(sidecar, O_RDWR|O_CREAT|O_CLOEXEC, 0600); flock(LOCK_EX|LOCK_NB)
-  │    ├─ lock acquired → we own this config's instance → proceed to bind
+  │    ├─ lock acquired → we own this config's instance:
+  │    │     **`ftruncate(fd, 0)` IMMEDIATELY** — clears any stale
+  │    │     `<pid>\n<port>\n<path>\n` left over from the previous owner,
+  │    │     so racing losers that arrive before we finish binding don't
+  │    │     read a dead port. Only *after* this do we bind.
   │    └─ EWOULDBLOCK → loser path (poll 50 ms × up to 60 = 3 s):
   │           ├─ per iteration: re-attempt flock(LOCK_NB).
-  │           │     If now LOCKED → owner died pre-publish; assume owner role.
-  │           ├─ else read sidecar; if populated, open browser → exit 0
+  │           │     If now LOCKED → owner died pre-publish; assume owner role
+  │           │     (truncate immediately, bind, write — as above).
+  │           ├─ else read sidecar; if populated **with our canonical
+  │           │     path**, open browser → exit 0.
+  │           │     (Path mismatch = stale content from an aborted prior
+  │           │      owner that crashed between flock and truncate; keep
+  │           │      polling — the current owner will overwrite shortly.)
   │           └─ timeout: log "settings UI unresponsive", exit 1
-  ├─ bind httplib::Server on 127.0.0.1:0 (kernel picks an ephemeral port) FIRST
-  ├─ ftruncate(fd, 0) + write `<pid>\n<port>\n<canonical_path>\n` AFTER bind
+  ├─ bind httplib::Server on 127.0.0.1:0 (kernel picks an ephemeral port)
+  ├─ write `<pid>\n<port>\n<canonical_path>\n` AFTER bind (file was truncated
+  │     at lock acquisition, so this write is the first populated content)
   ├─ `setsid()` so the process survives tray-parent exit
   ├─ fork+exec xdg-open on the URL (unless --no-browser)
   ├─ create self-pipe:
@@ -70,7 +80,7 @@ autowhisper config ui [--config PATH] [--no-browser]
       then main thread closes fd which releases the flock)
 ```
 
-Key ordering rule: **the sidecar file stays empty until after the bind succeeds.** The loser never sees a bogus port because a placeholder port is never written — only a populated file is published. Losers that race in before the owner has bound poll-read until the file is non-empty (bounded at 3 seconds).
+Key ordering rule: **the sidecar file is empty between lock-acquisition and bind-success.** The owner truncates as its very first action after acquiring the lock (clearing any content left over from the previous owner that wasn't unlinked on purpose — see shutdown rule below), then binds, then writes real content. The loser never sees a bogus port: it either sees an empty/short file and keeps polling, or it sees fully-populated content written after a successful bind. Bounded at 3 seconds of polling.
 
 The flock handles crash recovery automatically: the kernel releases it when the owning process dies, so the next launch's `flock(LOCK_NB)` succeeds immediately.
 
@@ -163,11 +173,17 @@ Launch sequence:
    - **Success** → we own this config's instance. Go to step 5.
    - **EWOULDBLOCK** → someone else owns it. Go to step 4.
 4. **Loser path**: poll every 50 ms for up to 3 seconds. Each iteration:
-   - Re-attempt `flock(fd, LOCK_EX | LOCK_NB)`. If it now succeeds, the previous owner died before publishing → **promote to owner** (go to step 5 with a truncated sidecar).
-   - Otherwise read sidecar. If non-empty and well-formed, sanity-check the stored path against our canonical path (defense against an FNV-64 collision; mismatch → log and exit 1), open browser at `http://127.0.0.1:<port>`, exit 0.
-   - If still empty and flock still held, sleep 50 ms and retry.
-   - On timeout after 3 s with lock held and no published port: log and exit 1.
-5. **Owner path**: leave the sidecar file empty for now. Bind the HTTP server on port 0 — kernel assigns a port. Only after bind succeeds: `ftruncate(fd, 0)`, write `<getpid()>\n<port>\n<canonical_path>\n`, fsync. Keep `fd` open and locked for the process lifetime.
+   - Re-attempt `flock(fd, LOCK_EX | LOCK_NB)`. If it now succeeds, the previous owner died before publishing → **promote to owner** and jump to step 5.
+   - Otherwise read sidecar. If non-empty and well-formed, check the stored path equals our canonical path:
+     - Match → open browser at `http://127.0.0.1:<port>`, exit 0.
+     - Mismatch → stale content from a previous owner that crashed between flock and truncate. Keep polling; the current owner will overwrite shortly. (A permanent mismatch after 3 s would indicate an FNV-64 collision — exit 1 and log, same as the timeout case.)
+   - If empty and flock still held, sleep 50 ms and retry.
+   - On timeout after 3 s with lock held and no matching published content: log and exit 1.
+5. **Owner path**:
+   - **First action after acquiring the lock: `ftruncate(fd, 0)`.** This clears any stale `<pid>\n<port>\n<path>\n` left by a previous owner (we deliberately do not unlink the sidecar at shutdown — see step 6 — so stale content is expected on every takeover and must be cleared before a loser can race in to read it).
+   - Then bind the HTTP server on port 0 — kernel assigns a port.
+   - Only after bind succeeds: write `<getpid()>\n<port>\n<canonical_path>\n`, fsync.
+   - Keep `fd` open and locked for the process lifetime.
 6. Shutdown (normal flow driven by the watcher thread, not the signal handler): `server.stop()`, then main-thread `close(fd)` which releases the flock.
 
    **Do NOT unlink the sidecar.** `flock` is keyed on the *inode*, not the path. If we unlinked before `close`, a new launch arriving in the window between `unlink` and `close` would `open` a brand-new inode (via `O_CREAT`) and succeed on `flock` immediately — two owners would coexist. Leaving the file in place keeps the inode stable: a racing launch's `open` returns the same inode we're about to release, and its `flock` blocks until we `close`. The next owner truncates and rewrites the sidecar on its own. Stale content between instances is harmless because the flock — not the file's contents — is the source of truth for liveness.
