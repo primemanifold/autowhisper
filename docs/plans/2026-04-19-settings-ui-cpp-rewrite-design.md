@@ -10,7 +10,7 @@ Also: fix the tray's broken "Open Config" handler (it currently runs `xdg-open` 
 
 ## Decisions
 
-- **Entry point**: `autowhisper config ui [--config PATH] [--port N] [--no-browser]` subcommand (not a separate binary).
+- **Entry point**: `autowhisper config ui [--config PATH] [--no-browser]` subcommand (not a separate binary). Ports are always ephemeral (kernel-assigned via `bind` on port 0); there is no user-facing `--port` flag. The URL is localhost-only, the browser is opened automatically, and a second instance on the same config reuses the existing port via the sidecar — the user never types a port.
 
 - **Config path resolution**:
     - `--config PATH` is used literally, whether or not the file exists (supports the first-run / new-config flow).
@@ -34,7 +34,7 @@ Also: fix the tray's broken "Open Config" handler (it currently runs `xdg-open` 
 ### Subcommand flow
 
 ```
-autowhisper config ui [--config PATH] [--port N] [--no-browser]
+autowhisper config ui [--config PATH] [--no-browser]
   ├─ weakly-canonicalize config path (std::filesystem::weakly_canonical)
   ├─ FNV-64(canonical_path) → sidecar path
   ├─ open(sidecar, O_RDWR|O_CREAT|O_CLOEXEC, 0600); flock(LOCK_EX|LOCK_NB)
@@ -44,7 +44,7 @@ autowhisper config ui [--config PATH] [--port N] [--no-browser]
   │           │     If now LOCKED → owner died pre-publish; assume owner role.
   │           ├─ else read sidecar; if populated, open browser → exit 0
   │           └─ timeout: log "settings UI unresponsive", exit 1
-  ├─ bind httplib::Server on 127.0.0.1:port (port=0 → kernel picks) FIRST
+  ├─ bind httplib::Server on 127.0.0.1:0 (kernel picks an ephemeral port) FIRST
   ├─ ftruncate(fd, 0) + write `<pid>\n<port>\n<canonical_path>\n` AFTER bind
   ├─ `setsid()` so the process survives tray-parent exit
   ├─ fork+exec xdg-open on the URL (unless --no-browser)
@@ -64,8 +64,10 @@ autowhisper config ui [--config PATH] [--port N] [--no-browser]
   │   see WG21 P3255R1). Matches the pure atomic-store pattern at
   │   `src/daemon/daemon.cpp:30-48` in spirit: handler does exactly one
   │   syscall, no C++ runtime machinery.
-  ├─ watcher reads the byte → calls `server.stop()`, unlinks sidecar, exits
-  └─ server.listen_after_bind()  (blocks; watcher's stop() causes this to return)
+  ├─ watcher reads the byte → calls `server.stop()`, exits
+  │   **(does NOT unlink the sidecar — see shutdown rule below)**
+  └─ server.listen_after_bind()  (blocks; watcher's stop() causes this to return,
+      then main thread closes fd which releases the flock)
 ```
 
 Key ordering rule: **the sidecar file stays empty until after the bind succeeds.** The loser never sees a bogus port because a placeholder port is never written — only a populated file is published. Losers that race in before the owner has bound poll-read until the file is non-empty (bounded at 3 seconds).
@@ -166,7 +168,11 @@ Launch sequence:
    - If still empty and flock still held, sleep 50 ms and retry.
    - On timeout after 3 s with lock held and no published port: log and exit 1.
 5. **Owner path**: leave the sidecar file empty for now. Bind the HTTP server on port 0 — kernel assigns a port. Only after bind succeeds: `ftruncate(fd, 0)`, write `<getpid()>\n<port>\n<canonical_path>\n`, fsync. Keep `fd` open and locked for the process lifetime.
-6. Shutdown (normal flow driven by the watcher thread, not the signal handler): `server.stop()`, `unlink(sidecar)`, `close(fd)` (implicitly releases the flock). The signal handler itself is limited to a single `write()` call on the self-pipe — the only async-signal-safe IPC primitive we need. (`std::atomic::notify_all` is deliberately **not** used because its signal-safety is not guaranteed by the standard — see WG21 P3255R1.)
+6. Shutdown (normal flow driven by the watcher thread, not the signal handler): `server.stop()`, then main-thread `close(fd)` which releases the flock.
+
+   **Do NOT unlink the sidecar.** `flock` is keyed on the *inode*, not the path. If we unlinked before `close`, a new launch arriving in the window between `unlink` and `close` would `open` a brand-new inode (via `O_CREAT`) and succeed on `flock` immediately — two owners would coexist. Leaving the file in place keeps the inode stable: a racing launch's `open` returns the same inode we're about to release, and its `flock` blocks until we `close`. The next owner truncates and rewrites the sidecar on its own. Stale content between instances is harmless because the flock — not the file's contents — is the source of truth for liveness.
+
+   The signal handler itself is limited to a single `write()` call on the self-pipe — the only async-signal-safe IPC primitive we need. (`std::atomic::notify_all` is deliberately **not** used because its signal-safety is not guaranteed by the standard — see WG21 P3255R1.)
 
 **Why the bind-before-publish rule**: if the owner wrote a placeholder port first, a racing loser could read `port=0` and try to open `http://127.0.0.1:0`. Since the owner only publishes after a successful bind, and the loser polls for a non-empty file, the loser always reads a real port or times out.
 
@@ -251,7 +257,7 @@ Not tested (acknowledged):
 | cpp-httplib bloats binary | Header-only; LTO strips unused parts. Measured ~30-50 KB addition. |
 | Submodule additions slow clones | Already using shallow submodules (`9ffe87b`). |
 | Asset regeneration on every build | CMake dependency tracks only the web source files. No rebuild if HTML unchanged. |
-| Sidecar file survives crash with stale port | Flock is released by kernel on any process exit; next launch takes over cleanly. |
+| Sidecar file survives crash with stale port | Flock is released by kernel on any process exit; next launch takes over cleanly and truncates the sidecar before rewriting. The sidecar is deliberately **not** unlinked at any point — flock is inode-keyed, so unlinking would allow a second launch to `open`+`flock` a different inode in the window between unlink and close, overlapping owners. |
 | Two clicks race on lock acquisition | Losing side's `flock(LOCK_NB)` returns EWOULDBLOCK, then reads the winner's port and opens the browser. No retry loop needed. |
 | Two instances launched with different `--config` paths | Sidecar hash includes the canonical path, so the two instances use different sidecars and different locks — they coexist on different ports. |
 | Losing launch reads a placeholder `port=0` before owner binds | Owner leaves the sidecar empty until bind succeeds; loser poll-reads (50 ms × up to 60 iterations = 3 s) for a populated file. Never sees port 0. |
