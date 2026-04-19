@@ -165,6 +165,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
     add_executable(autowhisper_tests
         tests/cpp/test_config.cpp
         tests/cpp/test_keycombo.cpp
+        tests/cpp/test_logging.cpp
         tests/cpp/test_models.cpp
         tests/cpp/test_subprocess.cpp
         tests/cpp/test_tray_display.cpp
