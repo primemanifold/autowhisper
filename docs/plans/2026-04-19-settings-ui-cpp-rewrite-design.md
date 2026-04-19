@@ -147,9 +147,10 @@ Raw string literal delimiter `)AUTOWHISPER_EMBED_END(` (long enough to never app
 
 ### Single-instance protocol
 
-Sidecar file path: `<runtime_dir>/autowhisper-settings-<hash>.info`, where:
+Sidecar file path: `<runtime_dir>/<basename>`, where:
 
-- `<runtime_dir>` = `$XDG_RUNTIME_DIR` if set and writable, else `/tmp`.
+- **If `$XDG_RUNTIME_DIR` is set and writable** (the normal case on modern Linux): `<runtime_dir>` = `$XDG_RUNTIME_DIR`, `<basename>` = `autowhisper-settings-<hash>.info`. `$XDG_RUNTIME_DIR` is already per-user (typically `/run/user/$UID`, mode `0700`), so no `$UID` suffix is needed in the basename.
+- **Fallback when `$XDG_RUNTIME_DIR` is unset or unwritable**: `<runtime_dir>` = `/tmp`, `<basename>` = `autowhisper-settings-$UID-<hash>.info`. `/tmp` is world-writable and shared across users, so the basename must include `$UID` (from `getuid()`) to prevent cross-user collisions and EACCES when another user on the same host has already claimed a sidecar for the same config-path hash.
 - `<hash>` = FNV-64 of the **weakly-canonicalized** config path, hex-encoded (16 chars).
 
 **Weakly-canonicalized** means `std::filesystem::weakly_canonical(path)` (C++17): resolves and canonicalizes whatever prefix of the path actually exists, appends the non-existing suffix verbatim, and normalizes `..`/`.`/symlinks along the way. This is required because the UI must launch against a config file that does not exist yet (first-run / new-config flow) — the existing Python tool intentionally supports this, and `Config::save()` (`src/config/config.cpp:357`) already `mkdir -p`s the parent on write.
