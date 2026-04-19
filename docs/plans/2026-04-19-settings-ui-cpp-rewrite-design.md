@@ -43,12 +43,17 @@ autowhisper config ui [--config PATH] [--port N] [--no-browser]
   ├─ ftruncate(fd, 0) + write `<pid>\n<port>\n<canonical_path>\n` AFTER bind
   ├─ `setsid()` so the process survives tray-parent exit
   ├─ fork+exec xdg-open on the URL (unless --no-browser)
-  ├─ start shutdown watcher thread (blocks on `shutdown_requested.wait(false)`)
+  ├─ create self-pipe (`pipe2(fds, O_CLOEXEC | O_NONBLOCK)`)
+  ├─ start shutdown watcher thread (blocks on `read(pipe_read_fd, …)`)
   ├─ install SIGINT/SIGTERM handlers — handler ONLY does
-  │       `shutdown_requested.store(true, release); shutdown_requested.notify_all();`
-  │   (async-signal-safe; matches `src/daemon/daemon.cpp:30-48`)
-  ├─ watcher wakes → calls `server.stop()`, unlinks sidecar, returns
-  └─ server.listen_after_bind()  (blocks; watcher.stop() causes this to return)
+  │       `(void)write(pipe_write_fd, "x", 1);`
+  │   which is listed as async-signal-safe in POSIX.1 (unlike
+  │   `std::atomic::notify_all`, whose signal-safety is not guaranteed —
+  │   see WG21 P3255R1). Matches the pure atomic-store pattern at
+  │   `src/daemon/daemon.cpp:30-48` in spirit: handler does exactly one
+  │   syscall, no C++ runtime machinery.
+  ├─ watcher reads the byte → calls `server.stop()`, unlinks sidecar, exits
+  └─ server.listen_after_bind()  (blocks; watcher's stop() causes this to return)
 ```
 
 Key ordering rule: **the sidecar file stays empty until after the bind succeeds.** The loser never sees a bogus port because a placeholder port is never written — only a populated file is published. Losers that race in before the owner has bound poll-read until the file is non-empty (bounded at 3 seconds).
@@ -104,8 +109,8 @@ Enum values today (extracted from `Config::validate` and `config.toml`):
 | GET | `/app.js` | — | embedded JS |
 | GET | `/api/schema` | — | `schema::to_json()` (sections, keys, types, enums, bounds, descriptions) |
 | GET | `/api/defaults` | — | `Config::default_config()` serialized as JSON (for the UI's "reset to defaults" affordance) |
-| GET | `/api/config` | — | current TOML → JSON |
-| PUT | `/api/config` | JSON config | validates against schema; writes TOML; `204` on success, `400 {errors: [...]}` on validation failure |
+| GET | `/api/config` | — | effective config as JSON. **If the target TOML exists**, `Config::load(path)` (which already merges defaults with partial TOML). **If the target file does not exist (ENOENT)**, returns `Config::default_config()` as JSON — matches the Python tool's first-run behavior (`tools/autowhisper-settings:85`) and enables new-config flows. Any other load error (invalid TOML, permission denied) returns `500` with the exception message. |
+| PUT | `/api/config` | JSON config | validates against schema; on success calls `Config::save(path)` (which already `mkdir -p`s the parent — `src/config/config.cpp:357`); `204` on success, `400 {errors: [...]}` on validation failure, `500` on disk error. |
 | POST | `/api/quit` | — | graceful shutdown (optional; needed for "Done" button) |
 
 All responses JSON (except static assets). All handlers synchronous — no long-lived requests.
@@ -149,7 +154,7 @@ Launch sequence:
    - If still empty and flock still held, sleep 50 ms and retry.
    - On timeout after 3 s with lock held and no published port: log and exit 1.
 5. **Owner path**: leave the sidecar file empty for now. Bind the HTTP server on port 0 — kernel assigns a port. Only after bind succeeds: `ftruncate(fd, 0)`, write `<getpid()>\n<port>\n<canonical_path>\n`, fsync. Keep `fd` open and locked for the process lifetime.
-6. Shutdown (normal flow driven by the watcher thread, not the signal handler): `server.stop()`, `unlink(sidecar)`, `close(fd)` (implicitly releases the lock). The signal handler itself is limited to the async-signal-safe atomic store + notify described in the launch diagram.
+6. Shutdown (normal flow driven by the watcher thread, not the signal handler): `server.stop()`, `unlink(sidecar)`, `close(fd)` (implicitly releases the flock). The signal handler itself is limited to a single `write()` call on the self-pipe — the only async-signal-safe IPC primitive we need. (`std::atomic::notify_all` is deliberately **not** used because its signal-safety is not guaranteed by the standard — see WG21 P3255R1.)
 
 **Why the bind-before-publish rule**: if the owner wrote a placeholder port first, a racing loser could read `port=0` and try to open `http://127.0.0.1:0`. Since the owner only publishes after a successful bind, and the loser polls for a non-empty file, the loser always reads a real port or times out.
 
@@ -196,11 +201,19 @@ Unit:
 Integration (new test file):
 
 - Start `httplib::Server` on ephemeral port in a test thread with a fixture TOML.
-- `GET /api/config` → expected JSON.
+- `GET /api/config` → expected JSON (fixture values merged with defaults).
 - `GET /api/schema` → matches `schema::to_json()`.
+- `GET /api/defaults` → matches a fresh `Config::default_config()` serialized.
 - `PUT /api/config` with valid body → `204`, TOML on disk updated.
 - `PUT /api/config` with invalid enum value → `400`, TOML unchanged.
 - Assets: `GET /` returns `Content-Type: text/html` and a non-empty body starting with `<!DOCTYPE html>`.
+
+**First-run / new-config flow (explicit coverage — Python parity)**:
+
+- Start the server against a path under a tempdir that **does not exist yet** (e.g. `$TMPDIR/nonexistent_dir/new.toml`).
+- `GET /api/config` → defaults JSON, no file created, no error.
+- `PUT /api/config` with a valid body → `204`. File is created at the target path; parent directories are created if missing (relies on existing `Config::save()` behavior). Subsequent `GET /api/config` reflects the written values.
+- `PUT` with an invalid body → `400`, no file created on disk.
 
 Not tested (acknowledged):
 
