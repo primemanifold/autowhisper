@@ -12,13 +12,16 @@ Also: fix the tray's broken "Open Config" handler (it currently runs `xdg-open` 
 
 - **Entry point**: `autowhisper config ui` subcommand (not a separate binary).
 - **Assets**: HTML/CSS/JS embedded at build time via a CMake step that converts files under `src/settings/web/` into C++ string literals (`src/settings/assets.h` generated).
-- **Schema**: new `src/config/schema.{h,cpp}` module in `CORE_LIB_SOURCES`. Single source of truth for section/key/type/enum/default/description/numeric bounds. Both `Config::validate()` and the settings UI read from it.
+- **Schema**: new `src/config/schema.{h,cpp}` module in `CORE_LIB_SOURCES`. Source of truth for section/key/type/enum/description/numeric bounds. Both `Config::validate()` and the settings UI read from it. **Defaults stay in `Config{}` member initializers** (heterogeneous types; a `std::variant` in `KeyDef` would add complexity for little gain). The UI fetches defaults via `GET /api/defaults`, which serializes `Config::default_config()`.
 - **HTTP server**: `cpp-httplib` (header-only, MIT). New submodule at `deps/cpp-httplib`.
 - **JSON**: `nlohmann/json` (header-only). New submodule at `deps/nlohmann-json`.
 - **Browser launch**: `fork + exec("xdg-open", url)` on the URL (not the TOML file — that's the bug we're fixing). Matches the Python `webbrowser.open()` behavior.
 - **Port**: ephemeral (bind port 0). Recorded in the sidecar file.
 - **Single-instance coordination**: **per-config-path** sidecar at `$XDG_RUNTIME_DIR/autowhisper-settings-<hash>.info` (fallback `/tmp/autowhisper-settings-$UID-<hash>.info`), where `<hash>` is a hex-encoded FNV-64 of the **canonicalized-or-weak** config path (see below). This means `autowhisper config ui --config A.toml` and `autowhisper config ui --config B.toml` coexist as independent instances on different ports — and the UI also works when the target config doesn't exist yet (first-run / new-config flow, preserved from the Python version). Sidecar stores `<pid>\n<port>\n<canonical_path>\n`. Liveness is determined by **`flock(LOCK_EX | LOCK_NB)` held for the lifetime of the owning process** — not `kill(pid, 0)`, which is unreliable under PID reuse. The sidecar fd is opened with `O_CLOEXEC` (with `fcntl(F_SETFD, FD_CLOEXEC)` as a portable fallback), so child processes spawned during the UI's lifetime (browser, xdg-open) do not inherit the lock.
-- **Tray**: "Open Config" menu item launches the main binary with `config ui --config <mgr->config_path_>` via `g_spawn_async()` (GLib is already linked for GTK). **Passing the daemon's actual config path is mandatory** — the tray already carries `config_path_` from the daemon (`src/daemon/daemon.cpp:82`, surfaced via `src/tray/platform/tray_gtk.cpp:143`), and without `--config` the UI would default-search and possibly edit a different file than the one the daemon is running against. GLib handles reaping so no zombies accumulate if the daemon stays up across multiple launches.
+- **Tray**: "Open Config" menu item launches the **same binary the tray itself is running from** — resolved via `/proc/self/exe` (`readlink`), not `PATH` search — with argv `{/proc/self/exe, "config", "ui", "--config", <mgr->config_path_>}`, via `g_spawn_async()` **without** `G_SPAWN_SEARCH_PATH`. Two reasons:
+    1. PATH search can pick a different install than the one running the daemon (e.g. `/usr/local/bin/autowhisper` vs `/usr/bin/autowhisper`) — the tray would then launch a UI built from a different version.
+    2. The tray already does `/proc/self/exe`-relative lookups for its icon assets (`src/tray/platform/tray_gtk.cpp:41`), so the pattern is consistent.
+  Passing `--config` is mandatory: the daemon's actual config path is carried in `config_path_` (`src/daemon/daemon.cpp:82`, `src/tray/platform/tray_gtk.cpp:143`), and without it the UI would default-search and possibly edit a different file. GLib handles reaping so no zombies accumulate across multiple launches.
 - **Deletion**: `tools/autowhisper-settings` (Python), its `install(PROGRAMS …)` line in `CMakeLists.txt`, and any `python3 (>= 3.11)` edge in `debian/control`.
 
 ## Architecture
@@ -31,16 +34,21 @@ autowhisper config ui [--config PATH] [--port N] [--no-browser]
   ├─ FNV-64(canonical_path) → sidecar path
   ├─ open(sidecar, O_RDWR|O_CREAT|O_CLOEXEC, 0600); flock(LOCK_EX|LOCK_NB)
   │    ├─ lock acquired → we own this config's instance → proceed to bind
-  │    └─ EWOULDBLOCK → loser path:
-  │           ├─ poll-read sidecar up to 3s total (50 ms interval)
-  │           ├─   success: open browser at http://127.0.0.1:<port> → exit 0
-  │           └─   timeout: log "settings UI unresponsive", exit 1
+  │    └─ EWOULDBLOCK → loser path (poll 50 ms × up to 60 = 3 s):
+  │           ├─ per iteration: re-attempt flock(LOCK_NB).
+  │           │     If now LOCKED → owner died pre-publish; assume owner role.
+  │           ├─ else read sidecar; if populated, open browser → exit 0
+  │           └─ timeout: log "settings UI unresponsive", exit 1
   ├─ bind httplib::Server on 127.0.0.1:port (port=0 → kernel picks) FIRST
   ├─ ftruncate(fd, 0) + write `<pid>\n<port>\n<canonical_path>\n` AFTER bind
   ├─ `setsid()` so the process survives tray-parent exit
   ├─ fork+exec xdg-open on the URL (unless --no-browser)
-  ├─ install SIGINT/SIGTERM handlers → unlink sidecar + graceful server.stop()
-  └─ server.listen_after_bind()  (blocks, holding the flock)
+  ├─ start shutdown watcher thread (blocks on `shutdown_requested.wait(false)`)
+  ├─ install SIGINT/SIGTERM handlers — handler ONLY does
+  │       `shutdown_requested.store(true, release); shutdown_requested.notify_all();`
+  │   (async-signal-safe; matches `src/daemon/daemon.cpp:30-48`)
+  ├─ watcher wakes → calls `server.stop()`, unlinks sidecar, returns
+  └─ server.listen_after_bind()  (blocks; watcher.stop() causes this to return)
 ```
 
 Key ordering rule: **the sidecar file stays empty until after the bind succeeds.** The loser never sees a bogus port because a placeholder port is never written — only a populated file is published. Losers that race in before the owner has bound poll-read until the file is non-empty (bounded at 3 seconds).
@@ -64,6 +72,8 @@ struct KeyDef {
     std::optional<double> min_numeric;
     std::optional<double> max_numeric;
     std::string_view description;
+    // No default value here — defaults live in Config{} member initializers
+    // and are exposed to the UI via GET /api/defaults.
 };
 
 const std::vector<KeyDef>& all();
@@ -92,7 +102,8 @@ Enum values today (extracted from `Config::validate` and `config.toml`):
 | GET | `/` | — | embedded `index.html` |
 | GET | `/style.css` | — | embedded CSS |
 | GET | `/app.js` | — | embedded JS |
-| GET | `/api/schema` | — | `schema::to_json()` |
+| GET | `/api/schema` | — | `schema::to_json()` (sections, keys, types, enums, bounds, descriptions) |
+| GET | `/api/defaults` | — | `Config::default_config()` serialized as JSON (for the UI's "reset to defaults" affordance) |
 | GET | `/api/config` | — | current TOML → JSON |
 | PUT | `/api/config` | JSON config | validates against schema; writes TOML; `204` on success, `400 {errors: [...]}` on validation failure |
 | POST | `/api/quit` | — | graceful shutdown (optional; needed for "Done" button) |
@@ -132,9 +143,13 @@ Launch sequence:
 3. `flock(fd, LOCK_EX | LOCK_NB)`:
    - **Success** → we own this config's instance. Go to step 5.
    - **EWOULDBLOCK** → someone else owns it. Go to step 4.
-4. **Loser path**: read the sidecar. If empty or malformed (owner still binding), poll every 50 ms for up to 3 seconds. When populated, sanity-check the stored path matches our canonical path (defense against an FNV-64 collision; if it doesn't match, log and exit 1). Open browser at `http://127.0.0.1:<port>`. Exit 0.
+4. **Loser path**: poll every 50 ms for up to 3 seconds. Each iteration:
+   - Re-attempt `flock(fd, LOCK_EX | LOCK_NB)`. If it now succeeds, the previous owner died before publishing → **promote to owner** (go to step 5 with a truncated sidecar).
+   - Otherwise read sidecar. If non-empty and well-formed, sanity-check the stored path against our canonical path (defense against an FNV-64 collision; mismatch → log and exit 1), open browser at `http://127.0.0.1:<port>`, exit 0.
+   - If still empty and flock still held, sleep 50 ms and retry.
+   - On timeout after 3 s with lock held and no published port: log and exit 1.
 5. **Owner path**: leave the sidecar file empty for now. Bind the HTTP server on port 0 — kernel assigns a port. Only after bind succeeds: `ftruncate(fd, 0)`, write `<getpid()>\n<port>\n<canonical_path>\n`, fsync. Keep `fd` open and locked for the process lifetime.
-6. On shutdown (SIGINT/SIGTERM/clean return): `unlink(sidecar)`, `close(fd)` (implicitly releases the lock).
+6. Shutdown (normal flow driven by the watcher thread, not the signal handler): `server.stop()`, `unlink(sidecar)`, `close(fd)` (implicitly releases the lock). The signal handler itself is limited to the async-signal-safe atomic store + notify described in the launch diagram.
 
 **Why the bind-before-publish rule**: if the owner wrote a placeholder port first, a racing loser could read `port=0` and try to open `http://127.0.0.1:0`. Since the owner only publishes after a successful bind, and the loser polls for a non-empty file, the loser always reads a real port or times out.
 
@@ -162,7 +177,7 @@ Launch sequence:
 | `CMakeLists.txt` | add `schema.cpp`, `cli_settings_ui.cpp`; add cpp-httplib + nlohmann/json submodules; add asset-embed step; remove `install(PROGRAMS tools/autowhisper-settings …)` |
 | `deps/cpp-httplib/` | new submodule |
 | `deps/nlohmann-json/` | new submodule |
-| `src/tray/platform/tray_gtk.cpp` | rewrite Open Config handler to spawn `autowhisper config ui --config <config_path_>` via `g_spawn_async()` with `G_SPAWN_SEARCH_PATH`, stdout/stderr to `/dev/null` |
+| `src/tray/platform/tray_gtk.cpp` | rewrite Open Config handler to spawn `<self_exe> config ui --config <config_path_>` via `g_spawn_async()` with absolute `argv[0]` resolved from `/proc/self/exe`; stdout/stderr to `/dev/null` |
 | `tools/autowhisper-settings` | deleted |
 | `debian/control` | drop any `python3 (>= 3.11)` dependency |
 | `tests/cpp/test_schema.cpp` | new — `schema::find`, `to_json` round-trips, enum membership |
