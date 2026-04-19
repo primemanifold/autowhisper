@@ -17,8 +17,8 @@ Also: fix the tray's broken "Open Config" handler (it currently runs `xdg-open` 
 - **JSON**: `nlohmann/json` (header-only). New submodule at `deps/nlohmann-json`.
 - **Browser launch**: `fork + exec("xdg-open", url)` on the URL (not the TOML file — that's the bug we're fixing). Matches the Python `webbrowser.open()` behavior.
 - **Port**: ephemeral (bind port 0). Recorded in the sidecar file.
-- **Single-instance coordination**: **per-config-path** sidecar at `$XDG_RUNTIME_DIR/autowhisper-settings-<hash>.info` (fallback `/tmp/autowhisper-settings-$UID-<hash>.info`), where `<hash>` is a hex-encoded FNV-64 of the canonical config path. This means `autowhisper config ui --config A.toml` and `autowhisper config ui --config B.toml` coexist as independent instances on different ports. Sidecar stores `<pid>\n<port>\n<canonical_config_path>\n`. Liveness is determined by **`flock(LOCK_EX | LOCK_NB)` held for the lifetime of the owning process** — not `kill(pid, 0)`, which is unreliable under PID reuse. A running owner holds the exclusive lock; a dead/crashed owner releases it automatically and the next launch takes over.
-- **Tray**: "Open Config" menu item launches the main binary with `config ui` via `g_spawn_async()` (GLib is already linked for GTK). GLib handles reaping so no zombies accumulate if the daemon stays up across multiple launches.
+- **Single-instance coordination**: **per-config-path** sidecar at `$XDG_RUNTIME_DIR/autowhisper-settings-<hash>.info` (fallback `/tmp/autowhisper-settings-$UID-<hash>.info`), where `<hash>` is a hex-encoded FNV-64 of the **canonicalized-or-weak** config path (see below). This means `autowhisper config ui --config A.toml` and `autowhisper config ui --config B.toml` coexist as independent instances on different ports — and the UI also works when the target config doesn't exist yet (first-run / new-config flow, preserved from the Python version). Sidecar stores `<pid>\n<port>\n<canonical_path>\n`. Liveness is determined by **`flock(LOCK_EX | LOCK_NB)` held for the lifetime of the owning process** — not `kill(pid, 0)`, which is unreliable under PID reuse. The sidecar fd is opened with `O_CLOEXEC` (with `fcntl(F_SETFD, FD_CLOEXEC)` as a portable fallback), so child processes spawned during the UI's lifetime (browser, xdg-open) do not inherit the lock.
+- **Tray**: "Open Config" menu item launches the main binary with `config ui --config <mgr->config_path_>` via `g_spawn_async()` (GLib is already linked for GTK). **Passing the daemon's actual config path is mandatory** — the tray already carries `config_path_` from the daemon (`src/daemon/daemon.cpp:82`, surfaced via `src/tray/platform/tray_gtk.cpp:143`), and without `--config` the UI would default-search and possibly edit a different file than the one the daemon is running against. GLib handles reaping so no zombies accumulate if the daemon stays up across multiple launches.
 - **Deletion**: `tools/autowhisper-settings` (Python), its `install(PROGRAMS …)` line in `CMakeLists.txt`, and any `python3 (>= 3.11)` edge in `debian/control`.
 
 ## Architecture
@@ -27,19 +27,23 @@ Also: fix the tray's broken "Open Config" handler (it currently runs `xdg-open` 
 
 ```
 autowhisper config ui [--config PATH] [--port N] [--no-browser]
-  ├─ canonicalize config path (realpath); compute FNV-64 hash → sidecar path
-  ├─ open(sidecar, O_RDWR|O_CREAT, 0600); flock(LOCK_EX|LOCK_NB)
-  │    ├─ lock acquired → we own this config's instance → proceed
-  │    └─ lock held by someone else → read port from sidecar
-  │                                 → open browser at existing URL → exit 0
-  ├─ write `<pid>\n0\n<canonical_path>\n` (port filled in after bind)
-  ├─ bind httplib::Server on 127.0.0.1:port (port=0 → kernel picks)
-  ├─ ftruncate + rewrite sidecar with real port
-  ├─ open browser at http://127.0.0.1:PORT (unless --no-browser)
+  ├─ weakly-canonicalize config path (std::filesystem::weakly_canonical)
+  ├─ FNV-64(canonical_path) → sidecar path
+  ├─ open(sidecar, O_RDWR|O_CREAT|O_CLOEXEC, 0600); flock(LOCK_EX|LOCK_NB)
+  │    ├─ lock acquired → we own this config's instance → proceed to bind
+  │    └─ EWOULDBLOCK → loser path:
+  │           ├─ poll-read sidecar up to 3s total (50 ms interval)
+  │           ├─   success: open browser at http://127.0.0.1:<port> → exit 0
+  │           └─   timeout: log "settings UI unresponsive", exit 1
+  ├─ bind httplib::Server on 127.0.0.1:port (port=0 → kernel picks) FIRST
+  ├─ ftruncate(fd, 0) + write `<pid>\n<port>\n<canonical_path>\n` AFTER bind
   ├─ `setsid()` so the process survives tray-parent exit
+  ├─ fork+exec xdg-open on the URL (unless --no-browser)
   ├─ install SIGINT/SIGTERM handlers → unlink sidecar + graceful server.stop()
   └─ server.listen_after_bind()  (blocks, holding the flock)
 ```
+
+Key ordering rule: **the sidecar file stays empty until after the bind succeeds.** The loser never sees a bogus port because a placeholder port is never written — only a populated file is published. Losers that race in before the owner has bound poll-read until the file is non-empty (bounded at 3 seconds).
 
 The flock handles crash recovery automatically: the kernel releases it when the owning process dies, so the next launch's `flock(LOCK_NB)` succeeds immediately.
 
@@ -106,11 +110,15 @@ Raw string literal delimiter `)AUTOWHISPER_EMBED_END(` (long enough to never app
 Sidecar file path: `<runtime_dir>/autowhisper-settings-<hash>.info`, where:
 
 - `<runtime_dir>` = `$XDG_RUNTIME_DIR` if set and writable, else `/tmp`.
-- `<hash>` = FNV-64 of the canonicalized (`realpath`) config path, hex-encoded (16 chars).
+- `<hash>` = FNV-64 of the **weakly-canonicalized** config path, hex-encoded (16 chars).
+
+**Weakly-canonicalized** means `std::filesystem::weakly_canonical(path)` (C++17): resolves and canonicalizes whatever prefix of the path actually exists, appends the non-existing suffix verbatim, and normalizes `..`/`.`/symlinks along the way. This is required because the UI must launch against a config file that does not exist yet (first-run / new-config flow) — the existing Python tool intentionally supports this, and `Config::save()` (`src/config/config.cpp:357`) already `mkdir -p`s the parent on write.
+
+Example: `~/new.toml` where `~/` exists but `new.toml` does not → `/home/isura/new.toml` (canonical parent + literal leaf).
 
 So each config file has its own independent instance — launching with `--config A.toml` and `--config B.toml` in parallel yields two servers on two ports, not a mis-routed reuse.
 
-Content (exactly three lines):
+Content (exactly three lines, written only after the server is bound):
 ```
 <pid>
 <port>
@@ -119,16 +127,20 @@ Content (exactly three lines):
 
 Launch sequence:
 
-1. Canonicalize the config path. Compute sidecar path.
-2. `open(sidecar, O_RDWR|O_CREAT, 0600)` — get an fd unconditionally.
+1. Weakly-canonicalize the config path. Compute sidecar path.
+2. `open(sidecar, O_RDWR|O_CREAT|O_CLOEXEC, 0600)` — get an fd unconditionally. If the platform lacks `O_CLOEXEC` in `open()`, follow with `fcntl(fd, F_SETFD, FD_CLOEXEC)`.
 3. `flock(fd, LOCK_EX | LOCK_NB)`:
    - **Success** → we own this config's instance. Go to step 5.
-   - **EWOULDBLOCK** → someone else owns it (and is alive, because flock is held for the process lifetime). Go to step 4.
-4. Read the sidecar (pid, port, path). Sanity-check the path matches (defense against stale content from an earlier run with the same hash, should not happen but cheap to verify). Open browser at `http://127.0.0.1:<port>`. Exit 0.
-5. `ftruncate(fd, 0)`, write `<getpid()>\n0\n<canonical_path>\n`. Bind HTTP server on port 0. Rewrite sidecar with the real port. Keep `fd` open and locked for the process lifetime.
+   - **EWOULDBLOCK** → someone else owns it. Go to step 4.
+4. **Loser path**: read the sidecar. If empty or malformed (owner still binding), poll every 50 ms for up to 3 seconds. When populated, sanity-check the stored path matches our canonical path (defense against an FNV-64 collision; if it doesn't match, log and exit 1). Open browser at `http://127.0.0.1:<port>`. Exit 0.
+5. **Owner path**: leave the sidecar file empty for now. Bind the HTTP server on port 0 — kernel assigns a port. Only after bind succeeds: `ftruncate(fd, 0)`, write `<getpid()>\n<port>\n<canonical_path>\n`, fsync. Keep `fd` open and locked for the process lifetime.
 6. On shutdown (SIGINT/SIGTERM/clean return): `unlink(sidecar)`, `close(fd)` (implicitly releases the lock).
 
-**Crash recovery**: when the owning process dies — clean, SIGKILL, segfault, whatever — the kernel releases the flock. The next launch's `flock(LOCK_NB)` succeeds in step 3 and takes over. No stale-file check logic needed, no PID-reuse hazard.
+**Why the bind-before-publish rule**: if the owner wrote a placeholder port first, a racing loser could read `port=0` and try to open `http://127.0.0.1:0`. Since the owner only publishes after a successful bind, and the loser polls for a non-empty file, the loser always reads a real port or times out.
+
+**Why `O_CLOEXEC`**: when the UI process forks `xdg-open` (which itself may fork a browser and exit), any inherited fds keep the flock held even after the UI server dies. That would break crash recovery — the next launch's `flock(LOCK_NB)` would fail because the browser still holds the inherited lock. `O_CLOEXEC` ensures the fd is closed on exec.
+
+**Crash recovery**: when the owning process dies — clean, SIGKILL, segfault, whatever — the kernel releases the flock (assuming no CLOEXEC-less inheritance, covered above). The next launch's `flock(LOCK_NB)` succeeds in step 3 and takes over. No stale-file check logic needed, no PID-reuse hazard.
 
 **Why not `kill(pid, 0)`**: PID reuse. After a reboot or long uptime, the stored PID may belong to an unrelated process — the check reports "alive" and we'd open the browser at a dead port forever.
 
@@ -150,7 +162,7 @@ Launch sequence:
 | `CMakeLists.txt` | add `schema.cpp`, `cli_settings_ui.cpp`; add cpp-httplib + nlohmann/json submodules; add asset-embed step; remove `install(PROGRAMS tools/autowhisper-settings …)` |
 | `deps/cpp-httplib/` | new submodule |
 | `deps/nlohmann-json/` | new submodule |
-| `src/tray/platform/tray_gtk.cpp` | rewrite Open Config handler to spawn `autowhisper config ui` detached |
+| `src/tray/platform/tray_gtk.cpp` | rewrite Open Config handler to spawn `autowhisper config ui --config <config_path_>` via `g_spawn_async()` with `G_SPAWN_SEARCH_PATH`, stdout/stderr to `/dev/null` |
 | `tools/autowhisper-settings` | deleted |
 | `debian/control` | drop any `python3 (>= 3.11)` dependency |
 | `tests/cpp/test_schema.cpp` | new — `schema::find`, `to_json` round-trips, enum membership |
@@ -201,4 +213,7 @@ Not tested (acknowledged):
 | Sidecar file survives crash with stale port | Flock is released by kernel on any process exit; next launch takes over cleanly. |
 | Two clicks race on lock acquisition | Losing side's `flock(LOCK_NB)` returns EWOULDBLOCK, then reads the winner's port and opens the browser. No retry loop needed. |
 | Two instances launched with different `--config` paths | Sidecar hash includes the canonical path, so the two instances use different sidecars and different locks — they coexist on different ports. |
+| Losing launch reads a placeholder `port=0` before owner binds | Owner leaves the sidecar empty until bind succeeds; loser poll-reads (50 ms × up to 60 iterations = 3 s) for a populated file. Never sees port 0. |
+| Lock fd inherited into `xdg-open` → browser holds lock after UI dies | `O_CLOEXEC` on the sidecar `open()` ensures the fd is closed on any `exec`. Verified by: after daemon-spawned UI exits, the next `config ui` must acquire the flock immediately. |
+| Tray launches UI against wrong config file | Tray passes `--config <mgr->config_path_>` explicitly. The daemon-supplied path is the source of truth, not the UI's default-search. |
 | FNV-64 hash collision across two config paths | FNV-64 collision space is 2^64; on a single user's machine with a handful of config paths, probability is negligible. Sanity-checking the canonical path stored in the sidecar (step 4) would detect a collision anyway and could be extended to spawn a new instance if needed. |
