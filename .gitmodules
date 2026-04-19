@@ -22,3 +22,7 @@
 	path = deps/whisper.cpp
 	url = https://github.com/ggerganov/whisper.cpp.git
 	shallow = true
+[submodule "deps/cpp-httplib"]
+	path = deps/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib.git
+	shallow = true
