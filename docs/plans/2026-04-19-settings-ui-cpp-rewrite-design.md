@@ -17,7 +17,7 @@ Also: fix the tray's broken "Open Config" handler (it currently runs `xdg-open` 
 - **JSON**: `nlohmann/json` (header-only). New submodule at `deps/nlohmann-json`.
 - **Browser launch**: `fork + exec("xdg-open", url)` on the URL (not the TOML file — that's the bug we're fixing). Matches the Python `webbrowser.open()` behavior.
 - **Port**: ephemeral (bind port 0). Recorded in the sidecar file.
-- **Single-instance coordination**: sidecar at `$XDG_RUNTIME_DIR/autowhisper-settings.info` (fallback `/tmp/autowhisper-settings-$UID.info`) storing `<pid>\n<port>\n`. Atomic creation via `O_CREAT|O_EXCL`. On re-launch with a live pid, just open the browser at the existing port and exit.
+- **Single-instance coordination**: **per-config-path** sidecar at `$XDG_RUNTIME_DIR/autowhisper-settings-<hash>.info` (fallback `/tmp/autowhisper-settings-$UID-<hash>.info`), where `<hash>` is a hex-encoded FNV-64 of the canonical config path. This means `autowhisper config ui --config A.toml` and `autowhisper config ui --config B.toml` coexist as independent instances on different ports. Sidecar stores `<pid>\n<port>\n<canonical_config_path>\n`. Liveness is determined by **`flock(LOCK_EX | LOCK_NB)` held for the lifetime of the owning process** — not `kill(pid, 0)`, which is unreliable under PID reuse. A running owner holds the exclusive lock; a dead/crashed owner releases it automatically and the next launch takes over.
 - **Tray**: "Open Config" menu item launches the main binary with `config ui` via `g_spawn_async()` (GLib is already linked for GTK). GLib handles reaping so no zombies accumulate if the daemon stays up across multiple launches.
 - **Deletion**: `tools/autowhisper-settings` (Python), its `install(PROGRAMS …)` line in `CMakeLists.txt`, and any `python3 (>= 3.11)` edge in `debian/control`.
 
@@ -27,17 +27,21 @@ Also: fix the tray's broken "Open Config" handler (it currently runs `xdg-open` 
 
 ```
 autowhisper config ui [--config PATH] [--port N] [--no-browser]
-  ├─ read sidecar; if pid alive → open browser at existing port → exit 0
-  ├─ otherwise: create sidecar with O_CREAT|O_EXCL containing getpid()\n0
+  ├─ canonicalize config path (realpath); compute FNV-64 hash → sidecar path
+  ├─ open(sidecar, O_RDWR|O_CREAT, 0600); flock(LOCK_EX|LOCK_NB)
+  │    ├─ lock acquired → we own this config's instance → proceed
+  │    └─ lock held by someone else → read port from sidecar
+  │                                 → open browser at existing URL → exit 0
+  ├─ write `<pid>\n0\n<canonical_path>\n` (port filled in after bind)
   ├─ bind httplib::Server on 127.0.0.1:port (port=0 → kernel picks)
-  ├─ rewrite sidecar with actual chosen port
+  ├─ ftruncate + rewrite sidecar with real port
   ├─ open browser at http://127.0.0.1:PORT (unless --no-browser)
   ├─ `setsid()` so the process survives tray-parent exit
-  ├─ install SIGINT/SIGTERM handlers → remove sidecar + graceful server.stop()
-  └─ server.listen_after_bind()  (blocks)
+  ├─ install SIGINT/SIGTERM handlers → unlink sidecar + graceful server.stop()
+  └─ server.listen_after_bind()  (blocks, holding the flock)
 ```
 
-If the sidecar exists but pid is not alive (stale after a crash), overwrite it.
+The flock handles crash recovery automatically: the kernel releases it when the owning process dies, so the next launch's `flock(LOCK_NB)` succeeds immediately.
 
 ### Schema module
 
@@ -73,7 +77,7 @@ Enum values today (extracted from `Config::validate` and `config.toml`):
 - `hotkeys.mode` — `push_to_talk`, `toggle`
 - `output.method` — `inject`, `clipboard`
 - `output.ending_action` — `none`, `newline`, `return_key`
-- `daemon.log_level` — `trace`, `debug`, `info`, `warn`, `warning`, `error`
+- `daemon.log_level` — `trace`, `debug`, `info`, `warn`, `error`, `critical`, `off` (mirrors `Config::validate()` at `src/config/config.cpp:269-271` exactly; does not include `warning` because validate() does not accept it)
 
 `Config::validate()` is refactored to iterate `schema::all()`. Error messages stay byte-identical ("Invalid model size", etc.) — 23 existing test assertions on those strings must not break.
 
@@ -99,25 +103,34 @@ Raw string literal delimiter `)AUTOWHISPER_EMBED_END(` (long enough to never app
 
 ### Single-instance protocol
 
-Sidecar file path: `<runtime_dir>/autowhisper-settings.info`.
+Sidecar file path: `<runtime_dir>/autowhisper-settings-<hash>.info`, where:
 
-Content: exactly two lines:
+- `<runtime_dir>` = `$XDG_RUNTIME_DIR` if set and writable, else `/tmp`.
+- `<hash>` = FNV-64 of the canonicalized (`realpath`) config path, hex-encoded (16 chars).
+
+So each config file has its own independent instance — launching with `--config A.toml` and `--config B.toml` in parallel yields two servers on two ports, not a mis-routed reuse.
+
+Content (exactly three lines):
 ```
 <pid>
 <port>
+<canonical_config_path>
 ```
 
 Launch sequence:
 
-1. Try `open(path, O_RDONLY)`. If present, parse pid+port.
-2. If pid is alive (`kill(pid, 0) == 0` or ESRCH false), open browser at port, exit 0.
-3. Otherwise (no file, or pid dead), attempt atomic claim: `open(path, O_WRONLY|O_CREAT|O_EXCL, 0600)`.
-4. If EEXIST (race: another instance beat us), go to step 1. Bounded to 3 retries — if we still can't make progress, log and exit 1.
-5. Write `getpid()\n0\n` to the claimed file.
-6. Start server, then `lseek(0)`, `ftruncate(0)`, rewrite with real port.
-7. On shutdown (SIGINT/SIGTERM/normal): `unlink(path)`.
+1. Canonicalize the config path. Compute sidecar path.
+2. `open(sidecar, O_RDWR|O_CREAT, 0600)` — get an fd unconditionally.
+3. `flock(fd, LOCK_EX | LOCK_NB)`:
+   - **Success** → we own this config's instance. Go to step 5.
+   - **EWOULDBLOCK** → someone else owns it (and is alive, because flock is held for the process lifetime). Go to step 4.
+4. Read the sidecar (pid, port, path). Sanity-check the path matches (defense against stale content from an earlier run with the same hash, should not happen but cheap to verify). Open browser at `http://127.0.0.1:<port>`. Exit 0.
+5. `ftruncate(fd, 0)`, write `<getpid()>\n0\n<canonical_path>\n`. Bind HTTP server on port 0. Rewrite sidecar with the real port. Keep `fd` open and locked for the process lifetime.
+6. On shutdown (SIGINT/SIGTERM/clean return): `unlink(sidecar)`, `close(fd)` (implicitly releases the lock).
 
-Stale-file recovery: the step-2 check handles crashed instances.
+**Crash recovery**: when the owning process dies — clean, SIGKILL, segfault, whatever — the kernel releases the flock. The next launch's `flock(LOCK_NB)` succeeds in step 3 and takes over. No stale-file check logic needed, no PID-reuse hazard.
+
+**Why not `kill(pid, 0)`**: PID reuse. After a reboot or long uptime, the stored PID may belong to an unrelated process — the check reports "alive" and we'd open the browser at a dead port forever.
 
 ## File layout
 
@@ -185,5 +198,7 @@ Not tested (acknowledged):
 | cpp-httplib bloats binary | Header-only; LTO strips unused parts. Measured ~30-50 KB addition. |
 | Submodule additions slow clones | Already using shallow submodules (`9ffe87b`). |
 | Asset regeneration on every build | CMake dependency tracks only the web source files. No rebuild if HTML unchanged. |
-| Sidecar file survives crash with stale port | `kill(pid, 0)` check on step 2 recovers. |
-| Two clicks race on `O_CREAT\|O_EXCL` | Losing side retries from step 1 and finds the winner's entry. |
+| Sidecar file survives crash with stale port | Flock is released by kernel on any process exit; next launch takes over cleanly. |
+| Two clicks race on lock acquisition | Losing side's `flock(LOCK_NB)` returns EWOULDBLOCK, then reads the winner's port and opens the browser. No retry loop needed. |
+| Two instances launched with different `--config` paths | Sidecar hash includes the canonical path, so the two instances use different sidecars and different locks — they coexist on different ports. |
+| FNV-64 hash collision across two config paths | FNV-64 collision space is 2^64; on a single user's machine with a handful of config paths, probability is negligible. Sanity-checking the canonical path stored in the sidecar (step 4) would detect a collision anyway and could be extended to spawn a new instance if needed. |
