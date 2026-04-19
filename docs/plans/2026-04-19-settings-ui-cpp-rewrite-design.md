@@ -10,7 +10,12 @@ Also: fix the tray's broken "Open Config" handler (it currently runs `xdg-open` 
 
 ## Decisions
 
-- **Entry point**: `autowhisper config ui` subcommand (not a separate binary).
+- **Entry point**: `autowhisper config ui [--config PATH] [--port N] [--no-browser]` subcommand (not a separate binary).
+
+- **Config path resolution**:
+    - `--config PATH` is used literally, whether or not the file exists (supports the first-run / new-config flow).
+    - Without `--config`, the UI targets `$HOME/.config/autowhisper/config.toml` **unconditionally** (same path as `get_user_config_path()` at `src/config/config.cpp:395-399`), whether or not it exists yet. This matches the Python tool's fallback (`tools/autowhisper-settings:74, 523`) and ensures first-run `autowhisper config ui` with no flags works.
+    - The UI deliberately does **not** walk the full `find_config_file()` search hierarchy (which includes `/etc/autowhisper/config.toml` and `/opt/autowhisper/config.toml`) — those are system/packaged defaults that the UI should not rewrite. The daemon may read them via `find_config_file()`, but the settings editor always operates on the user's own config.
 - **Assets**: HTML/CSS/JS embedded at build time via a CMake step that converts files under `src/settings/web/` into C++ string literals (`src/settings/assets.h` generated).
 - **Schema**: new `src/config/schema.{h,cpp}` module in `CORE_LIB_SOURCES`. Source of truth for section/key/type/enum/description/numeric bounds. Both `Config::validate()` and the settings UI read from it. **Defaults stay in `Config{}` member initializers** (heterogeneous types; a `std::variant` in `KeyDef` would add complexity for little gain). The UI fetches defaults via `GET /api/defaults`, which serializes `Config::default_config()`.
 - **HTTP server**: `cpp-httplib` (header-only, MIT). New submodule at `deps/cpp-httplib`.
@@ -43,10 +48,17 @@ autowhisper config ui [--config PATH] [--port N] [--no-browser]
   ├─ ftruncate(fd, 0) + write `<pid>\n<port>\n<canonical_path>\n` AFTER bind
   ├─ `setsid()` so the process survives tray-parent exit
   ├─ fork+exec xdg-open on the URL (unless --no-browser)
-  ├─ create self-pipe (`pipe2(fds, O_CLOEXEC | O_NONBLOCK)`)
-  ├─ start shutdown watcher thread (blocks on `read(pipe_read_fd, …)`)
+  ├─ create self-pipe:
+  │     `pipe2(fds, O_CLOEXEC)`  — read end stays blocking
+  │     `fcntl(fds[1], F_SETFL, O_NONBLOCK)` — write end is non-blocking
+  │     so the signal handler can never stall even if the pipe fills.
+  ├─ start shutdown watcher thread: blocking `read(fds[0], &c, 1)` —
+  │     blocks until the handler writes a byte. Pipe capacity is
+  │     thousands of bytes; we only ever write 1 byte per signal, so
+  │     `write()` on the non-blocking write end will never return
+  │     EAGAIN in practice.
   ├─ install SIGINT/SIGTERM handlers — handler ONLY does
-  │       `(void)write(pipe_write_fd, "x", 1);`
+  │       `(void)write(fds[1], "x", 1);`
   │   which is listed as async-signal-safe in POSIX.1 (unlike
   │   `std::atomic::notify_all`, whose signal-safety is not guaranteed —
   │   see WG21 P3255R1). Matches the pure atomic-store pattern at
@@ -214,6 +226,7 @@ Integration (new test file):
 - `GET /api/config` → defaults JSON, no file created, no error.
 - `PUT /api/config` with a valid body → `204`. File is created at the target path; parent directories are created if missing (relies on existing `Config::save()` behavior). Subsequent `GET /api/config` reflects the written values.
 - `PUT` with an invalid body → `400`, no file created on disk.
+- **No-flags invocation**: also cover running `cmd_config_ui` with no explicit path (simulated via a `HOME` override pointing at an empty tempdir). Verify it targets `$HOME/.config/autowhisper/config.toml`, returns defaults on GET, and a subsequent PUT creates the file and `$HOME/.config/autowhisper/`.
 
 Not tested (acknowledged):
 
