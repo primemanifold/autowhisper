@@ -26,3 +26,22 @@ tracked so they aren't lost.
   Hotkey via `RegisterHotKey` or `SetWindowsHookEx`, text via `SendInput`,
   tray via `Shell_NotifyIcon`, service via either a scheduled task or a
   Windows service. Effort: L.
+
+## Tests / coverage (added 2026-04-20 by /ship coverage audit)
+
+- **launchctl state-machine unit test** — extract the
+  `current_label_loaded → matches_plist → bootstrap vs kickstart` decision
+  in `src/service/service_macos.mm` into a pure function that takes a
+  `launchctl print` output string + expected plist path, and unit-test it
+  with synthetic outputs (loaded-at-correct-plist, loaded-at-stale-plist,
+  not-loaded, mangled output). Codex finding #6 from the port plan.
+  Effort: S (CC ~15 min).
+- **`.app/Contents/Resources/AutoWhisper.icns`** — convert existing PNG
+  icons via `iconutil` in `cmake/MacOSBundle.cmake`, add `CFBundleIconFile`
+  to `Info.plist.in`. Cosmetic Finder icon; menu-bar tray uses SF Symbols
+  so doesn't affect functionality. ISSUE-001 from the /qa report.
+  Effort: S (CC ~15 min).
+- **Settings UI `/api/config` PUT float precision** — round floats to their
+  source precision on write so `silence_duration = 0.3` doesn't become
+  `0.30000001192092896` after a round-trip. Pre-existing, not mac-specific.
+  ISSUE-002 from the /qa report. Effort: S.
