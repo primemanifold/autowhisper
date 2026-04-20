@@ -28,6 +28,7 @@ find_package(Threads REQUIRED)
 # === Testable core sources (platform-independent) ===
 set(CORE_LIB_SOURCES
     src/config/config.cpp
+    src/config/schema.cpp
     src/hotkey/hotkey_common.cpp
     src/models/models.cpp
     src/tray/tray_common.cpp
@@ -42,6 +43,7 @@ target_include_directories(autowhisper_core PUBLIC
 target_link_libraries(autowhisper_core PUBLIC
     tomlplusplus::tomlplusplus
     spdlog::spdlog
+    nlohmann_json
     Threads::Threads
 )
 target_compile_definitions(autowhisper_core PUBLIC
