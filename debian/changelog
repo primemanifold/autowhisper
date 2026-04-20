@@ -1,3 +1,27 @@
+autowhisper (0.7.0-1) noble; urgency=medium
+
+  * macOS port: first-class mac target via native frameworks
+    - CGEventTap hotkey listener (listen-only)
+    - CGEventPost text injection with Unicode/emoji support
+    - NSStatusItem menu-bar tray (mic SF Symbol, template mode)
+    - launchd LaunchAgent supervision (replaces systemd on mac)
+    - CG Preflight APIs for Input Monitoring and Accessibility checks
+    - AVCaptureDevice-backed microphone permission detection
+    - NSMicrophoneUsageDescription in Info.plist
+    - Metal inference auto-enabled via whisper.cpp (no config change)
+    - LSUIElement .app bundle with hardened runtime + ad-hoc signing
+    - Universal binary (arm64 + x86_64), deployment target macOS 12.0
+  * Architectural seams for cross-platform support:
+    - PlatformOutput interface (X11/macos/fake) replaces ifdef'd output
+    - ServiceManager interface (systemd/launchd) replaces inline shell-out
+    - Doctor split into common + per-platform checks with CheckResult
+  * 16 new tests cover the OutputManager state machine (9 cases) and the
+    macOS keycode-to-X11-canonical-name mapping (7 cases). 99 tests pass.
+  * Docs: docs/MACOS.md user guide; TODOS.md for deferred follow-ups
+    (Homebrew tap, DMG, Sparkle auto-update, Windows port).
+
+ -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Mon, 20 Apr 2026 14:15:00 -0500
+
 autowhisper (0.6.0-2) noble; urgency=medium
 
   * Packaging: include git submodule sources in release tarball (no code changes)
