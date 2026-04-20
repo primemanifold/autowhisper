@@ -57,10 +57,21 @@ public:
         const NSUInteger CHUNK = 20;  // CGEventKeyboardSetUnicodeString is bounded.
         std::vector<UniChar> buf(CHUNK);
 
-        for (NSUInteger i = 0; i < total; i += CHUNK) {
+        for (NSUInteger i = 0; i < total; ) {
             NSUInteger n = std::min<NSUInteger>(CHUNK, total - i);
+            // Don't split a surrogate pair across chunks: if the last unit
+            // in this window is a high surrogate (0xD800..0xDBFF) and
+            // there's more text after, shrink the window by one so the
+            // pair is emitted together on the next iteration.
+            if (i + n < total && n > 0) {
+                UniChar last = [ns characterAtIndex:(i + n - 1)];
+                if (last >= 0xD800 && last <= 0xDBFF) {
+                    n -= 1;
+                }
+            }
             [ns getCharacters:buf.data() range:NSMakeRange(i, n)];
             post_unicode_chunk(buf.data(), n);
+            i += n;
         }
 
         spdlog::debug("Injected {} UTF-16 units via CGEventPost", total);
