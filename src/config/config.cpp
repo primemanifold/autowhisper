@@ -375,4 +375,14 @@ std::string get_user_config_path() {
     return std::string(home) + "/.config/autowhisper/config.toml";
 }
 
+std::string resolve_config_path() {
+    std::string user_config = get_user_config_path();
+    if (fs::exists(user_config)) return user_config;
+    try {
+        return find_config_file();
+    } catch (...) {
+        return user_config;
+    }
+}
+
 } // namespace autowhisper

@@ -158,7 +158,7 @@ bool install_signal_pipe_and_handlers() {
 
 int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
     const std::string config_path = config_path_opt.empty()
-                                      ? get_user_config_path()
+                                      ? resolve_config_path()
                                       : config_path_opt;
     const std::string canonical = settings::weak_canonical(config_path);
     const std::string sidecar = settings::sidecar_path_for(canonical);
