@@ -71,6 +71,15 @@ TEST_CASE("validate_json rejects invalid enum value", "[handlers]") {
     CHECK(r.errors.front().find("Invalid model size") != std::string::npos);
 }
 
+TEST_CASE("validate_json rejects type-mismatched value", "[handlers]") {
+    auto j = settings::defaults_json();
+    j["model"]["beam_size"] = "abc";
+    auto r = settings::validate_json(j);
+    CHECK_FALSE(r.ok());
+    REQUIRE(!r.errors.empty());
+    CHECK(r.errors.front().find("Invalid model.beam_size") != std::string::npos);
+}
+
 TEST_CASE("save_config_json writes file and creates parents", "[handlers]") {
     TempDir tmp;
     auto path = (tmp.path / "sub1" / "sub2" / "new.toml").string();

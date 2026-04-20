@@ -80,8 +80,12 @@ Config json_to_config(const nlohmann::json& j) {
 
     auto get = [&](const char* section, const char* key, auto& dst) {
         if (j.contains(section) && j[section].contains(key)) {
-            try { dst = j[section][key].get<std::decay_t<decltype(dst)>>(); }
-            catch (...) { /* leave default */ }
+            try {
+                dst = j[section][key].get<std::decay_t<decltype(dst)>>();
+            } catch (const std::exception& e) {
+                throw std::runtime_error(
+                    std::string("Invalid ") + section + "." + key + ": " + e.what());
+            }
         }
     };
 
