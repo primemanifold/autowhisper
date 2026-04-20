@@ -1,3 +1,9 @@
+autowhisper (0.6.0-2) noble; urgency=medium
+
+  * Packaging: include git submodule sources in release tarball (no code changes)
+
+ -- AutoWhisper Contributors <autowhisper@users.noreply.github.com>  Mon, 20 Apr 2026 06:44:02 -0500
+
 autowhisper (0.6.0-1) noble; urgency=medium
 
   * Settings UI: reopen browser when launched against a running instance
