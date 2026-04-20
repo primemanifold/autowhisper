@@ -85,4 +85,8 @@ std::string find_config_file();
 // Get user config path (~/.config/autowhisper/config.toml)
 std::string get_user_config_path();
 
+// Resolve the active config path: user config if present, else first
+// match from find_config_file(), else the user-config path (for writes).
+std::string resolve_config_path();
+
 } // namespace autowhisper

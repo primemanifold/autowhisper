@@ -2,8 +2,10 @@
 
 #include <spdlog/spdlog.h>
 
+#include <climits>
 #include <filesystem>
 #include <thread>
+#include <unistd.h>
 
 #include <gtk/gtk.h>
 
@@ -138,16 +140,39 @@ void TrayManager::start() {
 
         // Open Config
         GtkWidget* config_item = gtk_menu_item_new_with_label("Open Config");
-        g_signal_connect(config_item, "activate",
-            G_CALLBACK(+[](GtkMenuItem*, gpointer data) {
-                auto* mgr = static_cast<TrayManager*>(data);
-                if (!mgr->config_path_.empty()) {
-                    std::string cmd = "xdg-open " + mgr->config_path_;
-                    if (system(cmd.c_str()) != 0) {
-                        spdlog::warn("Failed to open config with xdg-open");
-                    }
-                }
-            }), this);
+        auto open_config_cb = +[](GtkMenuItem*, gpointer data) {
+            auto* mgr = static_cast<TrayManager*>(data);
+            if (mgr->config_path_.empty()) {
+                spdlog::warn("No config path known; cannot launch settings UI");
+                return;
+            }
+            char exe_path[PATH_MAX];
+            ssize_t n = ::readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+            if (n <= 0) {
+                spdlog::warn("readlink(/proc/self/exe) failed; cannot launch settings UI");
+                return;
+            }
+            exe_path[n] = '\0';
+
+            gchar* argv[6];
+            argv[0] = exe_path;
+            argv[1] = (gchar*)"config";
+            argv[2] = (gchar*)"ui";
+            argv[3] = (gchar*)"--config";
+            argv[4] = (gchar*)mgr->config_path_.c_str();
+            argv[5] = nullptr;
+
+            GError* err = nullptr;
+            GSpawnFlags flags = (GSpawnFlags)(G_SPAWN_STDOUT_TO_DEV_NULL | G_SPAWN_STDERR_TO_DEV_NULL);
+            gboolean ok = g_spawn_async(
+                nullptr, argv, nullptr, flags,
+                nullptr, nullptr, nullptr, &err);
+            if (!ok) {
+                spdlog::warn("g_spawn_async failed: {}", err ? err->message : "unknown");
+                if (err) g_error_free(err);
+            }
+        };
+        g_signal_connect(config_item, "activate", G_CALLBACK(open_config_cb), this);
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), config_item);
 
         // Quit

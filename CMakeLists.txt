@@ -21,6 +21,8 @@ option(AUTOWHISPER_ENABLE_TESTS "Build tests" ON)
 include(cmake/CompilerWarnings.cmake)
 include(cmake/FetchDependencies.cmake)
 include(cmake/PlatformSetup.cmake)
+include(cmake/EmbedAssets.cmake)
+autowhisper_embed_web_assets(${CMAKE_BINARY_DIR}/generated/settings)
 
 # Threads (needed by core lib and main executable)
 find_package(Threads REQUIRED)
@@ -31,6 +33,8 @@ set(CORE_LIB_SOURCES
     src/config/schema.cpp
     src/hotkey/hotkey_common.cpp
     src/models/models.cpp
+    src/settings/handlers.cpp
+    src/settings/sidecar.cpp
     src/tray/tray_common.cpp
     src/util/logging.cpp
     src/util/subprocess.cpp
@@ -62,6 +66,7 @@ set(APP_SOURCES
     src/inference/inference.cpp
     src/feedback/feedback.cpp
     src/cli/cli.cpp
+    src/cli/cli_settings_ui.cpp
     src/doctor/doctor.cpp
     src/output/output_common.cpp
 )
@@ -93,11 +98,16 @@ endif()
 # === Main executable ===
 add_executable(autowhisper ${APP_SOURCES})
 
+target_include_directories(autowhisper PRIVATE
+    ${CMAKE_BINARY_DIR}/generated
+)
+
 target_link_libraries(autowhisper PRIVATE
     autowhisper_core
     whisper
     CLI11::CLI11
     miniaudio
+    cpp_httplib
 )
 
 # Platform libraries
@@ -156,7 +166,6 @@ autowhisper_set_warnings(autowhisper)
 # Install
 install(TARGETS autowhisper RUNTIME DESTINATION bin)
 install(DIRECTORY icons/ DESTINATION share/autowhisper/icons)
-install(PROGRAMS tools/autowhisper-settings DESTINATION bin)
 
 # Tests
 if(AUTOWHISPER_ENABLE_TESTS)
@@ -170,11 +179,15 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_logging.cpp
         tests/cpp/test_models.cpp
         tests/cpp/test_schema.cpp
+        tests/cpp/test_settings_handlers.cpp
+        tests/cpp/test_settings_http.cpp
+        tests/cpp/test_sidecar.cpp
         tests/cpp/test_subprocess.cpp
         tests/cpp/test_tray_display.cpp
     )
     target_link_libraries(autowhisper_tests PRIVATE
         autowhisper_core
+        cpp_httplib
         Catch2::Catch2WithMain
     )
     autowhisper_set_warnings(autowhisper_tests)

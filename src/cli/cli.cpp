@@ -85,6 +85,15 @@ void setup_cli(CLI::App& app) {
     auto* config_path = config_cmd->add_subcommand("path", "Show config file path");
     config_path->callback([]() { std::exit(cmd_config_path()); });
 
+    static std::string ui_config;
+    static bool ui_no_browser = false;
+    auto* config_ui = config_cmd->add_subcommand("ui", "Open settings UI in browser");
+    config_ui->add_option("-c,--config", ui_config, "Config file path");
+    config_ui->add_flag("--no-browser", ui_no_browser, "Do not open a browser window");
+    config_ui->callback([]() {
+        std::exit(cmd_config_ui(ui_config, !ui_no_browser));
+    });
+
     // --- Doctor ---
     static bool doctor_fix = false;
     auto* doctor_cmd = app.add_subcommand("doctor", "Diagnose system configuration");
