@@ -1,5 +1,7 @@
 #include "config/config.h"
 
+#include "config/schema.h"
+
 #include <spdlog/spdlog.h>
 #include <toml++/toml.hpp>
 
@@ -9,8 +11,9 @@
 #include <filesystem>
 #include <fstream>
 #include <limits>
-#include <set>
 #include <stdexcept>
+#include <string>
+#include <string_view>
 
 namespace fs = std::filesystem;
 
@@ -68,6 +71,16 @@ std::vector<std::string> get_string_array(const toml::table& tbl, const std::str
     }
 
     return def;
+}
+
+void check_enum(std::string_view section, std::string_view key,
+                const std::string& value, std::string_view message_prefix) {
+    const auto* d = schema::find(section, key);
+    if (!d || d->type != schema::Type::Enum) return;
+    for (auto allowed : d->enum_values) {
+        if (value == allowed) return;
+    }
+    throw std::runtime_error(std::string(message_prefix) + ": " + value);
 }
 
 } // anonymous namespace
@@ -166,30 +179,9 @@ Config Config::default_config() {
 }
 
 void Config::validate() const {
-    // Validate model size
-    static const std::set<std::string> valid_models = {
-        "tiny", "tiny.en", "base", "base.en", "small", "small.en",
-        "medium", "medium.en", "large", "large-v1", "large-v2", "large-v3",
-        "distil-large-v2", "distil-large-v3", "distil-medium.en", "distil-small.en",
-    };
-    if (valid_models.find(model.size) == valid_models.end()) {
-        throw std::runtime_error("Invalid model size: " + model.size);
-    }
-
-    // Validate device
-    static const std::set<std::string> valid_devices = {"cuda", "cpu", "auto"};
-    if (valid_devices.find(model.device) == valid_devices.end()) {
-        throw std::runtime_error("Invalid device: " + model.device);
-    }
-
-    // Validate compute type
-    static const std::set<std::string> valid_compute = {
-        "float16", "float32", "int8", "int8_float16",
-        "int8_float32", "int8_bfloat16", "bfloat16",
-    };
-    if (valid_compute.find(model.compute_type) == valid_compute.end()) {
-        throw std::runtime_error("Invalid compute_type: " + model.compute_type);
-    }
+    check_enum("model", "size", model.size, "Invalid model size");
+    check_enum("model", "device", model.device, "Invalid device");
+    check_enum("model", "compute_type", model.compute_type, "Invalid compute_type");
 
     if (model.beam_size <= 0 || model.beam_size > 10) {
         throw std::runtime_error("Invalid beam_size: must be between 1 and 10");
@@ -221,10 +213,7 @@ void Config::validate() const {
         spdlog::warn("Sample rate {} is not Whisper's native 16kHz", audio.sample_rate);
     }
 
-    // Validate hotkey mode
-    if (hotkeys.mode != "push_to_talk" && hotkeys.mode != "toggle") {
-        throw std::runtime_error("Invalid hotkey mode: " + hotkeys.mode);
-    }
+    check_enum("hotkeys", "mode", hotkeys.mode, "Invalid hotkey mode");
     if (hotkeys.trigger.empty()) {
         throw std::runtime_error("Invalid hotkeys.trigger: at least one trigger is required");
     }
@@ -239,20 +228,13 @@ void Config::validate() const {
         }
     }
 
-    // Validate output method
-    if (output.method != "inject" && output.method != "clipboard") {
-        throw std::runtime_error("Invalid output method: " + output.method);
-    }
+    check_enum("output", "method", output.method, "Invalid output method");
     if (!std::isfinite(output.paste_delay) || output.paste_delay < 0.0f ||
         output.paste_delay > static_cast<float>(std::numeric_limits<int>::max())) {
         throw std::runtime_error("Invalid paste_delay: must be >= 0");
     }
 
-    // Validate ending action
-    if (output.ending_action != "none" && output.ending_action != "newline" &&
-        output.ending_action != "return_key") {
-        throw std::runtime_error("Invalid ending_action: " + output.ending_action);
-    }
+    check_enum("output", "ending_action", output.ending_action, "Invalid ending_action");
 
     // Validate volume
     if (!std::isfinite(feedback.volume) || feedback.volume < 0.0f || feedback.volume > 1.0f) {
@@ -266,12 +248,7 @@ void Config::validate() const {
         throw std::runtime_error("Invalid feedback duration: must be > 0");
     }
 
-    static const std::set<std::string> valid_log_levels = {
-        "trace", "debug", "info", "warn", "error", "critical", "off",
-    };
-    if (valid_log_levels.find(daemon.log_level) == valid_log_levels.end()) {
-        throw std::runtime_error("Invalid daemon.log_level: " + daemon.log_level);
-    }
+    check_enum("daemon", "log_level", daemon.log_level, "Invalid daemon.log_level");
     if (daemon.pid_file.empty()) {
         throw std::runtime_error("Invalid daemon.pid_file: cannot be empty");
     }
