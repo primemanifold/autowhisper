@@ -1,13 +1,35 @@
 (async () => {
-  const [schema, config, defaults] = await Promise.all([
-    fetch("/api/schema").then(r => r.json()),
-    fetch("/api/config").then(r => r.json()),
-    fetch("/api/defaults").then(r => r.json()),
-  ]);
-
   const form = document.getElementById("settings-form");
   const pathEl = document.getElementById("config-path");
   const status = document.getElementById("status");
+
+  async function loadJson(url) {
+    const r = await fetch(url);
+    if (!r.ok) {
+      let detail = r.statusText;
+      try {
+        const body = await r.json();
+        detail = body.error || (body.errors && body.errors.join("; ")) || detail;
+      } catch (_) {}
+      throw new Error(`${url} -> HTTP ${r.status}: ${detail}`);
+    }
+    return r.json();
+  }
+
+  let schema, config, defaults;
+  try {
+    [schema, config, defaults] = await Promise.all([
+      loadJson("/api/schema"),
+      loadJson("/api/config"),
+      loadJson("/api/defaults"),
+    ]);
+  } catch (e) {
+    status.textContent = "Failed to load settings: " + e.message;
+    status.className = "err";
+    document.getElementById("save-btn").disabled = true;
+    document.getElementById("reset-btn").disabled = true;
+    return;
+  }
 
   const sections = Object.keys(schema);
   for (const section of sections) {
