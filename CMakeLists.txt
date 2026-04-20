@@ -21,6 +21,8 @@ option(AUTOWHISPER_ENABLE_TESTS "Build tests" ON)
 include(cmake/CompilerWarnings.cmake)
 include(cmake/FetchDependencies.cmake)
 include(cmake/PlatformSetup.cmake)
+include(cmake/EmbedAssets.cmake)
+autowhisper_embed_web_assets(${CMAKE_BINARY_DIR}/generated/settings)
 
 # Threads (needed by core lib and main executable)
 find_package(Threads REQUIRED)
@@ -94,6 +96,10 @@ endif()
 
 # === Main executable ===
 add_executable(autowhisper ${APP_SOURCES})
+
+target_include_directories(autowhisper PRIVATE
+    ${CMAKE_BINARY_DIR}/generated
+)
 
 target_link_libraries(autowhisper PRIVATE
     autowhisper_core
