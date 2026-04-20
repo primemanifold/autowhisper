@@ -50,8 +50,10 @@ private:
     std::vector<std::string> trigger_hotkeys_ = {"shift+super"};
     std::vector<std::string> cancel_hotkeys_ = {"esc"};
 
+    // shared_ptr so platform blocks (dispatch_async on mac) can capture a
+    // strong reference and stay safe after TrayManager destruction.
     struct Impl;
-    std::unique_ptr<Impl> impl_;
+    std::shared_ptr<Impl> impl_;
 };
 
 // Helper functions for display

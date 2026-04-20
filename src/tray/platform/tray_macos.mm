@@ -80,7 +80,7 @@ TrayManager::TrayManager(bool enabled,
     : enabled_(enabled),
       on_quit_(std::move(on_quit)),
       config_path_(config_path),
-      impl_(std::make_unique<Impl>()) {
+      impl_(std::make_shared<Impl>()) {
     impl_->config_path = config_path;
 }
 
@@ -89,28 +89,29 @@ TrayManager::~TrayManager() { stop(); }
 void TrayManager::start() {
     if (!enabled_) return;
 
-    auto* impl_raw = impl_.get();
-    auto quit_cb    = on_quit_;
+    // Capture a shared_ptr<Impl> into each block so it stays alive across
+    // the dispatch_async boundary even if ~TrayManager() runs first.
+    auto impl = impl_;
+    auto quit_cb = on_quit_;
     auto config_path = impl_->config_path;
 
-    // Build the menu on the main thread — required by AppKit.
     dispatch_async(dispatch_get_main_queue(), ^{
         NSStatusBar* bar = [NSStatusBar systemStatusBar];
-        impl_raw->item = [bar statusItemWithLength:NSVariableStatusItemLength];
-        impl_raw->item.button.accessibilityLabel = @"AutoWhisper";
+        impl->item = [bar statusItemWithLength:NSVariableStatusItemLength];
+        impl->item.button.accessibilityLabel = @"AutoWhisper";
 
         if (@available(macOS 11.0, *)) {
-            impl_raw->item.button.image = mic_image_for_state(TrayState::IDLE);
+            impl->item.button.image = mic_image_for_state(TrayState::IDLE);
         } else {
-            impl_raw->item.button.title = @"AW";
+            impl->item.button.title = @"AW";
         }
 
-        impl_raw->target = [[AWTrayTarget alloc] init];
-        impl_raw->target.onQuit = ^{
+        impl->target = [[AWTrayTarget alloc] init];
+        impl->target.onQuit = ^{
             spdlog::info("Tray: quit requested");
             if (quit_cb) quit_cb();
         };
-        impl_raw->target.onOpenSettings = ^{
+        impl->target.onOpenSettings = ^{
             // Launch the settings UI via the same binary.
             NSString* exe = [[NSBundle mainBundle] executablePath];
             if (!exe) {
@@ -134,7 +135,7 @@ void TrayManager::start() {
                                       err.localizedDescription.UTF8String);
             }
         };
-        impl_raw->target.onOpenLogs = ^{
+        impl->target.onOpenLogs = ^{
             NSString* home = NSHomeDirectory();
             NSString* log = [home stringByAppendingPathComponent:@"Library/Logs/autowhisper/autowhisper.log"];
             [[NSWorkspace sharedWorkspace] openURL:[NSURL fileURLWithPath:log]];
@@ -149,7 +150,7 @@ void TrayManager::start() {
             keyEquivalent:@""];
         [header setEnabled:NO];
         [menu addItem:header];
-        impl_raw->header_item = header;
+        impl->header_item = header;
 
         [menu addItem:[NSMenuItem separatorItem]];
 
@@ -157,33 +158,33 @@ void TrayManager::start() {
             initWithTitle:@"Open Settings\u2026"
                    action:@selector(openSettingsClicked:)
             keyEquivalent:@","];
-        settings.target = impl_raw->target;
+        settings.target = impl->target;
         [menu addItem:settings];
 
         NSMenuItem* logs = [[NSMenuItem alloc]
             initWithTitle:@"Open Logs"
                    action:@selector(openLogsClicked:)
             keyEquivalent:@""];
-        logs.target = impl_raw->target;
+        logs.target = impl->target;
         [menu addItem:logs];
 
         [menu addItem:[NSMenuItem separatorItem]];
 
         NSMenuItem* input_dev = [[NSMenuItem alloc] initWithTitle:@"Input: \u2014" action:nil keyEquivalent:@""];
         [input_dev setEnabled:NO]; [menu addItem:input_dev];
-        impl_raw->input_item = input_dev;
+        impl->input_item = input_dev;
 
         NSMenuItem* output_dev = [[NSMenuItem alloc] initWithTitle:@"Output: \u2014" action:nil keyEquivalent:@""];
         [output_dev setEnabled:NO]; [menu addItem:output_dev];
-        impl_raw->output_item = output_dev;
+        impl->output_item = output_dev;
 
         NSMenuItem* hotkey = [[NSMenuItem alloc] initWithTitle:@"Hotkey: \u2014" action:nil keyEquivalent:@""];
         [hotkey setEnabled:NO]; [menu addItem:hotkey];
-        impl_raw->hotkey_item = hotkey;
+        impl->hotkey_item = hotkey;
 
         NSMenuItem* cancel = [[NSMenuItem alloc] initWithTitle:@"Cancel: \u2014" action:nil keyEquivalent:@""];
         [cancel setEnabled:NO]; [menu addItem:cancel];
-        impl_raw->cancel_item = cancel;
+        impl->cancel_item = cancel;
 
         [menu addItem:[NSMenuItem separatorItem]];
 
@@ -191,21 +192,21 @@ void TrayManager::start() {
             initWithTitle:@"Quit AutoWhisper"
                    action:@selector(quitClicked:)
             keyEquivalent:@"q"];
-        quit.target = impl_raw->target;
+        quit.target = impl->target;
         [menu addItem:quit];
 
-        impl_raw->item.menu = menu;
+        impl->item.menu = menu;
         spdlog::info("NSStatusItem created");
     });
 }
 
 void TrayManager::stop() {
     if (!enabled_) return;
-    auto* impl_raw = impl_.get();
+    auto impl = impl_;
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (impl_raw->item) {
-            [[NSStatusBar systemStatusBar] removeStatusItem:impl_raw->item];
-            impl_raw->item = nil;
+        if (impl->item) {
+            [[NSStatusBar systemStatusBar] removeStatusItem:impl->item];
+            impl->item = nil;
         }
     });
 }
@@ -213,59 +214,59 @@ void TrayManager::stop() {
 void TrayManager::set_state(TrayState state) {
     state_ = state;
     if (!enabled_) return;
-    auto* impl_raw = impl_.get();
+    auto impl = impl_;
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (!impl_raw->item) return;
+        if (!impl->item) return;
         if (@available(macOS 11.0, *)) {
-            impl_raw->item.button.image = mic_image_for_state(state);
+            impl->item.button.image = mic_image_for_state(state);
         }
-        impl_raw->header_item.title =
+        impl->header_item.title =
             [NSString stringWithUTF8String:state_label(state).c_str()];
-        impl_raw->item.button.accessibilityLabel =
+        impl->item.button.accessibilityLabel =
             [NSString stringWithFormat:@"AutoWhisper, %s", state_label(state).c_str()];
     });
 }
 
 void TrayManager::set_input_device(const std::string& name) {
     input_device_ = name;
-    auto* impl_raw = impl_.get();
+    auto impl = impl_;
     std::string label = "Input: " + name;
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (impl_raw->input_item) {
-            impl_raw->input_item.title = [NSString stringWithUTF8String:label.c_str()];
+        if (impl->input_item) {
+            impl->input_item.title = [NSString stringWithUTF8String:label.c_str()];
         }
     });
 }
 
 void TrayManager::set_output_device(const std::string& name) {
     output_device_ = name;
-    auto* impl_raw = impl_.get();
+    auto impl = impl_;
     std::string label = "Output: " + name;
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (impl_raw->output_item) {
-            impl_raw->output_item.title = [NSString stringWithUTF8String:label.c_str()];
+        if (impl->output_item) {
+            impl->output_item.title = [NSString stringWithUTF8String:label.c_str()];
         }
     });
 }
 
 void TrayManager::set_hotkey(const std::vector<std::string>& hotkeys) {
     trigger_hotkeys_ = hotkeys;
-    auto* impl_raw = impl_.get();
+    auto impl = impl_;
     std::string label = "Hotkey: " + format_hotkeys(hotkeys);
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (impl_raw->hotkey_item) {
-            impl_raw->hotkey_item.title = [NSString stringWithUTF8String:label.c_str()];
+        if (impl->hotkey_item) {
+            impl->hotkey_item.title = [NSString stringWithUTF8String:label.c_str()];
         }
     });
 }
 
 void TrayManager::set_cancel_hotkey(const std::vector<std::string>& hotkeys) {
     cancel_hotkeys_ = hotkeys;
-    auto* impl_raw = impl_.get();
+    auto impl = impl_;
     std::string label = "Cancel: " + format_hotkeys(hotkeys);
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (impl_raw->cancel_item) {
-            impl_raw->cancel_item.title = [NSString stringWithUTF8String:label.c_str()];
+        if (impl->cancel_item) {
+            impl->cancel_item.title = [NSString stringWithUTF8String:label.c_str()];
         }
     });
 }
