@@ -169,6 +169,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_keycombo.cpp
         tests/cpp/test_logging.cpp
         tests/cpp/test_models.cpp
+        tests/cpp/test_schema.cpp
         tests/cpp/test_subprocess.cpp
         tests/cpp/test_tray_display.cpp
     )
