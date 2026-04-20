@@ -1,6 +1,7 @@
 #include "cli/cli.h"
 #include "config/config.h"
 #include "config/schema.h"
+#include "settings/assets.h"
 #include "settings/handlers.h"
 
 #include <httplib.h>
@@ -57,6 +58,15 @@ void register_api_routes(httplib::Server& srv, const std::string& config_path) {
             return;
         }
         res.status = 204;
+    });
+    srv.Get("/", [](const httplib::Request&, httplib::Response& res) {
+        res.set_content(std::string(settings::assets::kIndexHtml), "text/html");
+    });
+    srv.Get("/style.css", [](const httplib::Request&, httplib::Response& res) {
+        res.set_content(std::string(settings::assets::kStyleCss), "text/css");
+    });
+    srv.Get("/app.js", [](const httplib::Request&, httplib::Response& res) {
+        res.set_content(std::string(settings::assets::kAppJs), "application/javascript");
     });
 }
 
