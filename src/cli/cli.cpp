@@ -3,6 +3,7 @@
 #include "daemon/daemon.h"
 #include "doctor/doctor.h"
 #include "models/models.h"
+#include "service/service.h"
 #include "util/logging.h"
 #include "util/subprocess.h"
 
@@ -17,14 +18,6 @@
 namespace fs = std::filesystem;
 
 namespace autowhisper {
-
-static const char* SERVICE_NAME = "autowhisper";
-
-static ProcessResult run_systemctl(const std::vector<std::string>& args) {
-    std::vector<std::string> cmd = {"systemctl", "--user"};
-    cmd.insert(cmd.end(), args.begin(), args.end());
-    return run_command(cmd, 10);
-}
 
 static std::string get_config_path_cli() {
     std::string user_config = get_user_config_path();
@@ -116,7 +109,8 @@ void setup_cli(CLI::App& app) {
 // === Service commands ===
 
 int cmd_start() {
-    auto result = run_systemctl({"start", SERVICE_NAME});
+    auto svc = make_service_manager();
+    auto result = svc->start();
     if (result.exit_code == 0) {
         std::cout << "\033[32mAutoWhisper started\033[0m\n";
         return 0;
@@ -126,7 +120,8 @@ int cmd_start() {
 }
 
 int cmd_stop() {
-    auto result = run_systemctl({"stop", SERVICE_NAME});
+    auto svc = make_service_manager();
+    auto result = svc->stop();
     if (result.exit_code == 0) {
         std::cout << "\033[32mAutoWhisper stopped\033[0m\n";
         return 0;
@@ -136,7 +131,8 @@ int cmd_stop() {
 }
 
 int cmd_restart() {
-    auto result = run_systemctl({"restart", SERVICE_NAME});
+    auto svc = make_service_manager();
+    auto result = svc->restart();
     if (result.exit_code == 0) {
         std::cout << "\033[32mAutoWhisper restarted\033[0m\n";
         return 0;
@@ -146,19 +142,16 @@ int cmd_restart() {
 }
 
 int cmd_status() {
-    auto result = run_systemctl({"status", SERVICE_NAME});
+    auto svc = make_service_manager();
+    auto result = svc->status();
     std::cout << result.stdout_str;
     if (!result.stderr_str.empty()) std::cerr << result.stderr_str;
-    return 0;
+    return result.exit_code;
 }
 
 int cmd_logs(bool follow, int lines) {
-    std::vector<std::string> cmd = {
-        "journalctl", "--user", "-u", SERVICE_NAME,
-        "-n" + std::to_string(lines)
-    };
-    if (follow) cmd.push_back("-f");
-    return run_passthrough(cmd);
+    auto svc = make_service_manager();
+    return svc->tail_logs(follow, lines);
 }
 
 int cmd_run(const std::string& config_path, const std::string& device,
