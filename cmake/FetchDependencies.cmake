@@ -25,6 +25,12 @@ target_include_directories(miniaudio INTERFACE ${CMAKE_SOURCE_DIR}/deps/miniaudi
 add_library(cpp_httplib INTERFACE)
 target_include_directories(cpp_httplib INTERFACE ${CMAKE_SOURCE_DIR}/deps/cpp-httplib)
 
+# nlohmann-json (header-only JSON)
+add_library(nlohmann_json INTERFACE)
+target_include_directories(nlohmann_json INTERFACE
+    ${CMAKE_SOURCE_DIR}/deps/nlohmann-json/single_include
+)
+
 # Catch2 v3.5.2 - Testing framework (only when tests are enabled)
 if(AUTOWHISPER_ENABLE_TESTS)
     add_subdirectory(${CMAKE_SOURCE_DIR}/deps/Catch2)

@@ -26,3 +26,7 @@
 	path = deps/cpp-httplib
 	url = https://github.com/yhirose/cpp-httplib.git
 	shallow = true
+[submodule "deps/nlohmann-json"]
+	path = deps/nlohmann-json
+	url = https://github.com/nlohmann/json.git
+	shallow = true
