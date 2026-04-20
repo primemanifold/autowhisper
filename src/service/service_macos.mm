@@ -109,8 +109,12 @@ public:
     }
 
     ServiceResult restart() override {
-        // Bootstrap if not loaded, otherwise kickstart.
-        if (is_loaded()) {
+        // Fast path: already loaded AND pointing at the current plist →
+        // just kickstart. Otherwise delegate to start() so the stale-job
+        // state machine replaces an outdated registration (e.g., app
+        // bundle moved). Plain `kickstart -k` on a stale job would keep
+        // spawning the old binary path forever.
+        if (is_loaded() && loaded_matches(plist_path())) {
             return to_service_result(
                 run_command({"launchctl", "kickstart", "-k", target()}, 10));
         }
