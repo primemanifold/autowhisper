@@ -1,6 +1,22 @@
 # Settings UI C++ Rewrite — Progress Handoff
 
-**Last updated:** 2026-04-19 (Phase 1 complete, Task 6 up next)
+**Last updated:** 2026-04-20 (All phases complete — Tasks 1-28)
+
+## Status: COMPLETE
+
+All 28 tasks finished. 82/82 tests pass in clean Release build.
+End-to-end smoke test verified:
+- `GET /api/{schema,defaults,config}` → 200 JSON
+- `GET /`, `/style.css`, `/app.js` → embedded assets
+- `PUT /api/config` → 400 on invalid enum (byte-exact error), 204 on valid save
+- Single-instance coordination: second invocation reports existing port
+- `SIGTERM` → clean shutdown via self-pipe watcher
+
+Commit range for Phase 2–10: `b8f20d8` → `c6cb8fe` (21 commits).
+
+---
+
+**Historical handoff (archived):**
 
 This document captures the in-flight state of the settings UI rewrite so that work can resume in a new session, with this tool or a different one (Copilot, Codex, another agent, manual).
 
