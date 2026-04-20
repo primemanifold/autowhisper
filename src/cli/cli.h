@@ -19,6 +19,7 @@ int cmd_config_show();
 int cmd_config_edit();
 int cmd_config_set(const std::string& key, const std::string& value);
 int cmd_config_path();
+int cmd_config_ui(const std::string& config_path, bool open_browser);
 int cmd_doctor(bool fix);
 int cmd_model_list();
 int cmd_model_download(const std::string& name);

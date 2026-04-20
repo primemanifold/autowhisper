@@ -66,6 +66,7 @@ set(APP_SOURCES
     src/inference/inference.cpp
     src/feedback/feedback.cpp
     src/cli/cli.cpp
+    src/cli/cli_settings_ui.cpp
     src/doctor/doctor.cpp
     src/output/output_common.cpp
 )
@@ -106,6 +107,7 @@ target_link_libraries(autowhisper PRIVATE
     whisper
     CLI11::CLI11
     miniaudio
+    cpp_httplib
 )
 
 # Platform libraries
