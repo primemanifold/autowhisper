@@ -182,6 +182,9 @@ int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
                 if (parsed->canonical_path == canonical) {
                     std::cout << "Settings UI already running at http://127.0.0.1:"
                               << parsed->port << "\n";
+                    if (open_browser) {
+                        launch_xdg_open("http://127.0.0.1:" + std::to_string(parsed->port));
+                    }
                     ::close(fd);
                     return 0;
                 }
