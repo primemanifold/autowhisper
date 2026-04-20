@@ -12,6 +12,7 @@
 #include <fcntl.h>
 #include <sys/file.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -114,6 +115,29 @@ void shutdown_signal_handler(int /*signo*/) {
     }
 }
 
+void launch_xdg_open(const std::string& url) {
+    pid_t pid = ::fork();
+    if (pid < 0) {
+        spdlog::warn("fork failed; cannot launch browser");
+        return;
+    }
+    if (pid == 0) {
+        if (::fork() == 0) {
+            ::setsid();
+            int devnull = ::open("/dev/null", O_RDWR);
+            if (devnull >= 0) {
+                ::dup2(devnull, 0); ::dup2(devnull, 1); ::dup2(devnull, 2);
+                if (devnull > 2) ::close(devnull);
+            }
+            ::execlp("xdg-open", "xdg-open", url.c_str(), (char*)nullptr);
+            ::_exit(127);
+        }
+        ::_exit(0);
+    }
+    int status = 0;
+    ::waitpid(pid, &status, 0);
+}
+
 bool install_signal_pipe_and_handlers() {
     if (::pipe(g_signal_pipe) < 0) return false;
     ::fcntl(g_signal_pipe[0], F_SETFD, FD_CLOEXEC);
@@ -133,7 +157,6 @@ bool install_signal_pipe_and_handlers() {
 }  // namespace
 
 int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
-    (void)open_browser;
     const std::string config_path = config_path_opt.empty()
                                       ? get_user_config_path()
                                       : config_path_opt;
@@ -215,9 +238,15 @@ int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
     settings::SidecarContents contents{::getpid(), port, canonical};
     write_full(fd, settings::format_sidecar(contents));
 
+    ::setsid();
+
     std::cout << "AutoWhisper Settings: http://127.0.0.1:" << port << "\n";
     std::cout << "Config file: " << canonical << "\n";
     std::cout << "Press Ctrl+C to close\n";
+
+    if (open_browser) {
+        launch_xdg_open("http://127.0.0.1:" + std::to_string(port));
+    }
 
     srv.listen_after_bind();
     watcher.join();
