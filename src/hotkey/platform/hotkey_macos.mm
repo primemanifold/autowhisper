@@ -116,15 +116,18 @@ CGEventRef HotkeyManager::Impl::tap_cb(CGEventTapProxy, CGEventType type,
     auto* impl = static_cast<Impl*>(userdata);
     if (!impl) return ev;
 
-    // Handle tap-disabled events — required by Apple docs. Re-enable the tap.
-    if (type == kCGEventTapDisabledByTimeout) {
-        spdlog::warn("CGEventTap disabled by timeout; re-enabling");
+    // Handle tap-disabled events — required by Apple docs. Re-enable the tap
+    // AND resync cached modifier state: while the tap was dead, modifier
+    // presses/releases we would have seen may have happened. Clearing the
+    // cache means the next real flagsChanged event correctly diffs 0 →
+    // current-mask and emits press events for whatever is actually held.
+    if (type == kCGEventTapDisabledByTimeout ||
+        type == kCGEventTapDisabledByUserInput) {
+        spdlog::warn("CGEventTap disabled ({}); re-enabling + resyncing state",
+                     type == kCGEventTapDisabledByTimeout ? "timeout" : "user-input");
         if (impl->tap) CGEventTapEnable(impl->tap, true);
-        return nullptr;
-    }
-    if (type == kCGEventTapDisabledByUserInput) {
-        spdlog::warn("CGEventTap disabled by user input; re-enabling");
-        if (impl->tap) CGEventTapEnable(impl->tap, true);
+        impl->last_flags = 0;
+        if (impl->manager) impl->manager->reset_input_state();
         return nullptr;
     }
 
@@ -187,6 +190,11 @@ void HotkeyManager::start() {
 
     running_.store(true);
 
+    // If stop() races ahead of the listener thread's CFRunLoopGetCurrent()
+    // call, CFRunLoopStop would be a no-op and CFRunLoopRun would block
+    // forever. The listener thread re-checks running_ AFTER publishing
+    // run_loop but BEFORE entering the loop — so a fast stop() caught
+    // between those two points still exits cleanly.
     impl_->listener = std::thread([this]() {
         const CGEventMask mask =
             CGEventMaskBit(kCGEventKeyDown) |
@@ -220,6 +228,14 @@ void HotkeyManager::start() {
         impl_->run_loop = CFRunLoopGetCurrent();
         CFRunLoopAddSource(impl_->run_loop, impl_->src, kCFRunLoopCommonModes);
         CGEventTapEnable(impl_->tap, true);
+
+        // Race guard: if stop() fired after running_=true but before
+        // run_loop was published, its CFRunLoopStop was a no-op. Check
+        // running_ here before entering CFRunLoopRun — if false, skip.
+        if (!running_.load()) {
+            spdlog::info("CGEventTap: early stop signaled before run loop");
+            return;
+        }
 
         spdlog::info("CGEventTap listening (listen-only)");
         CFRunLoopRun();

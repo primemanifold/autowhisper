@@ -82,6 +82,13 @@ void HotkeyManager::send_event(HotkeyEvent event) {
     }
 }
 
+void HotkeyManager::reset_input_state() {
+    spdlog::debug("Hotkey: resetting cached input state (modifier resync)");
+    pressed_modifiers_.clear();
+    trigger_pressed_ = false;
+    active_trigger_.reset();
+}
+
 std::optional<KeyCombo> HotkeyManager::check_any_trigger(const std::string& key_name) const {
     for (const auto& combo : trigger_combos_) {
         if (combo.is_modifier_only) {
