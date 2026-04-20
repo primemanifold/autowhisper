@@ -21,6 +21,10 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/deps/spdlog)
 add_library(miniaudio INTERFACE)
 target_include_directories(miniaudio INTERFACE ${CMAKE_SOURCE_DIR}/deps/miniaudio)
 
+# cpp-httplib (header-only HTTP server)
+add_library(cpp_httplib INTERFACE)
+target_include_directories(cpp_httplib INTERFACE ${CMAKE_SOURCE_DIR}/deps/cpp-httplib)
+
 # Catch2 v3.5.2 - Testing framework (only when tests are enabled)
 if(AUTOWHISPER_ENABLE_TESTS)
     add_subdirectory(${CMAKE_SOURCE_DIR}/deps/Catch2)

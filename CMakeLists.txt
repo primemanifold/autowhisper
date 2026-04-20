@@ -25,12 +25,6 @@ include(cmake/PlatformSetup.cmake)
 # Threads (needed by core lib and main executable)
 find_package(Threads REQUIRED)
 
-# cpp-httplib (header-only HTTP server)
-add_library(cpp_httplib INTERFACE)
-target_include_directories(cpp_httplib INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-httplib
-)
-
 # === Testable core sources (platform-independent) ===
 set(CORE_LIB_SOURCES
     src/config/config.cpp
