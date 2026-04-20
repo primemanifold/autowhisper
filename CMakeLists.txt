@@ -181,12 +181,14 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_models.cpp
         tests/cpp/test_schema.cpp
         tests/cpp/test_settings_handlers.cpp
+        tests/cpp/test_settings_http.cpp
         tests/cpp/test_sidecar.cpp
         tests/cpp/test_subprocess.cpp
         tests/cpp/test_tray_display.cpp
     )
     target_link_libraries(autowhisper_tests PRIVATE
         autowhisper_core
+        cpp_httplib
         Catch2::Catch2WithMain
     )
     autowhisper_set_warnings(autowhisper_tests)
