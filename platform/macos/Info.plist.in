@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>AutoWhisper</string>
+    <key>CFBundleDisplayName</key>
+    <string>AutoWhisper</string>
+    <key>CFBundleIdentifier</key>
+    <string>us.primemanifold.autowhisper</string>
+    <key>CFBundleVersion</key>
+    <string>@PROJECT_VERSION@</string>
+    <key>CFBundleShortVersionString</key>
+    <string>@PROJECT_VERSION@</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleExecutable</key>
+    <string>autowhisper</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>@CMAKE_OSX_DEPLOYMENT_TARGET@</string>
+    <!-- Menu-bar app: no Dock icon, no menu-bar app name. -->
+    <key>LSUIElement</key>
+    <true/>
+    <!-- Usage descriptions for TCC prompts. -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>AutoWhisper uses your microphone to transcribe speech locally. Audio never leaves this device.</string>
+</dict>
+</plist>

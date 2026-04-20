@@ -13,6 +13,16 @@
 #include <unistd.h>
 #endif
 
+#if defined(__APPLE__)
+namespace autowhisper {
+// Defined in daemon_macos.mm. Kept outside this TU so we don't need to
+// compile daemon.cpp as Objective-C++ on mac.
+void aw_macos_setup_signals(std::atomic<bool>* shutdown_flag);
+void aw_macos_run_event_loop(std::function<void()> worker);
+void aw_macos_stop_event_loop();
+} // namespace autowhisper
+#endif
+
 namespace fs = std::filesystem;
 
 namespace autowhisper {
@@ -28,12 +38,13 @@ AutoWhisperDaemon::~AutoWhisperDaemon() {
 }
 
 void AutoWhisperDaemon::setup_signals() {
-#ifndef _WIN32
     g_daemon = this;
-
+#if defined(__APPLE__)
+    // Use dispatch sources — the signal handler path cannot safely call
+    // [NSApp stop:] which is what request_shutdown() does on mac.
+    aw_macos_setup_signals(&shutdown_requested_);
+#elif !defined(_WIN32)
     struct sigaction sa{};
-    // Only use async-signal-safe operations in the handler.
-    // spdlog, mutexes, and condition_variable::notify are NOT safe here.
     sa.sa_handler = [](int) {
         if (g_daemon) {
             g_daemon->shutdown_requested_.store(true, std::memory_order_release);
@@ -41,8 +52,7 @@ void AutoWhisperDaemon::setup_signals() {
     };
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-
-    sigaction(SIGINT, &sa, nullptr);
+    sigaction(SIGINT,  &sa, nullptr);
     sigaction(SIGTERM, &sa, nullptr);
 #endif
 }
@@ -83,11 +93,12 @@ void AutoWhisperDaemon::initialize() {
         config_.tray.enabled,
         [this]() { request_shutdown(); },
         config_path_);
+    // Start first so the status-item + menu exist before setters fire.
+    tray_->start();
     tray_->set_input_device(audio_->input_device_name());
     tray_->set_output_device(audio_->output_device_name());
     tray_->set_hotkey(config_.hotkeys.trigger);
     tray_->set_cancel_hotkey(config_.hotkeys.cancel);
-    tray_->start();
 
     spdlog::info("Initialization complete");
 }
@@ -97,9 +108,19 @@ void AutoWhisperDaemon::run() {
 
     hotkey_->start();
 
+#if defined(__APPLE__)
+    // AppKit requires the main thread and a running NSApp (for the tray).
+    // Move event-loop work to a worker and call NSApp.run() here.
+    aw_macos_run_event_loop([this]() {
+        while (!shutdown_requested_.load()) {
+            process_events();
+        }
+    });
+#else
     while (!shutdown_requested_.load()) {
         process_events();
     }
+#endif
 
     cleanup();
 }
@@ -231,6 +252,10 @@ void AutoWhisperDaemon::request_shutdown() {
     state_.store(DaemonState::SHUTDOWN);
     shutdown_requested_.store(true);
     queue_cv_.notify_all();
+#if defined(__APPLE__)
+    // Unwind the NSApp run loop so run() can fall through to cleanup().
+    aw_macos_stop_event_loop();
+#endif
 }
 
 void AutoWhisperDaemon::write_pid_file() {
