@@ -14,8 +14,11 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <chrono>
+#include <csignal>
 #include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -101,6 +104,32 @@ int open_sidecar_locked(const std::string& path, bool* got_lock) {
     return fd;
 }
 
+static int g_signal_pipe[2] = {-1, -1};
+static httplib::Server* g_server = nullptr;
+
+void shutdown_signal_handler(int /*signo*/) {
+    if (g_signal_pipe[1] >= 0) {
+        char c = 'x';
+        (void)!::write(g_signal_pipe[1], &c, 1);
+    }
+}
+
+bool install_signal_pipe_and_handlers() {
+    if (::pipe(g_signal_pipe) < 0) return false;
+    ::fcntl(g_signal_pipe[0], F_SETFD, FD_CLOEXEC);
+    ::fcntl(g_signal_pipe[1], F_SETFD, FD_CLOEXEC);
+    int flags = ::fcntl(g_signal_pipe[1], F_GETFL, 0);
+    ::fcntl(g_signal_pipe[1], F_SETFL, flags | O_NONBLOCK);
+
+    struct sigaction sa{};
+    sa.sa_handler = shutdown_signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    ::sigaction(SIGINT, &sa, nullptr);
+    ::sigaction(SIGTERM, &sa, nullptr);
+    return true;
+}
+
 }  // namespace
 
 int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
@@ -168,6 +197,21 @@ int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
         return 1;
     }
 
+    g_server = &srv;
+    if (!install_signal_pipe_and_handlers()) {
+        std::cerr << "Failed to install signal-pipe shutdown\n";
+        ::close(fd);
+        return 1;
+    }
+
+    std::thread watcher([]() {
+        char buf[1];
+        while (::read(g_signal_pipe[0], buf, 1) <= 0) {
+            if (errno != EINTR) break;
+        }
+        if (g_server) g_server->stop();
+    });
+
     settings::SidecarContents contents{::getpid(), port, canonical};
     write_full(fd, settings::format_sidecar(contents));
 
@@ -176,6 +220,9 @@ int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
     std::cout << "Press Ctrl+C to close\n";
 
     srv.listen_after_bind();
+    watcher.join();
+    if (g_signal_pipe[0] >= 0) ::close(g_signal_pipe[0]);
+    if (g_signal_pipe[1] >= 0) ::close(g_signal_pipe[1]);
     ::close(fd);
     return 0;
 }
