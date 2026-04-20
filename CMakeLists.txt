@@ -31,6 +31,7 @@ set(CORE_LIB_SOURCES
     src/config/schema.cpp
     src/hotkey/hotkey_common.cpp
     src/models/models.cpp
+    src/settings/handlers.cpp
     src/tray/tray_common.cpp
     src/util/logging.cpp
     src/util/subprocess.cpp
