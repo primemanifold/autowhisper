@@ -19,9 +19,12 @@ Config json_to_config(const nlohmann::json& j);
 struct ValidationResult {
     bool ok() const { return errors.empty(); }
     std::vector<std::string> errors;
+    std::vector<ValidationIssue> issues;
 };
 
 ValidationResult validate_json(const nlohmann::json& j);
+
+nlohmann::json issue_to_json(const ValidationIssue& issue);
 
 void save_config_json(const std::string& path, const nlohmann::json& j);
 

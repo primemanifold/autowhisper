@@ -5,6 +5,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <thread>
@@ -79,6 +80,66 @@ TEST_CASE("validate_json rejects type-mismatched value", "[handlers]") {
     CHECK_FALSE(r.ok());
     REQUIRE(!r.errors.empty());
     CHECK(r.errors.front().find("Invalid model.beam_size") != std::string::npos);
+}
+
+TEST_CASE("validate_json surfaces structured issues with path, code, severity", "[handlers]") {
+    auto j = settings::defaults_json();
+    j["model"]["size"] = "not-a-real-model";
+    j["audio"]["channels"] = 99;
+    auto r = settings::validate_json(j);
+
+    CHECK_FALSE(r.ok());
+    REQUIRE(r.issues.size() >= 2);
+
+    auto find = [&](const std::string& path) {
+        return std::find_if(r.issues.begin(), r.issues.end(),
+            [&](const ValidationIssue& iss) { return iss.path == path; });
+    };
+
+    auto model_iss = find("model.size");
+    REQUIRE(model_iss != r.issues.end());
+    CHECK(model_iss->severity == ValidationSeverity::Error);
+    CHECK(model_iss->code == "invalid_enum");
+    CHECK(model_iss->message.find("Invalid model size") != std::string::npos);
+
+    auto audio_iss = find("audio.channels");
+    REQUIRE(audio_iss != r.issues.end());
+    CHECK(audio_iss->severity == ValidationSeverity::Error);
+    CHECK(audio_iss->code == "out_of_range");
+
+    REQUIRE(r.errors.size() >= 2);
+}
+
+TEST_CASE("validate_json type-mismatch yields type_error issue with section.key path", "[handlers]") {
+    auto j = settings::defaults_json();
+    j["model"]["beam_size"] = "abc";
+    auto r = settings::validate_json(j);
+
+    CHECK_FALSE(r.ok());
+    REQUIRE(r.issues.size() == 1);
+    CHECK(r.issues.front().severity == ValidationSeverity::Error);
+    CHECK(r.issues.front().path == "model.beam_size");
+    CHECK(r.issues.front().code == "type_error");
+    CHECK(r.issues.front().message.find("Invalid model.beam_size") != std::string::npos);
+    REQUIRE(r.errors.size() == 1);
+}
+
+TEST_CASE("issue_to_json serializes severity, path, code, message", "[handlers]") {
+    ValidationIssue iss;
+    iss.severity = ValidationSeverity::Warning;
+    iss.path = "audio.sample_rate";
+    iss.code = "non_native_rate";
+    iss.message = "Sample rate is not 16kHz";
+
+    auto j = settings::issue_to_json(iss);
+    CHECK(j["severity"] == "warning");
+    CHECK(j["path"] == "audio.sample_rate");
+    CHECK(j["code"] == "non_native_rate");
+    CHECK(j["message"] == "Sample rate is not 16kHz");
+
+    iss.severity = ValidationSeverity::Error;
+    j = settings::issue_to_json(iss);
+    CHECK(j["severity"] == "error");
 }
 
 TEST_CASE("save_config_json writes file and creates parents", "[handlers]") {

@@ -37,13 +37,21 @@ void register_routes(httplib::Server& srv, const std::string& path) {
         try { body = nlohmann::json::parse(req.body); }
         catch (const std::exception& e) {
             r.status = 400;
-            r.set_content(nlohmann::json{{"errors", {e.what()}}}.dump(), "application/json");
+            r.set_content(nlohmann::json{
+                {"errors", {e.what()}},
+                {"issues", nlohmann::json::array({{
+                    {"severity", "error"}, {"path", ""}, {"code", "json_parse_error"},
+                    {"message", e.what()}}})}}.dump(), "application/json");
             return;
         }
         auto v = settings::validate_json(body);
         if (!v.ok()) {
             r.status = 400;
-            r.set_content(nlohmann::json{{"errors", v.errors}}.dump(), "application/json");
+            nlohmann::json issues = nlohmann::json::array();
+            for (const auto& iss : v.issues) issues.push_back(settings::issue_to_json(iss));
+            r.set_content(nlohmann::json{
+                {"errors", v.errors}, {"issues", std::move(issues)}}.dump(),
+                "application/json");
             return;
         }
         settings::save_config_json(path, body);
@@ -169,4 +177,46 @@ TEST_CASE("PUT /api/config with invalid enum returns 400 and does not write", "[
     CHECK(std::string(j["errors"][0]).find("Invalid model size") != std::string::npos);
 
     CHECK_FALSE(fs::exists(path));
+}
+
+TEST_CASE("PUT /api/config 400 response includes structured issues array", "[settings_http]") {
+    TempDir tmp;
+    auto path = (tmp.path / "c.toml").string();
+    ServerFixture s(path);
+
+    auto body = settings::defaults_json();
+    body["model"]["size"] = "not-a-real-model";
+
+    httplib::Client cli("127.0.0.1", s.port);
+    auto res = cli.Put("/api/config", body.dump(), "application/json");
+    REQUIRE(res);
+    CHECK(res->status == 400);
+
+    auto j = nlohmann::json::parse(res->body);
+    REQUIRE(j.contains("issues"));
+    REQUIRE(j["issues"].is_array());
+    REQUIRE(!j["issues"].empty());
+    auto& iss = j["issues"][0];
+    CHECK(iss["severity"] == "error");
+    CHECK(iss["path"] == "model.size");
+    CHECK(iss["code"] == "invalid_enum");
+    CHECK(std::string(iss["message"]).find("Invalid model size") != std::string::npos);
+}
+
+TEST_CASE("PUT /api/config malformed JSON returns 400 with json_parse_error issue", "[settings_http]") {
+    TempDir tmp;
+    auto path = (tmp.path / "c.toml").string();
+    ServerFixture s(path);
+
+    httplib::Client cli("127.0.0.1", s.port);
+    auto res = cli.Put("/api/config", "{not-json", "application/json");
+    REQUIRE(res);
+    CHECK(res->status == 400);
+
+    auto j = nlohmann::json::parse(res->body);
+    REQUIRE(j.contains("issues"));
+    REQUIRE(j["issues"].is_array());
+    REQUIRE(!j["issues"].empty());
+    CHECK(j["issues"][0]["severity"] == "error");
+    CHECK(j["issues"][0]["code"] == "json_parse_error");
 }

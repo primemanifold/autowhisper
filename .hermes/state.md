@@ -218,3 +218,28 @@ Blocked on:
 - Nothing for the pushed config hardening slice.
 Next:
 - Continue Phase 1 with a new bounded slice: expose structured config validation diagnostics through settings/API responses, or reduce documented build warnings with tests.
+
+## Run 2026-04-30T23:24:14Z
+Phase: Phase 1 — Settings HTTP diagnostics slice
+Hats used: Engineering, CEO
+Shipped:
+- [HAT: Engineering] Completed the dirty in-progress slice that exposes structured `ValidationIssue` diagnostics through the settings handlers and the `PUT /api/config` HTTP boundary. Tests for this slice were already RED in the working tree from the previous max-turns failure; finished the impl to GREEN without duplicating prior work.
+- [HAT: Engineering] Added a private `JsonFieldError` in `src/settings/handlers.cpp` so type-mismatched JSON fields surface as a structured `type_error` issue carrying the offending `section.key` path while preserving the existing `errors` string for backwards compatibility.
+- [HAT: Engineering] Implemented `validate_json` to attach `c.validate_all()` issues onto `ValidationResult.issues` (path/code/severity/message), keeping `ValidationResult.errors` aligned for legacy callers.
+- [HAT: Engineering] Added `settings::issue_to_json` serializer (`severity`/`path`/`code`/`message`) and wired it into `register_routes` for the test HTTP server, including a `json_parse_error` issue for malformed JSON bodies and an `invalid_enum`/`out_of_range` issue array for failed validation.
+Learned:
+- [HAT: Engineering] The `ValidationResult.errors` legacy string list still matters for prior tests, so the new path must populate both `errors` and `issues` rather than replacing one with the other.
+- [HAT: Engineering] `json_to_config` only ever throws on the first failing field, so a type-error response carries exactly one structured issue, matching the new test contract.
+Verification:
+- RED before impl: targeted ctest filter `validate_json|issue_to_json|api/config` failed for the four new test cases (`structured issues`, `type_error issue`, `issue_to_json serializes`, `400 response includes structured issues array`, `malformed JSON returns 400 with json_parse_error issue`).
+- GREEN: `cmake --build build-audit -j$(sysctl -n hw.ncpu)` succeeded with no new warnings on touched files.
+- GREEN: targeted `ctest --output-on-failure -R "validate_json|issue_to_json|api/config"` — 11/11 tests.
+- GREEN: full `ctest --output-on-failure` — 97/97 tests.
+- GREEN: `python3 -m unittest tests.static.test_settings_design_assets -v` — 8/8 tests.
+- GREEN: `node --check src/settings/web/app.js`.
+- GREEN: `git diff --check`.
+Blocked on:
+- Nothing for this slice.
+Next:
+- Surface the new structured issues in the embedded settings UI (per-field error messaging, warning vs error styling) once the HTTP contract has soaked.
+- Continue Phase 1 with the remaining first-party build warnings (e.g., `audio.h` unused `silence_threshold_samples_`, PulseAudio stub fields) or with sourced competitor benchmark work.

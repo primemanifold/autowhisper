@@ -11,6 +11,19 @@ namespace fs = std::filesystem;
 
 namespace autowhisper::settings {
 
+namespace {
+
+class JsonFieldError : public std::runtime_error {
+public:
+    JsonFieldError(std::string path, const std::string& message)
+        : std::runtime_error(message), path_(std::move(path)) {}
+    const std::string& path() const noexcept { return path_; }
+private:
+    std::string path_;
+};
+
+}  // namespace
+
 nlohmann::json config_to_json(const Config& c) {
     nlohmann::json j;
 
@@ -83,7 +96,8 @@ Config json_to_config(const nlohmann::json& j) {
             try {
                 dst = j[section][key].get<std::decay_t<decltype(dst)>>();
             } catch (const std::exception& e) {
-                throw std::runtime_error(
+                throw JsonFieldError(
+                    std::string(section) + "." + key,
                     std::string("Invalid ") + section + "." + key + ": " + e.what());
             }
         }
@@ -161,13 +175,45 @@ nlohmann::json defaults_json() {
 
 ValidationResult validate_json(const nlohmann::json& j) {
     ValidationResult r;
+    Config c;
     try {
-        Config c = json_to_config(j);
-        c.validate();
+        c = json_to_config(j);
+    } catch (const JsonFieldError& e) {
+        ValidationIssue iss;
+        iss.severity = ValidationSeverity::Error;
+        iss.path = e.path();
+        iss.code = "type_error";
+        iss.message = e.what();
+        r.errors.emplace_back(iss.message);
+        r.issues.push_back(std::move(iss));
+        return r;
     } catch (const std::exception& e) {
-        r.errors.emplace_back(e.what());
+        ValidationIssue iss;
+        iss.severity = ValidationSeverity::Error;
+        iss.code = "type_error";
+        iss.message = e.what();
+        r.errors.emplace_back(iss.message);
+        r.issues.push_back(std::move(iss));
+        return r;
+    }
+
+    auto issues = c.validate_all();
+    for (auto& iss : issues) {
+        if (iss.severity == ValidationSeverity::Error) {
+            r.errors.emplace_back(iss.message);
+        }
+        r.issues.push_back(std::move(iss));
     }
     return r;
+}
+
+nlohmann::json issue_to_json(const ValidationIssue& issue) {
+    return nlohmann::json{
+        {"severity", issue.severity == ValidationSeverity::Error ? "error" : "warning"},
+        {"path", issue.path},
+        {"code", issue.code},
+        {"message", issue.message},
+    };
 }
 
 void save_config_json(const std::string& path, const nlohmann::json& j) {
