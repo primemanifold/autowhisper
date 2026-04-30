@@ -64,6 +64,25 @@ struct TrayConfig {
     bool enabled = true;
 };
 
+enum class ValidationSeverity {
+    Error,
+    Warning,
+};
+
+struct ValidationIssue {
+    ValidationSeverity severity = ValidationSeverity::Error;
+    std::string path;
+    std::string code;
+    std::string message;
+};
+
+struct ConfigLoadResult;
+struct Config;
+
+struct ConfigValidator {
+    static std::vector<ValidationIssue> validate(const Config& config);
+};
+
 struct Config {
     ModelConfig model;
     AudioConfig audio;
@@ -74,9 +93,16 @@ struct Config {
     TrayConfig tray;
 
     static Config load(const std::string& path);
+    static ConfigLoadResult load_with_diagnostics(const std::string& path);
     static Config default_config();
+    std::vector<ValidationIssue> validate_all() const;
     void validate() const;
     void save(const std::string& path) const;
+};
+
+struct ConfigLoadResult {
+    Config config;
+    std::vector<ValidationIssue> issues;
 };
 
 // Find config file in standard locations

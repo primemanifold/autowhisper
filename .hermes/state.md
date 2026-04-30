@@ -1,10 +1,10 @@
 # AutoWhisper Hermes State
 
-Current phase: Phase 0 — Orient
+Current phase: Phase 1 — Config hardening in progress
 Repository: `primemanifold/autowhisper`
 Local path: `/Users/odin-mac-730/src/autowhisper`
-Branch: `core`
-Observed commit: `2778945`
+Branch: `primeodin/design-system-settings-ui`
+Observed commit before this slice: `d7e22da`
 Campaign prompt: Hermes Operator four-hat loop for building AutoWhisper into a category-leading agentic voice-to-text product.
 
 ## Where we are
@@ -173,3 +173,33 @@ Blocked on:
 - Nothing for Phase 0 audit baseline.
 Next:
 - Commit this state handoff note, push it, then continue from the next smallest phase slice in a future run.
+
+## Run 2026-04-30T23:06:22Z
+Phase: Phase 1 — Config hardening slice in progress
+Hats used: Engineering, Research, CEO
+Shipped:
+- [HAT: Engineering] Started Phase 1 with a bounded config-validation hardening slice rather than attempting all Phase 1 at once.
+- [HAT: Engineering] Added structured `ValidationIssue`/`ValidationSeverity` diagnostics, `ConfigValidator::validate(const Config&)`, and `Config::validate_all()` while preserving `Config::validate()` as the throw-on-first-error compatibility API.
+- [HAT: Engineering] Added `Config::load_with_diagnostics()` so TOML unknown sections/keys are surfaced as warning issues, while `Config::load()` still throws on validation errors and logs warnings.
+- [HAT: Engineering] Reserved top-level `schema_version`, added `schema::version()`, `schema::is_known_section()`, and `schema::is_known_key()` helpers.
+- [HAT: Engineering] Aligned schema numeric max bounds with hard validation for `model.beam_size`, `model.num_threads`, and `audio.channels`.
+- [HAT: Research] Used two read-only subagents for candidate-slice selection and config API review; both recommended config hardening as the smallest high-leverage Phase 1 start.
+- [HAT: Research] Used Claude Code read-only pre-commit review when available; it returned PASS with minor non-blocking notes. A Hermes subagent review initially returned FAIL on diagnostic-load semantics; the blocker was fixed and a second read-only subagent review returned PASS.
+Learned:
+- [HAT: Engineering] `Config::load_with_diagnostics()` must not call `Config::validate()` internally, otherwise collected validation errors are unreachable; normal `Config::load()` owns the throw-on-error behavior.
+- [HAT: Engineering] Legacy `output.append_newline` needs explicit warning suppression because it is intentionally translated to `output.ending_action` for backwards compatibility.
+- [HAT: CEO] Phase 1 is not complete; this is only the first gate-oriented hardening slice.
+Verification:
+- RED: New config/schema tests failed before implementation for missing `validate_all`, `ConfigValidator`, `load_with_diagnostics`, schema version/helpers, and schema max bounds.
+- RED: Added diagnostic-load regression failed while `load_with_diagnostics()` still threw validation errors.
+- GREEN: `cmake --build build-audit -j$(sysctl -n hw.ncpu || nproc || echo 2)` passed.
+- GREEN: `cd build-audit && ctest --output-on-failure` passed — 92/92 tests.
+- GREEN: `python3 -m unittest tests.static.test_settings_design_assets -v` passed — 8/8 tests.
+- GREEN: `node --check src/settings/web/app.js` passed.
+- GREEN: `git diff --check` passed.
+Blocked on:
+- Nothing for this slice.
+Next:
+- Commit and push this Phase 1 config hardening slice to `origin/primeodin/design-system-settings-ui`.
+- Next Phase 1 slice should either extend settings/JSON validation to expose structured warnings/errors in API responses, or tackle the remaining first-party build warnings (`audio.h` unused `silence_threshold_samples_`; PulseAudio stub fields) with tests where feasible.
+- Product/marketing Phase 1 competitor benchmark remains incomplete and should not be claimed as done.

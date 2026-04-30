@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 
 namespace fs = std::filesystem;
 
@@ -73,19 +74,78 @@ std::vector<std::string> get_string_array(const toml::table& tbl, const std::str
     return def;
 }
 
-void check_enum(std::string_view section, std::string_view key,
-                const std::string& value, std::string_view message_prefix) {
+ValidationIssue make_issue(ValidationSeverity severity, std::string path,
+                           std::string code, std::string message) {
+    return ValidationIssue{severity, std::move(path), std::move(code), std::move(message)};
+}
+
+void add_error(std::vector<ValidationIssue>& issues, std::string path,
+               std::string code, std::string message) {
+    issues.push_back(make_issue(ValidationSeverity::Error, std::move(path), std::move(code), std::move(message)));
+}
+
+bool is_allowed_enum(std::string_view section, std::string_view key, const std::string& value) {
     const auto* d = schema::find(section, key);
-    if (!d || d->type != schema::Type::Enum) return;
-    for (auto allowed : d->enum_values) {
-        if (value == allowed) return;
+    if (!d || d->type != schema::Type::Enum) return true;
+    return std::any_of(d->enum_values.begin(), d->enum_values.end(), [&](auto allowed) {
+        return value == allowed;
+    });
+}
+
+void collect_unknown_toml_issues(const toml::table& tbl, std::vector<ValidationIssue>& issues) {
+    for (const auto& [section_key, section_node] : tbl) {
+        const std::string section(section_key.str());
+        if (section == "schema_version") continue;
+
+        if (!section_node.is_table()) {
+            issues.push_back(make_issue(ValidationSeverity::Warning, section, "unknown_key",
+                                        "Unknown top-level config key: " + section));
+            continue;
+        }
+
+        if (!schema::is_known_section(section)) {
+            issues.push_back(make_issue(ValidationSeverity::Warning, section, "unknown_section",
+                                        "Unknown config section: " + section));
+            continue;
+        }
+
+        const auto* section_table = section_node.as_table();
+        for (const auto& item : *section_table) {
+            const std::string key_s(item.first.str());
+            // Legacy key translated to output.ending_action below; do not warn for it.
+            if (section == "output" && key_s == "append_newline") continue;
+            if (!schema::is_known_key(section, key_s)) {
+                issues.push_back(make_issue(ValidationSeverity::Warning, section + "." + key_s,
+                                            "unknown_key", "Unknown config key: " + section + "." + key_s));
+            }
+        }
     }
-    throw std::runtime_error(std::string(message_prefix) + ": " + value);
 }
 
 } // anonymous namespace
 
 Config Config::load(const std::string& path) {
+    auto result = load_with_diagnostics(path);
+    for (const auto& issue : result.issues) {
+        if (issue.severity == ValidationSeverity::Warning) {
+            spdlog::warn("{}", issue.message);
+        }
+    }
+
+    auto error = std::find_if(result.issues.begin(), result.issues.end(), [](const ValidationIssue& issue) {
+        return issue.severity == ValidationSeverity::Error;
+    });
+    if (error != result.issues.end()) {
+        throw std::runtime_error(error->message);
+    }
+
+    if (result.config.audio.sample_rate != 16000) {
+        spdlog::warn("Sample rate {} is not Whisper's native 16kHz", result.config.audio.sample_rate);
+    }
+    return result.config;
+}
+
+ConfigLoadResult Config::load_with_diagnostics(const std::string& path) {
     if (!fs::exists(path)) {
         throw std::runtime_error("Config file not found: " + path);
     }
@@ -98,6 +158,8 @@ Config Config::load(const std::string& path) {
     }
 
     Config config;
+    std::vector<ValidationIssue> issues;
+    collect_unknown_toml_issues(tbl, issues);
 
     // [model]
     if (auto model = tbl["model"].as_table()) {
@@ -170,90 +232,122 @@ Config Config::load(const std::string& path) {
         config.tray.enabled = get_or(*tray, "enabled", config.tray.enabled);
     }
 
-    config.validate();
-    return config;
+    auto validation_issues = config.validate_all();
+    issues.insert(issues.end(), validation_issues.begin(), validation_issues.end());
+    return ConfigLoadResult{config, std::move(issues)};
 }
 
 Config Config::default_config() {
     return Config{};
 }
 
-void Config::validate() const {
-    check_enum("model", "size", model.size, "Invalid model size");
-    check_enum("model", "device", model.device, "Invalid device");
-    check_enum("model", "compute_type", model.compute_type, "Invalid compute_type");
+std::vector<ValidationIssue> Config::validate_all() const {
+    std::vector<ValidationIssue> issues;
+
+    if (!is_allowed_enum("model", "size", model.size)) {
+        add_error(issues, "model.size", "invalid_enum", "Invalid model size: " + model.size);
+    }
+    if (!is_allowed_enum("model", "device", model.device)) {
+        add_error(issues, "model.device", "invalid_enum", "Invalid device: " + model.device);
+    }
+    if (!is_allowed_enum("model", "compute_type", model.compute_type)) {
+        add_error(issues, "model.compute_type", "invalid_enum", "Invalid compute_type: " + model.compute_type);
+    }
 
     if (model.beam_size <= 0 || model.beam_size > 10) {
-        throw std::runtime_error("Invalid beam_size: must be between 1 and 10");
+        add_error(issues, "model.beam_size", "out_of_range", "Invalid beam_size: must be between 1 and 10");
     }
     if (model.num_threads <= 0 || model.num_threads > 256) {
-        throw std::runtime_error("Invalid num_threads: must be between 1 and 256");
+        add_error(issues, "model.num_threads", "out_of_range", "Invalid num_threads: must be between 1 and 256");
     }
 
     if (audio.sample_rate <= 0) {
-        throw std::runtime_error("Invalid sample_rate: must be > 0");
+        add_error(issues, "audio.sample_rate", "out_of_range", "Invalid sample_rate: must be > 0");
     }
     if (audio.channels <= 0 || audio.channels > 8) {
-        throw std::runtime_error("Invalid channels: must be between 1 and 8");
+        add_error(issues, "audio.channels", "out_of_range", "Invalid channels: must be between 1 and 8");
     }
     if (audio.buffer_size <= 0) {
-        throw std::runtime_error("Invalid buffer_size: must be > 0");
+        add_error(issues, "audio.buffer_size", "out_of_range", "Invalid buffer_size: must be > 0");
     }
     if (!std::isfinite(audio.vad_threshold) || audio.vad_threshold < 0.0f || audio.vad_threshold > 1.0f) {
-        throw std::runtime_error("Invalid vad_threshold: must be between 0.0 and 1.0");
+        add_error(issues, "audio.vad_threshold", "out_of_range", "Invalid vad_threshold: must be between 0.0 and 1.0");
     }
     if (!std::isfinite(audio.silence_duration) || audio.silence_duration <= 0.0f) {
-        throw std::runtime_error("Invalid silence_duration: must be > 0");
+        add_error(issues, "audio.silence_duration", "out_of_range", "Invalid silence_duration: must be > 0");
     }
     if (!std::isfinite(audio.max_duration) || audio.max_duration <= 0.0f) {
-        throw std::runtime_error("Invalid max_duration: must be > 0");
+        add_error(issues, "audio.max_duration", "out_of_range", "Invalid max_duration: must be > 0");
     }
 
-    if (audio.sample_rate != 16000) {
-        spdlog::warn("Sample rate {} is not Whisper's native 16kHz", audio.sample_rate);
+    if (!is_allowed_enum("hotkeys", "mode", hotkeys.mode)) {
+        add_error(issues, "hotkeys.mode", "invalid_enum", "Invalid hotkey mode: " + hotkeys.mode);
     }
-
-    check_enum("hotkeys", "mode", hotkeys.mode, "Invalid hotkey mode");
     if (hotkeys.trigger.empty()) {
-        throw std::runtime_error("Invalid hotkeys.trigger: at least one trigger is required");
+        add_error(issues, "hotkeys.trigger", "missing_required", "Invalid hotkeys.trigger: at least one trigger is required");
     }
     for (const auto& key : hotkeys.trigger) {
         if (key.empty()) {
-            throw std::runtime_error("Invalid hotkeys.trigger: empty key entry");
+            add_error(issues, "hotkeys.trigger", "empty_entry", "Invalid hotkeys.trigger: empty key entry");
         }
     }
     for (const auto& key : hotkeys.cancel) {
         if (key.empty()) {
-            throw std::runtime_error("Invalid hotkeys.cancel: empty key entry");
+            add_error(issues, "hotkeys.cancel", "empty_entry", "Invalid hotkeys.cancel: empty key entry");
         }
     }
 
-    check_enum("output", "method", output.method, "Invalid output method");
+    if (!is_allowed_enum("output", "method", output.method)) {
+        add_error(issues, "output.method", "invalid_enum", "Invalid output method: " + output.method);
+    }
     if (!std::isfinite(output.paste_delay) || output.paste_delay < 0.0f ||
         output.paste_delay > static_cast<float>(std::numeric_limits<int>::max())) {
-        throw std::runtime_error("Invalid paste_delay: must be >= 0");
+        add_error(issues, "output.paste_delay", "out_of_range", "Invalid paste_delay: must be >= 0");
     }
 
-    check_enum("output", "ending_action", output.ending_action, "Invalid ending_action");
+    if (!is_allowed_enum("output", "ending_action", output.ending_action)) {
+        add_error(issues, "output.ending_action", "invalid_enum", "Invalid ending_action: " + output.ending_action);
+    }
 
-    // Validate volume
     if (!std::isfinite(feedback.volume) || feedback.volume < 0.0f || feedback.volume > 1.0f) {
-        throw std::runtime_error("Invalid volume: must be between 0.0 and 1.0");
+        add_error(issues, "feedback.volume", "out_of_range", "Invalid volume: must be between 0.0 and 1.0");
     }
     if (feedback.frequency_start <= 0 || feedback.frequency_stop <= 0 ||
         feedback.frequency_error <= 0) {
-        throw std::runtime_error("Invalid feedback frequencies: must be > 0");
+        add_error(issues, "feedback.frequency", "out_of_range", "Invalid feedback frequencies: must be > 0");
     }
     if (!std::isfinite(feedback.duration) || feedback.duration <= 0.0f) {
-        throw std::runtime_error("Invalid feedback duration: must be > 0");
+        add_error(issues, "feedback.duration", "out_of_range", "Invalid feedback duration: must be > 0");
     }
 
-    check_enum("daemon", "log_level", daemon.log_level, "Invalid daemon.log_level");
+    if (!is_allowed_enum("daemon", "log_level", daemon.log_level)) {
+        add_error(issues, "daemon.log_level", "invalid_enum", "Invalid daemon.log_level: " + daemon.log_level);
+    }
     if (daemon.pid_file.empty()) {
-        throw std::runtime_error("Invalid daemon.pid_file: cannot be empty");
+        add_error(issues, "daemon.pid_file", "empty_value", "Invalid daemon.pid_file: cannot be empty");
     }
     if (daemon.work_dir.empty()) {
-        throw std::runtime_error("Invalid daemon.work_dir: cannot be empty");
+        add_error(issues, "daemon.work_dir", "empty_value", "Invalid daemon.work_dir: cannot be empty");
+    }
+
+    return issues;
+}
+
+std::vector<ValidationIssue> ConfigValidator::validate(const Config& config) {
+    return config.validate_all();
+}
+
+void Config::validate() const {
+    const auto issues = validate_all();
+    auto it = std::find_if(issues.begin(), issues.end(), [](const ValidationIssue& issue) {
+        return issue.severity == ValidationSeverity::Error;
+    });
+    if (it != issues.end()) {
+        throw std::runtime_error(it->message);
+    }
+
+    if (audio.sample_rate != 16000) {
+        spdlog::warn("Sample rate {} is not Whisper's native 16kHz", audio.sample_rate);
     }
 }
 

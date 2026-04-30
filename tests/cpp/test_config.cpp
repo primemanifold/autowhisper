@@ -235,6 +235,55 @@ TEST_CASE("Config::validate rejects out-of-range volume", "[config][validate]") 
 // ============================================================
 
 
+TEST_CASE("Config::validate_all returns all validation errors", "[config][validate]") {
+    auto cfg = Config::default_config();
+    cfg.model.size = "nonexistent";
+    cfg.model.beam_size = 0;
+    cfg.audio.vad_threshold = 1.5f;
+    cfg.feedback.volume = 2.0f;
+
+    auto issues = cfg.validate_all();
+
+    CHECK(issues.size() >= 4);
+    CHECK(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+        return issue.severity == ValidationSeverity::Error &&
+               issue.path == "model.size" &&
+               issue.code == "invalid_enum";
+    }));
+    CHECK(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+        return issue.severity == ValidationSeverity::Error &&
+               issue.path == "model.beam_size" &&
+               issue.code == "out_of_range";
+    }));
+    CHECK(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+        return issue.severity == ValidationSeverity::Error &&
+               issue.path == "audio.vad_threshold" &&
+               issue.code == "out_of_range";
+    }));
+    CHECK(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+        return issue.severity == ValidationSeverity::Error &&
+               issue.path == "feedback.volume" &&
+               issue.code == "out_of_range";
+    }));
+}
+
+TEST_CASE("ConfigValidator::validate returns validation issues without throwing", "[config][validate]") {
+    auto cfg = Config::default_config();
+    cfg.output.method = "stdout";
+
+    auto issues = ConfigValidator::validate(cfg);
+
+    REQUIRE(issues.size() == 1);
+    CHECK(issues.front().path == "output.method");
+    CHECK(issues.front().code == "invalid_enum");
+    CHECK(issues.front().severity == ValidationSeverity::Error);
+}
+
+TEST_CASE("Config::validate_all returns empty for valid defaults", "[config][validate]") {
+    auto cfg = Config::default_config();
+    CHECK(cfg.validate_all().empty());
+}
+
 TEST_CASE("Config::validate rejects invalid numeric ranges", "[config][validate]") {
     auto cfg = Config::default_config();
 
@@ -291,6 +340,71 @@ TEST_CASE("Config::validate rejects invalid hotkey and daemon settings", "[confi
         cfg.daemon.log_level = "verbose";
         REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid daemon.log_level"));
     }
+}
+
+TEST_CASE("Config::load_with_diagnostics warns on unknown TOML keys", "[config][io]") {
+    TempFile tmp(R"(
+[model]
+size = "tiny.en"
+extra_model_key = true
+
+[unknown_section]
+foo = "bar"
+)");
+
+    auto result = Config::load_with_diagnostics(tmp.path.string());
+
+    CHECK(result.config.model.size == "tiny.en");
+    CHECK(result.config.validate_all().empty());
+    REQUIRE(result.issues.size() >= 2);
+    CHECK(std::any_of(result.issues.begin(), result.issues.end(), [](const auto& issue) {
+        return issue.severity == ValidationSeverity::Warning &&
+               issue.path == "model.extra_model_key" &&
+               issue.code == "unknown_key";
+    }));
+    CHECK(std::any_of(result.issues.begin(), result.issues.end(), [](const auto& issue) {
+        return issue.severity == ValidationSeverity::Warning &&
+               issue.path == "unknown_section" &&
+               issue.code == "unknown_section";
+    }));
+}
+
+TEST_CASE("Config::load_with_diagnostics returns validation errors without throwing", "[config][io]") {
+    TempFile tmp(R"(
+[model]
+size = "nonexistent"
+beam_size = 0
+)");
+
+    auto result = Config::load_with_diagnostics(tmp.path.string());
+
+    CHECK(result.config.model.size == "nonexistent");
+    CHECK(std::any_of(result.issues.begin(), result.issues.end(), [](const auto& issue) {
+        return issue.severity == ValidationSeverity::Error &&
+               issue.path == "model.size" &&
+               issue.code == "invalid_enum";
+    }));
+    CHECK(std::any_of(result.issues.begin(), result.issues.end(), [](const auto& issue) {
+        return issue.severity == ValidationSeverity::Error &&
+               issue.path == "model.beam_size" &&
+               issue.code == "out_of_range";
+    }));
+}
+
+TEST_CASE("Config::load_with_diagnostics allows schema_version and legacy append_newline", "[config][io]") {
+    TempFile tmp(R"(
+schema_version = 1
+
+[output]
+append_newline = true
+)");
+
+    auto result = Config::load_with_diagnostics(tmp.path.string());
+
+    CHECK(result.config.output.ending_action == "newline");
+    CHECK(std::none_of(result.issues.begin(), result.issues.end(), [](const auto& issue) {
+        return issue.path == "schema_version" || issue.path == "output.append_newline";
+    }));
 }
 
 TEST_CASE("Config::load throws on missing file", "[config][io]") {
