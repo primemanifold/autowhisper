@@ -105,3 +105,30 @@ Blocked on:
 - Nothing for branch creation.
 Next:
 - Open a PR from `primeodin/design-system-settings-ui` into `core` when Channa wants review/merge flow.
+
+## Run 2026-04-30T15:56:29Z
+Phase: Phase 0.3 — Settings navigation and accessibility hardening
+Hats used: Engineering, Research, CEO
+Shipped:
+- Used Claude Code read-only review plus Hermes subagents to identify small next improvements after the design-system slice.
+- Added URL-hash deep linking for settings panes (`#pane-audio`, `#audio`, etc.) while using `history.replaceState` on nav clicks to avoid back-stack spam.
+- Added `aria-current="page"` to the active settings nav item.
+- Fixed checkbox descriptions so `aria-describedby` attaches to the actual checkbox input rather than the wrapper element.
+- Added static regression tests for pane deep-linking/accessibility, checkbox description wiring, and IA/nav target drift.
+- Added `.hermes/reviews/2026-04-30-settings-nav-a11y-precommit.md`.
+Learned:
+- Claude Code and Hermes subagents independently converged on navigation/accessibility as the highest-leverage low-risk next slice.
+- The previous UI implementation attached descriptions correctly for text/select controls but not for boolean checkbox controls.
+Verification:
+- Watched new static tests fail before implementation, then pass after the fix.
+- Passed `python3 -m unittest tests.static.test_settings_design_assets -v`.
+- Passed `node --check src/settings/web/app.js`.
+- Passed `git diff --check`.
+- Browser smoke verified `/index.html#pane-audio`, `aria-current`, checkbox `aria-describedby`, and nav hash updates.
+- Independent pre-commit reviewer returned PASS.
+Blocked on:
+- Native C++ configure/build/ctest is still blocked because `cmake` is not installed on this host.
+Next:
+- Add a real DOM/browser regression test for settings rendering, labels, descriptions, hash navigation, dirty state, and Advanced synchronization.
+- Implement diagnostics-backed panels for model availability, microphone availability, platform permissions, and doctor results.
+- Start macOS M0 build-truth gate work before claiming macOS readiness.

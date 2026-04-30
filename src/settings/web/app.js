@@ -93,6 +93,8 @@
 
   renderAllPanes();
   bindNavigation();
+  activatePane(paneIdFromHash());
+  window.addEventListener("hashchange", () => activatePane(paneIdFromHash()));
   bindFormDirtyTracking();
   updateDirtyState();
   setBusy(false);
@@ -234,7 +236,8 @@
       desc.id = inputId(paneId, section, keyDef.key) + "-desc";
       desc.textContent = keyDef.description;
       controlWrap.appendChild(desc);
-      controlWrap.firstElementChild?.setAttribute?.("aria-describedby", desc.id);
+      const describedControl = controlWrap.querySelector("input, select");
+      describedControl?.setAttribute("aria-describedby", desc.id);
     }
 
     row.append(labelWrap, controlWrap);
@@ -290,14 +293,34 @@
     nav.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-target]");
       if (!button) return;
-      activatePane(button.dataset.target);
+      activatePane(button.dataset.target, { updateHash: true });
     });
   }
 
-  function activatePane(id) {
+  function paneIdFromHash() {
+    const rawHash = window.location.hash.replace(/^#/, "");
+    if (!rawHash) return IA_SECTIONS[0].id;
+    try {
+      const decoded = decodeURIComponent(rawHash);
+      return decoded.startsWith("pane-") ? decoded.slice(5) : decoded;
+    } catch (_) {
+      return IA_SECTIONS[0].id;
+    }
+  }
+
+  function activatePane(id, options = {}) {
     const pane = IA_SECTIONS.find((candidate) => candidate.id === id) || IA_SECTIONS[0];
     document.querySelectorAll(".aw-pane").forEach((el) => el.classList.toggle("is-active", el.dataset.pane === pane.id));
-    document.querySelectorAll(".aw-nav-item").forEach((el) => el.classList.toggle("is-active", el.dataset.target === pane.id));
+    document.querySelectorAll(".aw-nav-item").forEach((el) => {
+      const isActive = el.dataset.target === pane.id;
+      el.classList.toggle("is-active", isActive);
+      if (isActive) el.setAttribute("aria-current", "page");
+      else el.removeAttribute("aria-current");
+    });
+    if (options.updateHash) {
+      const nextHash = `#pane-${pane.id}`;
+      if (window.location.hash !== nextHash) history.replaceState(null, "", nextHash);
+    }
     sectionTitle.textContent = pane.title;
     sectionKicker.textContent = `${pane.number} · Settings`;
     sectionLede.textContent = pane.lede;

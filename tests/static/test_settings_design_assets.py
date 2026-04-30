@@ -65,6 +65,21 @@ class SettingsDesignAssetsTest(unittest.TestCase):
         self.assertIn("inputId(paneId, section, keyDef.key) + \"-desc\"", self.js)
         self.assertIn("document.querySelectorAll(`[data-config-key=\"${section}.${keyDef.key}\"]`)", self.js)
 
+    def test_checkbox_descriptions_attach_to_form_controls(self):
+        self.assertIn('controlWrap.querySelector("input, select")', self.js)
+        self.assertNotIn('controlWrap.firstElementChild?.setAttribute?.("aria-describedby"', self.js)
+
+    def test_active_pane_is_deep_linkable_and_accessible(self):
+        self.assertIn("window.location.hash", self.js)
+        self.assertIn('window.addEventListener("hashchange"', self.js)
+        self.assertIn('aria-current', self.js)
+        self.assertIn('history.replaceState', self.js)
+
+    def test_nav_targets_match_ia_sections(self):
+        section_ids = set(re.findall(r'id: "([a-z-]+)"', self.js))
+        nav_targets = set(re.findall(r'data-target="([a-z-]+)"', self.index))
+        self.assertEqual(nav_targets, section_ids)
+
 
 if __name__ == "__main__":
     unittest.main()
