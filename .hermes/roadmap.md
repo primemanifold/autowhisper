@@ -58,3 +58,34 @@ Definition of done:
 - ICP, JTBD, positioning statement, message house, and naming check exist.
 - CEO decision is logged in `.hermes/decisions.md`.
 - Positioning explicitly resolves whether AutoWhisper remains Linux-first, local-first, or expands target platform/category.
+
+
+### Milestone 0.2 — Design-system intake and first settings slice
+
+Status: locally implemented, pending push.
+
+Success metric:
+
+- The uploaded design concept is preserved and the production settings UI has a first framework-free implementation slice that reflects the design direction.
+
+Definition of done:
+
+- [x] Source concept preserved under `design/source-concept/`.
+- [x] Design-system intake documented in `design/README.md` and `design/design-system.md`.
+- [x] Production settings UI uses `--aw-` tokens and intent navigation.
+- [x] Settings UI still renders from `/api/schema`, `/api/config`, and `/api/defaults`.
+- [x] Static regression tests prevent React/Babel/Tailwind adoption in production settings assets.
+- [x] Advanced pane duplicate-control behavior verified with pane-scoped IDs and synced `data-config-key` controls.
+
+### Milestone M0 — macOS build truth
+
+Success metric:
+
+- AutoWhisper has a verified macOS build and an honest feature/readiness matrix.
+
+Definition of done:
+
+- Current macOS placeholders are replaced or explicitly guarded.
+- Homebrew/Xcode prerequisites are documented.
+- Menu bar, hotkey, output insertion, permissions, and packaging gaps are tracked as implementation work.
+- No marketing surface claims macOS readiness before local verification.

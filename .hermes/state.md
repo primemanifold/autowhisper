@@ -60,3 +60,31 @@ Next:
 - In Phase 1, research competitors and build `research/benchmark.md` with sourced claims only.
 Blocked on:
 - Nothing.
+
+## Run 2026-04-30T15:36:03Z
+Phase: Phase 0.2 — Design intake and first production settings slice
+Hats used: Research, Marketing, Engineering, CEO
+Shipped:
+- Preserved Channa's uploaded AutoWhisper design concept under `design/source-concept/`.
+- Created `design/README.md` and `design/design-system.md` documenting the accepted design direction, tokens, IA, accessibility requirements, and implementation stance.
+- Created `engineering/design-implementation-plan.md` for incremental design-system implementation.
+- Created `engineering/macos-roadmap.md` making macOS a first-class strategic target while honestly noting current placeholder status.
+- Rebuilt the embedded settings UI in `src/settings/web/` around paper-light `--aw-` design tokens, intent navigation, status/dirty-state affordances, and schema-driven rendering.
+- Added `tests/static/test_settings_design_assets.py` and `tests/static/mock_settings_server.py` for regression and browser smoke checks.
+Learned:
+- The uploaded concept is React-based for design exploration, but production should stay plain HTML/CSS/JS to fit the embedded native C++ app.
+- The repo already has macOS CMake branches and `.mm` files, but hotkey, text output, and tray/menu bar implementations are placeholders.
+- Independent pre-commit review caught an Advanced-pane duplicate-ID/save bug; pane-scoped IDs plus `data-config-key` synchronization fixed it.
+Verification:
+- Passed `python3 -m unittest tests.static.test_settings_design_assets -v`.
+- Passed `node --check src/settings/web/app.js`.
+- Passed `git diff --check`.
+- Browser mock-server visual QA passed with no console errors; Advanced edits synced back to the primary Dictation pane.
+- Independent focused re-review passed after the duplicate-ID fix.
+Blocked on:
+- `cmake` is not installed on this host, so C++ configure/build/ctest verification could not run here.
+Next:
+- Install or provide CMake for local native verification, then run configure/build/ctest.
+- Implement real diagnostics-backed panels for model availability, microphone availability, platform permissions, and doctor results.
+- Start macOS M0 build-truth work before claiming macOS readiness.
+- Continue Phase 1 competitor research before making comparative market claims.

@@ -55,3 +55,22 @@ For AutoWhisper, prefer local verification before push. Use gstack-style `/autop
 - Future runs should avoid casual pushes after each local commit.
 - Local test/build commands and independent reviews become the default quality gate.
 - GitHub Actions remain a release/major-change validation backstop rather than the primary feedback loop.
+
+## ADR-0004 — Accept design-system direction and treat macOS as first-class target
+
+Date: 2026-04-30T15:36:03Z
+
+### Context
+
+Channa provided an AutoWhisper design-system and UI concept package, then clarified that the goal is to build the best product in this category from the core local-first mission and to add a macOS version. The current production settings UI is embedded static HTML/CSS/JS served by the C++ app. The repo already contains macOS platform placeholders, but they do not implement global hotkeys, text insertion, or menu bar behavior.
+
+### Decision
+
+Adopt the uploaded paper-light, engineered design direction as the canonical design input. Port it into production incrementally without adding a frontend framework. Treat macOS as a first-class strategic product target while preserving Linux/X11 stability and avoiding claims that macOS is product-ready before implementation and verification.
+
+### Consequences
+
+- `design/` now preserves the source concept and documents the design system.
+- `src/settings/web/` remains framework-free and schema-driven.
+- `engineering/macos-roadmap.md` defines macOS as a deliberate platform program, not a placeholder promise.
+- Future product claims about speed, accuracy, privacy superiority, or platform readiness still require benchmarks or implementation evidence.
