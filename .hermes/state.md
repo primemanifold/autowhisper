@@ -132,3 +132,32 @@ Next:
 - Add a real DOM/browser regression test for settings rendering, labels, descriptions, hash navigation, dirty state, and Advanced synchronization.
 - Implement diagnostics-backed panels for model availability, microphone availability, platform permissions, and doctor results.
 - Start macOS M0 build-truth gate work before claiming macOS readiness.
+
+## Run 2026-04-30T17:03:00Z
+Phase: Phase 0 — Audit baseline gate
+Hats used: Research, Marketing, Engineering, CEO
+Shipped:
+- Installed safe local audit prerequisites via Homebrew: `cmake` 4.3.2 and `cppcheck` 2.20.0.
+- Initialized vendored submodules for the audit build.
+- Fixed macOS AppleClang 21 audit build compatibility for vendored spdlog/bundled fmt by defining `FMT_CONSTEVAL=` only on AppleClang 21+ macOS builds.
+- Fixed two C++ test files to include `<unistd.h>` for `::getpid()`/`::getuid()` on macOS.
+- Created `audit/build-warnings.md`, `audit/static-analysis.txt`, and `audit/BASELINE.md` with toolchain/dependency/test/warning baseline and known product gaps.
+Learned:
+- [HAT: Engineering] Phase 0 native configure/build/ctest now passes on this macOS host: 83/83 CTest tests passed.
+- [HAT: Engineering] The app still builds macOS platform placeholders for hotkey/output/tray; passing build does not mean macOS product readiness.
+- [HAT: Research] cppcheck completed and found style/configuration findings, including one `unknownMacro` parser/configuration finding for `AUTOWHISPER_VERSION`; no build/test failure was caused by cppcheck.
+- [HAT: Marketing] README docs still need cleanup around GPU/CUDA qualification and `autowhisper config` vs `autowhisper config ui` behavior before strong product claims.
+- [HAT: CEO] Phase 0 gate is satisfied after small compatibility fixes; next work should move into the next smallest high-leverage slice rather than claiming 1.0.0 readiness.
+Verification:
+- Passed `cmake -B build-audit -DCMAKE_BUILD_TYPE=Debug -DAUTOWHISPER_ENABLE_TESTS=ON`.
+- Passed `cmake --build build-audit -j$(sysctl -n hw.ncpu || nproc || echo 2)` after clean rebuild.
+- Passed `cd build-audit && ctest --output-on-failure` — 83/83 tests.
+- Completed `cppcheck --enable=all --suppress=missingIncludeSystem --std=c++20 src/` with findings recorded in `audit/static-analysis.txt`.
+- Passed `python3 -m unittest tests.static.test_settings_design_assets -v` — 8/8 tests.
+- Passed `node --check src/settings/web/app.js`.
+- Passed `git diff --check`.
+Blocked on:
+- No Phase 0 gate blockers remain on this host.
+Next:
+- Commit Phase 0 audit baseline and compatibility fixes.
+- Proceed to the next bounded phase slice: either Phase 1 sourced competitor/positioning research or an engineering hardening slice that addresses documented docs drift and cppcheck/build warnings.

@@ -1,0 +1,346 @@
+Checking src/audio/audio.cpp ...
+src/audio/audio.cpp:4:2: information: Include file: "audio/audio.h" not found. [missingInclude]
+#include "audio/audio.h"
+ ^
+src/audio/audio.cpp:55:27: style: Consider using std::accumulate algorithm instead of a raw loop. [useStlAlgorithm]
+            total_samples += buf.size();
+                          ^
+src/audio/audio.cpp:162:45: style: Consider using std::accumulate algorithm instead of a raw loop. [useStlAlgorithm]
+    for (const auto& chunk : buffer_) total += chunk.size();
+                                            ^
+src/audio/audio.cpp:184:45: style: Consider using std::accumulate algorithm instead of a raw loop. [useStlAlgorithm]
+    for (const auto& chunk : buffer_) total += chunk.size();
+                                            ^
+1/25 files checked 4% done
+Checking src/cli/cli.cpp ...
+src/cli/cli.cpp:1:2: information: Include file: "cli/cli.h" not found. [missingInclude]
+#include "cli/cli.h"
+ ^
+src/cli/cli.cpp:2:2: information: Include file: "config/config.h" not found. [missingInclude]
+#include "config/config.h"
+ ^
+src/cli/cli.cpp:3:2: information: Include file: "daemon/daemon.h" not found. [missingInclude]
+#include "daemon/daemon.h"
+ ^
+src/cli/cli.cpp:4:2: information: Include file: "doctor/doctor.h" not found. [missingInclude]
+#include "doctor/doctor.h"
+ ^
+src/cli/cli.cpp:5:2: information: Include file: "models/models.h" not found. [missingInclude]
+#include "models/models.h"
+ ^
+src/cli/cli.cpp:6:2: information: Include file: "util/logging.h" not found. [missingInclude]
+#include "util/logging.h"
+ ^
+src/cli/cli.cpp:7:2: information: Include file: "util/subprocess.h" not found. [missingInclude]
+#include "util/subprocess.h"
+ ^
+src/cli/cli.cpp:179:38: error: There is an unknown macro here somewhere. Configuration is required. If AUTOWHISPER_VERSION is a macro then please configure it. [unknownMacro]
+        spdlog::info("AutoWhisper v" AUTOWHISPER_VERSION " starting");
+                                     ^
+2/25 files checked 12% done
+Checking src/cli/cli_settings_ui.cpp ...
+src/cli/cli_settings_ui.cpp:1:2: information: Include file: "cli/cli.h" not found. [missingInclude]
+#include "cli/cli.h"
+ ^
+src/cli/cli_settings_ui.cpp:2:2: information: Include file: "config/config.h" not found. [missingInclude]
+#include "config/config.h"
+ ^
+src/cli/cli_settings_ui.cpp:3:2: information: Include file: "config/schema.h" not found. [missingInclude]
+#include "config/schema.h"
+ ^
+src/cli/cli_settings_ui.cpp:4:2: information: Include file: "settings/assets.h" not found. [missingInclude]
+#include "settings/assets.h"
+ ^
+src/cli/cli_settings_ui.cpp:5:2: information: Include file: "settings/handlers.h" not found. [missingInclude]
+#include "settings/handlers.h"
+ ^
+src/cli/cli_settings_ui.cpp:6:2: information: Include file: "settings/sidecar.h" not found. [missingInclude]
+#include "settings/sidecar.h"
+ ^
+src/cli/cli_settings_ui.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+3/25 files checked 17% done
+Checking src/config/config.cpp ...
+src/config/config.cpp:1:2: information: Include file: "config/config.h" not found. [missingInclude]
+#include "config/config.h"
+ ^
+src/config/config.cpp:3:2: information: Include file: "config/schema.h" not found. [missingInclude]
+#include "config/schema.h"
+ ^
+src/config/config.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+src/config/config.cpp:81:0: style: Consider using std::any_of algorithm instead of a raw loop. [useStlAlgorithm]
+        if (value == allowed) return;
+^
+src/config/config.cpp:221:26: style: Consider using std::any_of algorithm instead of a raw loop. [useStlAlgorithm]
+        if (key.empty()) {
+                         ^
+src/config/config.cpp:226:26: style: Consider using std::any_of algorithm instead of a raw loop. [useStlAlgorithm]
+        if (key.empty()) {
+                         ^
+src/config/config.cpp:291:55: style: Consider using std::copy algorithm instead of a raw loop. [useStlAlgorithm]
+    for (const auto& t : hotkeys.trigger) trigger_arr.push_back(t);
+                                                      ^
+src/config/config.cpp:293:53: style: Consider using std::copy algorithm instead of a raw loop. [useStlAlgorithm]
+    for (const auto& c : hotkeys.cancel) cancel_arr.push_back(c);
+                                                    ^
+src/config/config.cpp:362:40: style: Consider using std::find_if algorithm instead of a raw loop. [useStlAlgorithm]
+        if (fs::is_regular_file(path)) {
+                                       ^
+4/25 files checked 27% done
+Checking src/config/schema.cpp ...
+src/config/schema.cpp:1:2: information: Include file: "config/schema.h" not found. [missingInclude]
+#include "config/schema.h"
+ ^
+src/config/schema.cpp:153:46: style: Consider using std::transform algorithm instead of a raw loop. [useStlAlgorithm]
+            for (auto v : d.enum_values) arr.push_back(std::string(v));
+                                             ^
+5/25 files checked 32% done
+Checking src/daemon/daemon.cpp ...
+src/daemon/daemon.cpp:1:2: information: Include file: "daemon/daemon.h" not found. [missingInclude]
+#include "daemon/daemon.h"
+ ^
+6/25 files checked 37% done
+Checking src/doctor/doctor.cpp ...
+src/doctor/doctor.cpp:1:2: information: Include file: "doctor/doctor.h" not found. [missingInclude]
+#include "doctor/doctor.h"
+ ^
+src/doctor/doctor.cpp:2:2: information: Include file: "config/config.h" not found. [missingInclude]
+#include "config/config.h"
+ ^
+src/doctor/doctor.cpp:3:2: information: Include file: "models/models.h" not found. [missingInclude]
+#include "models/models.h"
+ ^
+src/doctor/doctor.cpp:4:2: information: Include file: "util/subprocess.h" not found. [missingInclude]
+#include "util/subprocess.h"
+ ^
+src/doctor/doctor.cpp:54:10: style: The member function 'autowhisper::::DiagnosticResult::info' can be static. [functionStatic]
+    void info(const std::string& msg) {
+         ^
+src/doctor/doctor.cpp:187:10: style: Variable 'tools' can be declared as const array [constVariable]
+    Tool tools[] = {
+         ^
+7/25 files checked 43% done
+Checking src/feedback/feedback.cpp ...
+src/feedback/feedback.cpp:1:2: information: Include file: "feedback/feedback.h" not found. [missingInclude]
+#include "feedback/feedback.h"
+ ^
+8/25 files checked 46% done
+Checking src/hotkey/hotkey_common.cpp ...
+src/hotkey/hotkey_common.cpp:1:2: information: Include file: "hotkey/hotkey.h" not found. [missingInclude]
+#include "hotkey/hotkey.h"
+ ^
+src/hotkey/hotkey_common.cpp:48:53: style: Consider using std::any_of algorithm instead of a raw loop. [useStlAlgorithm]
+        if (valid_mods.find(p) == valid_mods.end()) {
+                                                    ^
+9/25 files checked 51% done
+Checking src/hotkey/platform/hotkey_win32.cpp ...
+src/hotkey/platform/hotkey_win32.cpp:4:2: information: Include file: "hotkey/hotkey.h" not found. [missingInclude]
+#include "hotkey/hotkey.h"
+ ^
+10/25 files checked 51% done
+Checking src/hotkey/platform/hotkey_x11.cpp ...
+src/hotkey/platform/hotkey_x11.cpp:1:2: information: Include file: "hotkey/hotkey.h" not found. [missingInclude]
+#include "hotkey/hotkey.h"
+ ^
+src/hotkey/platform/hotkey_x11.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+11/25 files checked 58% done
+Checking src/inference/inference.cpp ...
+src/inference/inference.cpp:1:2: information: Include file: "inference/inference.h" not found. [missingInclude]
+#include "inference/inference.h"
+ ^
+src/inference/inference.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+src/inference/inference.cpp:60:31: style: Consider using std::find_if algorithm instead of a raw loop. [useStlAlgorithm]
+        if (fs::exists(path)) {
+                              ^
+src/inference/inference.cpp:112:17: style: Consider using std::accumulate algorithm instead of a raw loop. [useStlAlgorithm]
+        max_val = std::max(max_val, std::abs(s));
+                ^
+src/inference/inference.cpp:116:15: style: Consider using std::transform algorithm instead of a raw loop. [useStlAlgorithm]
+            s /= max_val;
+              ^
+12/25 files checked 62% done
+Checking src/main.cpp ...
+src/daemon/daemon.h:3:2: information: Include file: "config/config.h" not found. [missingInclude]
+#include "config/config.h"
+ ^
+src/daemon/daemon.h:4:2: information: Include file: "audio/audio.h" not found. [missingInclude]
+#include "audio/audio.h"
+ ^
+src/daemon/daemon.h:5:2: information: Include file: "feedback/feedback.h" not found. [missingInclude]
+#include "feedback/feedback.h"
+ ^
+src/daemon/daemon.h:6:2: information: Include file: "hotkey/hotkey.h" not found. [missingInclude]
+#include "hotkey/hotkey.h"
+ ^
+src/daemon/daemon.h:7:2: information: Include file: "inference/inference.h" not found. [missingInclude]
+#include "inference/inference.h"
+ ^
+src/daemon/daemon.h:8:2: information: Include file: "output/output.h" not found. [missingInclude]
+#include "output/output.h"
+ ^
+src/daemon/daemon.h:9:2: information: Include file: "pulseaudio/pulseaudio.h" not found. [missingInclude]
+#include "pulseaudio/pulseaudio.h"
+ ^
+src/daemon/daemon.h:10:2: information: Include file: "tray/tray.h" not found. [missingInclude]
+#include "tray/tray.h"
+ ^
+src/daemon/daemon.h:30:5: style: Class 'AutoWhisperDaemon' has a constructor with 1 argument that is not explicit. [noExplicitConstructor]
+    AutoWhisperDaemon(Config config, const std::string& config_path = "");
+    ^
+13/25 files checked 62% done
+Checking src/models/models.cpp ...
+src/models/models.cpp:1:2: information: Include file: "models/models.h" not found. [missingInclude]
+#include "models/models.h"
+ ^
+src/models/models.cpp:2:2: information: Include file: "util/subprocess.h" not found. [missingInclude]
+#include "util/subprocess.h"
+ ^
+src/models/models.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+14/25 files checked 66% done
+Checking src/output/output_common.cpp ...
+src/output/output_common.cpp:1:2: information: Include file: "output/output.h" not found. [missingInclude]
+#include "output/output.h"
+ ^
+src/output/output_common.cpp:2:2: information: Include file: "util/subprocess.h" not found. [missingInclude]
+#include "util/subprocess.h"
+ ^
+15/25 files checked 68% done
+Checking src/output/platform/output_win32.cpp ...
+src/output/platform/output_win32.cpp:2:2: information: Include file: "output/output.h" not found. [missingInclude]
+#include "output/output.h"
+ ^
+16/25 files checked 69% done
+Checking src/output/platform/output_x11.cpp ...
+src/output/platform/output_x11.cpp:1:2: information: Include file: "output/output.h" not found. [missingInclude]
+#include "output/output.h"
+ ^
+17/25 files checked 70% done
+Checking src/pulseaudio/pulseaudio.cpp ...
+src/pulseaudio/pulseaudio.cpp:1:2: information: Include file: "pulseaudio/pulseaudio.h" not found. [missingInclude]
+#include "pulseaudio/pulseaudio.h"
+ ^
+src/pulseaudio/pulseaudio.cpp:18:14: style: struct member 'MutedSinkInput::index' is never used. [unusedStructMember]
+    uint32_t index;
+             ^
+src/pulseaudio/pulseaudio.cpp:19:17: style: struct member 'MutedSinkInput::name' is never used. [unusedStructMember]
+    std::string name;
+                ^
+src/pulseaudio/pulseaudio.cpp:20:10: style: struct member 'MutedSinkInput::was_muted' is never used. [unusedStructMember]
+    bool was_muted;
+         ^
+src/pulseaudio/pulseaudio.cpp:28:33: style: struct member 'Impl::muted_inputs' is never used. [unusedStructMember]
+    std::vector<MutedSinkInput> muted_inputs;
+                                ^
+Checking src/pulseaudio/pulseaudio.cpp: HAVE_PULSEAUDIO=HAVE_PULSEAUDIO...
+src/pulseaudio/pulseaudio.cpp:60:18: style: struct member 'SinkInputListData::ml' is never used. [unusedStructMember]
+    pa_mainloop* ml;
+                 ^
+18/25 files checked 75% done
+Checking src/settings/handlers.cpp ...
+src/settings/handlers.cpp:1:2: information: Include file: "settings/handlers.h" not found. [missingInclude]
+#include "settings/handlers.h"
+ ^
+src/settings/handlers.cpp:2:2: information: Include file: "config/config.h" not found. [missingInclude]
+#include "config/config.h"
+ ^
+19/25 files checked 79% done
+Checking src/settings/sidecar.cpp ...
+src/settings/sidecar.cpp:1:2: information: Include file: "settings/sidecar.h" not found. [missingInclude]
+#include "settings/sidecar.h"
+ ^
+20/25 files checked 81% done
+Checking src/tray/platform/tray_gtk.cpp ...
+src/tray/platform/tray_gtk.cpp:1:2: information: Include file: "tray/tray.h" not found. [missingInclude]
+#include "tray/tray.h"
+ ^
+src/tray/platform/tray_gtk.cpp:40:17: style: The member function 'autowhisper::Impl::get_icon_path' can be static. [functionStatic]
+    std::string get_icon_path(TrayState state) const {
+                ^
+Checking src/tray/platform/tray_gtk.cpp: HAVE_APPINDICATOR;HAVE_AYATANA_APPINDICATOR...
+src/tray/platform/tray_gtk.cpp:162:23: style: C-style pointer casting [cstyleCast]
+            argv[4] = (gchar*)mgr->config_path_.c_str();
+                      ^
+src/tray/platform/tray_gtk.cpp:159:23: warning: Potentially invalid type conversion in old-style C cast, clarify/fix with C++ cast [dangerousTypeCast]
+            argv[1] = (gchar*)"config";
+                      ^
+src/tray/platform/tray_gtk.cpp:160:23: warning: Potentially invalid type conversion in old-style C cast, clarify/fix with C++ cast [dangerousTypeCast]
+            argv[2] = (gchar*)"ui";
+                      ^
+src/tray/platform/tray_gtk.cpp:161:23: warning: Potentially invalid type conversion in old-style C cast, clarify/fix with C++ cast [dangerousTypeCast]
+            argv[3] = (gchar*)"--config";
+                      ^
+Checking src/tray/platform/tray_gtk.cpp: HAVE_APPINDICATOR=HAVE_APPINDICATOR...
+Checking src/tray/platform/tray_gtk.cpp: HAVE_APPINDICATOR=HAVE_APPINDICATOR;HAVE_AYATANA_APPINDICATOR=HAVE_AYATANA_APPINDICATOR...
+Checking src/tray/platform/tray_gtk.cpp: HAVE_AYATANA_APPINDICATOR=HAVE_AYATANA_APPINDICATOR...
+21/25 files checked 87% done
+Checking src/tray/platform/tray_win32.cpp ...
+src/tray/platform/tray_win32.cpp:2:2: information: Include file: "tray/tray.h" not found. [missingInclude]
+#include "tray/tray.h"
+ ^
+22/25 files checked 87% done
+Checking src/tray/tray_common.cpp ...
+src/tray/tray_common.cpp:1:2: information: Include file: "tray/tray.h" not found. [missingInclude]
+#include "tray/tray.h"
+ ^
+23/25 files checked 88% done
+Checking src/util/logging.cpp ...
+src/util/logging.cpp:1:2: information: Include file: "util/logging.h" not found. [missingInclude]
+#include "util/logging.h"
+ ^
+src/util/logging.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+24/25 files checked 89% done
+Checking src/util/subprocess.cpp ...
+src/util/subprocess.cpp:1:2: information: Include file: "util/subprocess.h" not found. [missingInclude]
+#include "util/subprocess.h"
+ ^
+src/util/subprocess.cpp:0:0: information: Limiting analysis of branches. Use --check-level=exhaustive to analyze all branches. [normalCheckLevelMaxBranches]
+
+^
+src/util/subprocess.cpp:109:20: style: Consider using std::transform algorithm instead of a raw loop. [useStlAlgorithm]
+            c_args.push_back(const_cast<char*>(a.c_str()));
+                   ^
+src/util/subprocess.cpp:260:20: style: Consider using std::transform algorithm instead of a raw loop. [useStlAlgorithm]
+            c_args.push_back(const_cast<char*>(a.c_str()));
+                   ^
+src/util/subprocess.cpp:474:20: style: Consider using std::transform algorithm instead of a raw loop. [useStlAlgorithm]
+            c_args.push_back(const_cast<char*>(a.c_str()));
+                   ^
+src/util/subprocess.cpp:423:30: style: Variable 'child_exited' is assigned a value that is never used. [unreadVariable]
+                child_exited = true;
+                             ^
+Checking src/util/subprocess.cpp: _WIN32...
+25/25 files checked 100% done
+src/cli/cli_settings_ui.cpp:159:5: style: The function 'cmd_config_ui' is never used. [unusedFunction]
+int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
+    ^
+src/config/schema.cpp:126:28: style: The function 'all' is never used. [unusedFunction]
+const std::vector<KeyDef>& all() {
+                           ^
+src/daemon/daemon.h:38:17: style: The function 'state' is never used. [unusedFunction]
+    DaemonState state() const { return state_.load(); }
+                ^
+src/doctor/doctor.cpp:259:5: style: The function 'run_diagnostics' is never used. [unusedFunction]
+int run_diagnostics(bool fix) {
+    ^
+src/models/models.cpp:62:6: style: The function 'list_models' is never used. [unusedFunction]
+void list_models() {
+     ^
+src/models/models.cpp:83:5: style: The function 'download_model' is never used. [unusedFunction]
+int download_model(const std::string& name) {
+    ^
+src/util/logging.cpp:11:6: style: The function 'setup_logging' is never used. [unusedFunction]
+void setup_logging(const std::string& level, const std::string& log_file) {
+     ^
+nofile:0:0: information: Active checkers: There was critical errors (use --checkers-report=<filename> to see details) [checkersReport]
+

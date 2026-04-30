@@ -74,3 +74,21 @@ Adopt the uploaded paper-light, engineered design direction as the canonical des
 - `src/settings/web/` remains framework-free and schema-driven.
 - `engineering/macos-roadmap.md` defines macOS as a deliberate platform program, not a placeholder promise.
 - Future product claims about speed, accuracy, privacy superiority, or platform readiness still require benchmarks or implementation evidence.
+
+## ADR-0005 — Keep vendored fmt/spdlog while unblocking AppleClang 21 audit builds
+
+Date: 2026-04-30T17:03:00Z
+
+### Context
+
+Phase 0 audit build on macOS arm64 with AppleClang 21 failed inside vendored spdlog 1.14.1 / bundled fmt 10.2.1. AppleClang rejected fmt's consteval compile-time format checking with `call to consteval function ... is not a constant expression`. Replacing bundled fmt with a Homebrew/system fmt would add dependency drift and violate the current vendored dependency model.
+
+### Decision
+
+For AppleClang 21+ on macOS only, define `FMT_CONSTEVAL=` on the vendored spdlog targets after `add_subdirectory(deps/spdlog)`. Keep `SPDLOG_FMT_EXTERNAL=OFF`, keep bundled fmt, and avoid changing Linux behavior or adding runtime dependencies.
+
+### Consequences
+
+- macOS audit builds pass with the current vendored dependency set.
+- fmt's consteval keyword path is disabled only for affected AppleClang builds; runtime formatting and dependency topology are unchanged.
+- This should be revisited when spdlog/fmt submodules are intentionally upgraded.
