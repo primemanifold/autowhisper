@@ -619,3 +619,12 @@ Boundaries:
 - The setup helper opens the relevant macOS privacy panes and requests microphone/TCC prompts, but users may still need to manually toggle permissions in System Settings and relaunch after granting them.
 Next:
 - Commit on `primeodin/macos-first-run-onboarding`, push, open PR to `core`, and monitor CI.
+
+## 2026-05-01T21:07:32Z — macOS downloaded release install reproduction and 0.7.1 release-prep evidence
+
+- Reproduced the public `v0.7.0` macOS ZIP from GitHub release with a fresh download/unzip install-style flow.
+- Evidence from clean HOME first run: Gatekeeper accepted the app, but first run exited `1`, did not create `~/.config/autowhisper/config.toml`, and stopped on missing `distil-small.en` before onboarding/setup. This matches user report that the downloaded app appears not to open and setup is unclear.
+- Verified the existing first-run onboarding branch fix locally as `0.7.1`: clean HOME app-bundle launch exited `0`, created writable user config, and routed the missing-model failure to setup/onboarding instead of silent/non-zero failure.
+- Captured browser screenshot evidence report at `/Users/odin-mac-730/.hermes/cache/screenshots/browser_screenshot_3ac93a4b7b304f3a9e72cc8d083adcef.png`; source report is `/tmp/autowhisper-install-screenshots/report.html`.
+- Release-prep changes added on the onboarding branch: bumped CMake version to `0.7.1`, added `CHANGELOG.md` 0.7.1 notes, and updated static website download references/tests from `v0.7.0` to `v0.7.1`.
+- Local gates after release-prep passed: CMake configure/build app bundle, static tests `27/27`, CTest `117/117`, `scripts/macos_app_smoke.sh`, `git diff --check`, app bundle plist version `0.7.1`, and CLI `--version` `0.7.1`.

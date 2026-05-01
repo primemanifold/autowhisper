@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.1 — 2026-05-01
+
+### Fixed
+- macOS installed-app first run now opens the native setup helper instead of silently exiting when required setup is missing, such as the default `distil-small.en` model.
+- App-bundle launch now creates/copies a writable user config at `~/.config/autowhisper/config.toml` so installed builds are not dependent on the repository checkout.
+- Native setup helper now presents first-run actions for model download and macOS permissions: Microphone, Input Monitoring, and Accessibility.
+
+### Validation
+- Reproduced the shipped `v0.7.0` ZIP from a fresh release download: Gatekeeper accepted, but clean first run exited `1`, created no user config, and stopped on missing `distil-small.en` without onboarding.
+- Verified the fixed app-bundle first run on a clean HOME: exit `0`, user config created, and missing-model failure routed to setup/onboarding.
+- Captured local screenshot-style evidence report for the broken download and fixed branch comparison.
+
 ## 0.7.0 — 2026-05-01
 
 ### Added
