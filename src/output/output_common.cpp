@@ -1,134 +1,131 @@
 #include "output/output.h"
-#include "util/subprocess.h"
 
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <thread>
 #include <chrono>
+#include <thread>
 
 namespace autowhisper {
 
-void OutputManager::initialize() {
-    xdotool_available_ = command_exists("xdotool");
-    xclip_available_ = command_exists("xclip");
+OutputManager::OutputManager(const OutputConfig& config)
+    : config_(config), platform_(make_platform_output()) {}
 
-    spdlog::info("Output methods: xdotool={}, xclip={}", xdotool_available_, xclip_available_);
+OutputManager::OutputManager(const OutputConfig& config,
+                             std::unique_ptr<PlatformOutput> platform)
+    : config_(config), platform_(std::move(platform)) {}
+
+OutputManager::~OutputManager() = default;
+
+void OutputManager::initialize() {
+    if (platform_) {
+        platform_->initialize();
+        spdlog::info("Output platform: {} (post_events={}, clipboard={})",
+                     platform_->name(),
+                     platform_->can_post_events(),
+                     platform_->can_copy_to_clipboard());
+    } else {
+        spdlog::error("Output: no platform implementation available");
+    }
 }
 
 bool OutputManager::inject(const std::string& text) {
     if (text.empty()) {
         spdlog::debug("Empty text, skipping injection");
+        last_outcome_ = Outcome::NOOP_EMPTY;
         return true;
     }
 
-    // Apply transformations
-    std::string processed = text;
-
-    if (config_.lowercase) {
-        std::transform(processed.begin(), processed.end(), processed.begin(), ::tolower);
+    if (!platform_) {
+        last_outcome_ = Outcome::FAILED;
+        return false;
     }
 
+    std::string processed = text;
+    if (config_.lowercase) {
+        std::transform(processed.begin(), processed.end(),
+                       processed.begin(), ::tolower);
+    }
     if (config_.ending_action == "newline") {
         processed += "\n";
     }
 
-    // Try injection methods
-    if (config_.method == "inject") {
-        // Also copy to clipboard if enabled
-        if (config_.also_copy_to_clipboard) {
-            copy_to_clipboard(processed);
+    const bool post_events = platform_->can_post_events();
+
+    // Strategy:
+    //   1) method=="inject" + post_events: try platform inject; if it fails,
+    //      fall through to clipboard path.
+    //   2) method=="inject" + !post_events: degraded — clipboard only (no
+    //      auto-paste, no return-key — they would all fail).
+    //   3) method=="clipboard": clipboard path as before.
+    //
+    // Rationale (codex #4): when post-event access is denied, direct inject,
+    // cmd+v paste, and synthesized return-key all share the same permission.
+    // The only real degraded mode is "copy to clipboard and tell the user."
+
+    if (config_.method == "inject" && post_events) {
+        if (config_.also_copy_to_clipboard && platform_->can_copy_to_clipboard()) {
+            platform_->copy_to_clipboard(processed);
         }
 
-        // Try platform-native injection first
-        if (inject_platform(processed)) {
-            if (config_.ending_action == "return_key") {
-                send_return_key();
-            }
-            return true;
-        }
+        if (deliver_inject(processed)) return true;
 
-        // Fall back to xdotool
-        if (xdotool_available_ && inject_xdotool(processed)) {
-            if (config_.ending_action == "return_key") {
-                send_return_key();
-            }
-            return true;
-        }
-
-        spdlog::warn("Direct injection failed, falling back to clipboard");
+        spdlog::warn("Platform inject failed; falling back to clipboard");
     }
 
-    // Clipboard method (or fallback)
-    bool result = inject_clipboard(processed);
-    if (result && config_.ending_action == "return_key") {
-        send_return_key();
-    }
-    return result;
+    // Clipboard path (degraded or explicitly requested).
+    return deliver_clipboard(processed, post_events);
 }
 
-bool OutputManager::inject_xdotool(const std::string& text) {
-    auto result = run_command({"xdotool", "type", "--clearmodifiers", "--", text}, 10);
-    if (result.exit_code == 0) {
-        spdlog::debug("Injected {} characters via xdotool", text.size());
-        return true;
+bool OutputManager::deliver_inject(const std::string& text) {
+    if (!platform_->inject(text)) {
+        return false;
     }
-    spdlog::warn("xdotool failed: {}", result.stderr_str);
-    return false;
-}
-
-bool OutputManager::copy_to_clipboard(const std::string& text) {
-    if (xclip_available_) {
-        auto result = run_command_with_input({"xclip", "-selection", "clipboard"}, text, 5);
-        if (result.exit_code == 0) {
-            spdlog::debug("Copied {} characters to clipboard", text.size());
-            return true;
-        }
-        spdlog::warn("xclip failed");
-    } else {
-        // Try xsel as fallback
-        auto result = run_command_with_input({"xsel", "--clipboard", "--input"}, text, 5);
-        if (result.exit_code == 0) {
-            spdlog::debug("Copied {} characters to clipboard via xsel", text.size());
-            return true;
-        }
+    if (config_.ending_action == "return_key") {
+        platform_->send_return_key();
     }
-    spdlog::warn("Clipboard copy failed");
-    return false;
-}
-
-bool OutputManager::inject_clipboard(const std::string& text) {
-    if (!copy_to_clipboard(text)) return false;
-
-    if (config_.auto_paste) {
-        std::this_thread::sleep_for(
-            std::chrono::milliseconds(static_cast<int>(config_.paste_delay * 1000)));
-        return send_paste();
-    }
+    last_outcome_ = Outcome::INJECTED;
     return true;
 }
 
-bool OutputManager::send_paste() {
-    if (xdotool_available_) {
-        auto result = run_command({"xdotool", "key", "--clearmodifiers", "ctrl+v"}, 5);
-        return result.exit_code == 0;
+bool OutputManager::deliver_clipboard(const std::string& text, bool post_events_allowed) {
+    if (!platform_->can_copy_to_clipboard()) {
+        spdlog::warn("Clipboard not available on this platform");
+        last_outcome_ = Outcome::FAILED;
+        return false;
     }
-    spdlog::warn("Cannot send paste: xdotool not available");
-    return false;
-}
 
-bool OutputManager::send_return_key() {
-    if (xdotool_available_) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-        auto result = run_command({"xdotool", "key", "--clearmodifiers", "Return"}, 5);
-        if (result.exit_code == 0) {
-            spdlog::debug("Sent Return keypress via xdotool");
-            return true;
-        }
-        spdlog::warn("xdotool key Return failed: {}", result.stderr_str);
+    if (!platform_->copy_to_clipboard(text)) {
+        spdlog::warn("Clipboard copy failed");
+        last_outcome_ = Outcome::FAILED;
+        return false;
     }
-    spdlog::warn("Cannot send Return key: xdotool not available");
-    return false;
+
+    if (!config_.auto_paste || !post_events_allowed) {
+        // Degraded mode: copied only. The caller/daemon is responsible for
+        // surfacing this to the user via tray state + feedback tone.
+        spdlog::info("Transcript copied to clipboard (no auto-paste: "
+                     "auto_paste={}, post_events_allowed={})",
+                     config_.auto_paste, post_events_allowed);
+        last_outcome_ = Outcome::CLIPBOARD_ONLY;
+        return true;
+    }
+
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(static_cast<int>(config_.paste_delay * 1000)));
+
+    if (!platform_->send_paste()) {
+        spdlog::warn("Auto-paste failed after clipboard copy");
+        last_outcome_ = Outcome::CLIPBOARD_ONLY;
+        return false;
+    }
+
+    if (config_.ending_action == "return_key") {
+        platform_->send_return_key();
+    }
+
+    last_outcome_ = Outcome::CLIPBOARD_PASTED;
+    return true;
 }
 
 } // namespace autowhisper

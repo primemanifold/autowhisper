@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config/config.h"
+#include "output/platform_output.h"
 
 #include <memory>
 #include <string>
@@ -9,7 +10,13 @@ namespace autowhisper {
 
 class OutputManager {
 public:
+    // Production ctor: owns a real PlatformOutput from make_platform_output().
     explicit OutputManager(const OutputConfig& config);
+
+    // Test ctor: inject a fake PlatformOutput.
+    OutputManager(const OutputConfig& config,
+                  std::unique_ptr<PlatformOutput> platform);
+
     ~OutputManager();
 
     OutputManager(const OutputManager&) = delete;
@@ -18,21 +25,23 @@ public:
     void initialize();
     bool inject(const std::string& text);
 
+    // Exposed for observability; returns the last outcome of inject().
+    enum class Outcome {
+        INJECTED,          // Direct synthesized-input typing succeeded.
+        CLIPBOARD_PASTED,  // Clipboard + paste succeeded.
+        CLIPBOARD_ONLY,    // Copied to clipboard, no auto-paste (degraded mode).
+        FAILED,            // Could not deliver text.
+        NOOP_EMPTY,        // text was empty.
+    };
+    Outcome last_outcome() const { return last_outcome_; }
+
 private:
     OutputConfig config_;
-    bool xdotool_available_ = false;
-    bool xclip_available_ = false;
+    std::unique_ptr<PlatformOutput> platform_;
+    Outcome last_outcome_ = Outcome::NOOP_EMPTY;
 
-    // Platform-specific implementation
-    struct Impl;
-    std::unique_ptr<Impl> impl_;
-
-    bool inject_platform(const std::string& text);
-    bool inject_xdotool(const std::string& text);
-    bool copy_to_clipboard(const std::string& text);
-    bool inject_clipboard(const std::string& text);
-    bool send_paste();
-    bool send_return_key();
+    bool deliver_inject(const std::string& text);
+    bool deliver_clipboard(const std::string& text, bool post_events_allowed);
 };
 
 } // namespace autowhisper

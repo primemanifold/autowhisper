@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <thread>
+#include <unistd.h>
 
 namespace fs = std::filesystem;
 using namespace autowhisper::settings;

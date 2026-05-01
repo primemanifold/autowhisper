@@ -129,7 +129,12 @@ void launch_xdg_open(const std::string& url) {
                 ::dup2(devnull, 0); ::dup2(devnull, 1); ::dup2(devnull, 2);
                 if (devnull > 2) ::close(devnull);
             }
+#if defined(__APPLE__)
+            // macOS: `open` delegates to LaunchServices (default browser).
+            ::execlp("open", "open", url.c_str(), (char*)nullptr);
+#else
             ::execlp("xdg-open", "xdg-open", url.c_str(), (char*)nullptr);
+#endif
             ::_exit(127);
         }
         ::_exit(0);

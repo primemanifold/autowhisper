@@ -84,7 +84,7 @@ TrayManager::TrayManager(bool enabled, QuitCallback on_quit,
     : enabled_(enabled),
       on_quit_(std::move(on_quit)),
       config_path_(config_path),
-      impl_(std::make_unique<Impl>()) {
+      impl_(std::make_shared<Impl>()) {
     impl_->manager = this;
 
 #if !defined(HAVE_AYATANA_APPINDICATOR) && !defined(HAVE_APPINDICATOR)
