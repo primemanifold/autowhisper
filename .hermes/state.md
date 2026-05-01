@@ -372,3 +372,29 @@ Blocked on:
 - Windows runtime E2E remains gated on a real Windows host, VM, or proven Wine-capable x86_64 runner.
 Next:
 - Push the reconciled desktop branch, open/merge its PR into `core`, then sync local `core` cleanly.
+
+
+## Run 2026-05-01T11:39:38Z
+Phase: PR landing complete
+Hats used: Engineering, CEO
+Shipped:
+- Merged PR #5 (`macos-port`) into `core` via squash merge.
+- Reconciled `primeodin/desktop-platform-foundation` with updated `core`, fixed Windows cross-build regressions from the platform abstraction merge, and pushed branch commit `95ee3d5a7f11c850556ce9cfdb0d1a54a4d03031`.
+- Opened PR #6 (`feat(desktop): add platform readiness foundation`) and merged it into `core` via squash after hosted GitHub `build` passed.
+Verification before merge:
+- Native macOS CTest: `117/117` passed.
+- Static settings UI tests: `11/11` passed.
+- `node --check src/settings/web/app.js` passed.
+- `git diff --check` passed.
+- Docker desktop smoke passed: Linux focused tests `31/31`; Windows MinGW cross-build produced PE32+ `autowhisper.exe` and `autowhisper_tests.exe`.
+- Independent review found Windows doctor readiness fail-open; fixed by making the Windows runtime-not-implemented diagnostic a `FAIL`, not a `WARN`.
+Remote state:
+- `origin/core` is at `7a3b3c1 feat(desktop): add platform readiness foundation (#6)`.
+- No open GitHub PRs were left after #6 merged.
+Local cleanup:
+- Local `core` was reset to `origin/core` after GitHub squash merge to avoid preserving pre-squash divergent branch history.
+- Generated build directories were removed.
+Remaining boundary:
+- Windows runtime E2E is still not claimed; it requires a Windows host, VM, or proven Wine-capable x86_64 runner.
+Next:
+- Start the next focused production slice from clean `core` (recommended: macOS permission/onboarding or menu-bar polish gate).
