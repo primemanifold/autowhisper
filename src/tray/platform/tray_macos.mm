@@ -121,17 +121,18 @@ void TrayManager::start() {
                 }
             }
             if (exe) {
+                NSString* helper = [[exe stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"AutoWhisperSettings"];
                 NSTask* task = [[NSTask alloc] init];
-                task.executableURL = [NSURL fileURLWithPath:exe];
-                NSMutableArray* args = [NSMutableArray arrayWithObjects:@"config", @"ui", nil];
+                task.executableURL = [NSURL fileURLWithPath:helper];
+                NSMutableArray* args = [NSMutableArray array];
                 if (!config_path.empty()) {
-                    [args addObject:@"-c"];
+                    [args addObject:@"--config"];
                     [args addObject:[NSString stringWithUTF8String:config_path.c_str()]];
                 }
                 task.arguments = args;
                 NSError* err = nil;
                 [task launchAndReturnError:&err];
-                if (err) spdlog::warn("Tray: failed to launch settings UI: {}",
+                if (err) spdlog::warn("Tray: failed to launch native settings: {}",
                                       err.localizedDescription.UTF8String);
             }
         };

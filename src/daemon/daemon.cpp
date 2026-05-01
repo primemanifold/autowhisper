@@ -18,6 +18,7 @@ namespace autowhisper {
 // Defined in daemon_macos.mm. Kept outside this TU so we don't need to
 // compile daemon.cpp as Objective-C++ on mac.
 void aw_macos_setup_signals(std::atomic<bool>* shutdown_flag);
+void aw_macos_teardown_signals();
 void aw_macos_run_event_loop(std::function<void()> worker);
 void aw_macos_stop_event_loop();
 } // namespace autowhisper
@@ -34,6 +35,9 @@ AutoWhisperDaemon::AutoWhisperDaemon(Config config, const std::string& config_pa
     : config_(std::move(config)), config_path_(config_path) {}
 
 AutoWhisperDaemon::~AutoWhisperDaemon() {
+#if defined(__APPLE__)
+    aw_macos_teardown_signals();
+#endif
     if (g_daemon == this) g_daemon = nullptr;
 }
 

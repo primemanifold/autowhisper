@@ -14,6 +14,7 @@ namespace {
 
 dispatch_source_t g_sigint_src  = nullptr;
 dispatch_source_t g_sigterm_src = nullptr;
+std::atomic<bool>* g_shutdown_flag = nullptr;
 
 } // namespace
 
@@ -21,6 +22,8 @@ dispatch_source_t g_sigterm_src = nullptr;
 // queue (not in an async-signal-unsafe context), so we can safely call
 // [NSApp stop:] inside the handler.
 void aw_macos_setup_signals(std::atomic<bool>* shutdown_flag) {
+    g_shutdown_flag = shutdown_flag;
+
     // Ignore default signal disposition so dispatch can receive them.
     signal(SIGINT,  SIG_IGN);
     signal(SIGTERM, SIG_IGN);
@@ -31,7 +34,7 @@ void aw_macos_setup_signals(std::atomic<bool>* shutdown_flag) {
         dst = dispatch_source_create(DISPATCH_SOURCE_TYPE_SIGNAL, sig, 0, q);
         dispatch_source_set_event_handler(dst, ^{
             spdlog::info("Received signal {}, requesting shutdown", sig);
-            if (shutdown_flag) shutdown_flag->store(true, std::memory_order_release);
+            if (g_shutdown_flag) g_shutdown_flag->store(true, std::memory_order_release);
             if ([NSApplication sharedApplication] && NSApp) {
                 [NSApp stop:nil];
                 // Wake up NSApp.run() — stop: only unwinds after the next event.
@@ -52,6 +55,18 @@ void aw_macos_setup_signals(std::atomic<bool>* shutdown_flag) {
 
     install(SIGINT,  g_sigint_src);
     install(SIGTERM, g_sigterm_src);
+}
+
+void aw_macos_teardown_signals() {
+    auto cancel = [](__strong dispatch_source_t& src) {
+        if (src) {
+            dispatch_source_cancel(src);
+            src = nullptr;
+        }
+    };
+    cancel(g_sigint_src);
+    cancel(g_sigterm_src);
+    g_shutdown_flag = nullptr;
 }
 
 // Run the AppKit event loop on the current (main) thread, with the caller's

@@ -10,6 +10,11 @@ INSTALL = ROOT / "platform" / "macos" / "install.sh"
 SMOKE = ROOT / "scripts" / "macos_app_smoke.sh"
 MAIN_CPP = ROOT / "src" / "main.cpp"
 CONFIG_CPP = ROOT / "src" / "config" / "config.cpp"
+TRAY_MACOS = ROOT / "src" / "tray" / "platform" / "tray_macos.mm"
+DAEMON_CPP = ROOT / "src" / "daemon" / "daemon.cpp"
+DAEMON_MACOS = ROOT / "src" / "daemon" / "daemon_macos.mm"
+HOTKEY_MACOS = ROOT / "src" / "hotkey" / "platform" / "hotkey_macos.mm"
+SWIFT_SETTINGS = ROOT / "platform" / "macos" / "SettingsApp.swift"
 
 
 class MacOSAppBundleAssetsTest(unittest.TestCase):
@@ -69,6 +74,54 @@ class MacOSAppBundleAssetsTest(unittest.TestCase):
             r"get_user_config_path\(\),[\s\S]+bundled_config",
             "A double-clicked app has no repo cwd, so config lookup must fall back to the bundled default after user config",
         )
+
+    def test_open_settings_uses_native_swiftui_helper_not_browser_ui(self):
+        cmake = BUNDLE_CMAKE.read_text(encoding="utf-8")
+        tray = TRAY_MACOS.read_text(encoding="utf-8")
+        self.assertTrue(SWIFT_SETTINGS.exists(), "Open Settings should launch a native SwiftUI helper window, not a browser tab")
+        swift = SWIFT_SETTINGS.read_text(encoding="utf-8")
+        for snippet in [
+            "import SwiftUI",
+            "AutoWhisperSettingsApp",
+            "SettingsView",
+            "ConfigStore",
+            "--config",
+        ]:
+            self.assertIn(snippet, swift)
+        self.assertNotIn("WebView", swift)
+        self.assertNotIn("WKWebView", swift)
+        self.assertIn("AUTOWHISPER_SETTINGS_HELPER", cmake)
+        self.assertIn("AUTOWHISPER_SWIFT_TARGET", cmake)
+        self.assertIn('-target "${AUTOWHISPER_SWIFT_TARGET}"', cmake)
+        self.assertIn("swiftc", cmake)
+        self.assertIn("AutoWhisperSettings", cmake)
+        self.assertIn('"${AUTOWHISPER_MACOS_DIR}/AutoWhisperSettings"', cmake)
+        self.assertIn("codesign --force", cmake)
+        self.assertRegex(cmake, r"codesign --force[\s\S]+AutoWhisperSettings")
+        self.assertIn("AutoWhisperSettings", tray)
+        self.assertIn('@"--config"', tray)
+        self.assertNotIn('@"config", @"ui"', tray)
+        self.assertNotIn("Grid(", swift)
+
+    def test_macos_signal_sources_do_not_capture_stack_shutdown_pointer(self):
+        daemon_cpp = DAEMON_CPP.read_text(encoding="utf-8")
+        daemon_macos = DAEMON_MACOS.read_text(encoding="utf-8")
+        self.assertIn("aw_macos_teardown_signals", daemon_cpp)
+        self.assertIn("aw_macos_teardown_signals", daemon_macos)
+        self.assertIn("g_shutdown_flag", daemon_macos)
+        self.assertIn("g_shutdown_flag = shutdown_flag", daemon_macos)
+        self.assertIn("g_shutdown_flag = nullptr", daemon_macos)
+        self.assertNotIn("if (shutdown_flag) shutdown_flag->store", daemon_macos)
+
+    def test_macos_hotkey_event_tap_is_released_on_listener_thread(self):
+        hotkey_macos = HOTKEY_MACOS.read_text(encoding="utf-8")
+        self.assertIn("CFRunLoopRemoveSource(impl_->run_loop", hotkey_macos)
+        self.assertIn("CFRelease(impl_->src)", hotkey_macos)
+        self.assertRegex(
+            hotkey_macos,
+            r"CFRunLoopRun\(\);[\s\S]+CFRunLoopRemoveSource\(impl_->run_loop[\s\S]+CFRelease\(impl_->src\)",
+        )
+        self.assertIn("listener thread releases the event tap", hotkey_macos)
 
     def test_entitlements_are_minimal_and_audio_focused(self):
         entitlements = ENTITLEMENTS.read_text(encoding="utf-8")

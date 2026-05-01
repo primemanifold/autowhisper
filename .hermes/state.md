@@ -494,3 +494,33 @@ Blocked on:
 - Launchpad/PPA upload remains subject to the previously observed FTP connectivity issue.
 Next:
 - Retag/recreate the v0.7.0 release and verify the release-event CI passes.
+
+## Run 2026-05-01T17:20:00Z
+Phase: v0.7.0 native settings helper follow-up
+Hats used: Engineering, CEO
+Shipped:
+- [HAT: Engineering] Added a native SwiftUI `AutoWhisperSettings` helper inside the macOS app bundle and changed the menu-bar Settings action to launch it instead of the embedded browser UI.
+- [HAT: Engineering] Bundled/signs the helper alongside the main app and added static regression coverage for the native-settings path.
+- [HAT: CEO] Treat this as a release-polish follow-up for the v0.7.0 macOS `.app` artifact, not a broad settings-system rewrite.
+Verification:
+- Passed `python3 -m unittest tests.static.test_macos_app_bundle_assets -v`.
+- Passed `swiftc -typecheck -framework SwiftUI -framework AppKit platform/macos/SettingsApp.swift`.
+- Passed `cmake --build build-macos-app-gate -j$(sysctl -n hw.ncpu || echo 2)` with `TMPDIR=/tmp/autowhisper-build-tmp`.
+Blocked on:
+- PPA upload still fails from GitHub-hosted runner with `[Errno 101] Network is unreachable` reaching Launchpad FTP; the release asset/tag path is separate and healthy.
+Next:
+- Run full local gates, rebuild Developer ID artifact with helper included, notarize/staple/assess, update the v0.7.0 release asset, and verify hosted CI.
+
+## Run 2026-05-01T17:25:00Z
+Phase: native settings helper review fix
+Hats used: Engineering
+Shipped:
+- [HAT: Engineering] Fixed pre-commit review blockers before shipping the native settings helper: `swiftc` now receives the configured macOS deployment target, and the SwiftUI view avoids macOS 13-only `Grid` so the helper remains compatible with the app's macOS 12.0 target.
+- [HAT: Engineering] Hardened hotkey array TOML serialization by stripping single quotes from comma-separated tokens before writing.
+Verification:
+- Passed `swiftc -typecheck -target arm64-apple-macos12.0 -framework SwiftUI -framework AppKit platform/macos/SettingsApp.swift`.
+- Rebuilt default app bundle; `otool -l` showed `AutoWhisperSettings` helper `minos 12.0`.
+- Passed `python3 -m unittest tests.static.test_macos_app_bundle_assets -v` after adding static coverage for the Swift target flag and macOS 13-only `Grid` exclusion.
+- Passed `git diff --check`.
+Next:
+- Run full local gates, commit/push, update tag/release asset, and verify hosted checks.

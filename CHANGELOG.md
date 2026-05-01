@@ -9,6 +9,7 @@
 - Bundled default `config.toml` fallback so double-clicked app launches do not depend on repository working directory.
 - Finder/LaunchServices launch handling so `AutoWhisper.app` starts the foreground daemon path when launched without a CLI subcommand.
 - Developer ID signing, notarization, stapling, and Gatekeeper acceptance proof for the macOS `.app` artifact.
+- Native SwiftUI settings helper bundled inside `AutoWhisper.app`, launched from the menu-bar Settings action instead of opening the browser UI.
 
 ### Changed
 - macOS bundle signing now uses a secure timestamp for Developer ID distribution readiness.

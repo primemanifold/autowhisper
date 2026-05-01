@@ -35,13 +35,33 @@ endif()
 set(AUTOWHISPER_INFO_PLIST_IN  "${CMAKE_SOURCE_DIR}/platform/macos/Info.plist.in")
 set(AUTOWHISPER_INFO_PLIST_OUT "${AUTOWHISPER_BUNDLE_DIR}/Contents/Info.plist")
 set(AUTOWHISPER_ENTITLEMENTS   "${CMAKE_SOURCE_DIR}/platform/macos/entitlements.plist")
+set(AUTOWHISPER_SETTINGS_SWIFT "${CMAKE_SOURCE_DIR}/platform/macos/SettingsApp.swift")
+set(AUTOWHISPER_SETTINGS_HELPER "${CMAKE_BINARY_DIR}/AutoWhisperSettings")
+find_program(AUTOWHISPER_SWIFTC swiftc REQUIRED)
+set(AUTOWHISPER_SWIFT_TARGET "${CMAKE_SYSTEM_PROCESSOR}-apple-macos${CMAKE_OSX_DEPLOYMENT_TARGET}")
+
+add_custom_command(
+    OUTPUT "${AUTOWHISPER_SETTINGS_HELPER}"
+    COMMAND "${AUTOWHISPER_SWIFTC}"
+            -O
+            -target "${AUTOWHISPER_SWIFT_TARGET}"
+            -framework SwiftUI
+            -framework AppKit
+            "${AUTOWHISPER_SETTINGS_SWIFT}"
+            -o "${AUTOWHISPER_SETTINGS_HELPER}"
+    DEPENDS "${AUTOWHISPER_SETTINGS_SWIFT}"
+    VERBATIM
+)
+add_custom_target(autowhisper_settings_helper DEPENDS "${AUTOWHISPER_SETTINGS_HELPER}")
 
 add_custom_target(autowhisper_bundle ALL
-    DEPENDS autowhisper
+    DEPENDS autowhisper autowhisper_settings_helper
     COMMAND ${CMAKE_COMMAND} -E make_directory "${AUTOWHISPER_MACOS_DIR}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${AUTOWHISPER_RESOURCES_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:autowhisper>" "${AUTOWHISPER_MACOS_DIR}/autowhisper"
+    COMMAND ${CMAKE_COMMAND} -E copy
+            "${AUTOWHISPER_SETTINGS_HELPER}" "${AUTOWHISPER_MACOS_DIR}/AutoWhisperSettings"
     COMMAND ${CMAKE_COMMAND} -E copy
             "${CMAKE_SOURCE_DIR}/config.toml" "${AUTOWHISPER_RESOURCES_DIR}/config.toml"
     COMMAND ${CMAKE_COMMAND}
@@ -50,6 +70,11 @@ add_custom_target(autowhisper_bundle ALL
             -DINPUT=${AUTOWHISPER_INFO_PLIST_IN}
             -DOUTPUT=${AUTOWHISPER_INFO_PLIST_OUT}
             -P "${CMAKE_SOURCE_DIR}/cmake/RenderInfoPlist.cmake"
+    COMMAND codesign --force
+            --sign "${AUTOWHISPER_SIGN_IDENTITY}"
+            --options runtime
+            --timestamp
+            "${AUTOWHISPER_MACOS_DIR}/AutoWhisperSettings"
     COMMAND codesign --force
             --sign "${AUTOWHISPER_SIGN_IDENTITY}"
             --options runtime
