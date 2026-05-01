@@ -524,3 +524,23 @@ Verification:
 - Passed `git diff --check`.
 Next:
 - Run full local gates, commit/push, update tag/release asset, and verify hosted checks.
+
+## Run 2026-05-01T17:38:00Z
+Phase: v0.7.0 shipped
+Hats used: Engineering, CEO
+Shipped:
+- [HAT: Engineering] Landed macOS app-bundle release work on `core` through PR #7 and follow-up commits.
+- [HAT: Engineering] Published GitHub release `v0.7.0` with `AutoWhisper-macOS-v0.7.0.zip` and checksum asset.
+- [HAT: Engineering] Rebuilt the Developer ID artifact after adding the native SwiftUI settings helper, notarized it, stapled it, validated the staple, and confirmed Gatekeeper accepted it as `source=Notarized Developer ID`.
+- [HAT: Engineering] Verified the bundled `AutoWhisperSettings` helper is built with macOS `minos 12.0`.
+Verification:
+- Local full gate passed: default macOS bundle build, app smoke, `ctest` 117/117, Python static tests 20/20, `node --check`, Swift type-check for macOS 12 target, and `git diff --check`.
+- Hosted GitHub CI on `core` for commit `2578e61` passed.
+- Hosted release-event CI for the recreated `v0.7.0` release passed.
+- PPA workflow builds/signs but Launchpad upload fails from GitHub-hosted runner with network unreachable to `ppa.launchpad.net`; this is recorded as release infrastructure follow-up, not a macOS artifact blocker.
+Boundaries:
+- macOS artifact proof covers Developer ID signing, Apple notarization acceptance, stapling, staple validation, and Gatekeeper acceptance for the zipped `.app` release asset.
+- This is still not a final DMG/PKG installer, auto-update, or full hotkey→record→transcribe→insert product acceptance pass.
+Next:
+- Fix or rerun Launchpad/PPA upload outside the blocked FTP path.
+- Add installer UX and end-to-end macOS dictation acceptance testing in the next release slice.
