@@ -36,12 +36,14 @@ set(AUTOWHISPER_INFO_PLIST_IN  "${CMAKE_SOURCE_DIR}/platform/macos/Info.plist.in
 set(AUTOWHISPER_INFO_PLIST_OUT "${AUTOWHISPER_BUNDLE_DIR}/Contents/Info.plist")
 set(AUTOWHISPER_ENTITLEMENTS   "${CMAKE_SOURCE_DIR}/platform/macos/entitlements.plist")
 
-add_custom_target(autowhisper_bundle
+add_custom_target(autowhisper_bundle ALL
     DEPENDS autowhisper
     COMMAND ${CMAKE_COMMAND} -E make_directory "${AUTOWHISPER_MACOS_DIR}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${AUTOWHISPER_RESOURCES_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy
             "$<TARGET_FILE:autowhisper>" "${AUTOWHISPER_MACOS_DIR}/autowhisper"
+    COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_SOURCE_DIR}/config.toml" "${AUTOWHISPER_RESOURCES_DIR}/config.toml"
     COMMAND ${CMAKE_COMMAND}
             -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
             -DPROJECT_VERSION=${PROJECT_VERSION}
@@ -52,8 +54,9 @@ add_custom_target(autowhisper_bundle
             --sign "${AUTOWHISPER_SIGN_IDENTITY}"
             --options runtime
             --entitlements "${AUTOWHISPER_ENTITLEMENTS}"
-            --timestamp=none
-            "${AUTOWHISPER_BUNDLE_DIR}" || echo "codesign failed (ignored for dev)"
+            --timestamp
+            "${AUTOWHISPER_BUNDLE_DIR}"
+    COMMAND codesign --verify --deep --strict "${AUTOWHISPER_BUNDLE_DIR}"
     COMMAND ${CMAKE_COMMAND} -E echo "AutoWhisper.app built at ${AUTOWHISPER_BUNDLE_DIR}"
     VERBATIM
 )

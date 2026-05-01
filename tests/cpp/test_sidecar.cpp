@@ -95,15 +95,18 @@ TEST_CASE("sidecar_path_for uses XDG_RUNTIME_DIR when set", "[sidecar]") {
     else unset_env_var("XDG_RUNTIME_DIR");
 }
 
-TEST_CASE("sidecar_path_for falls back to /tmp with UID when no XDG", "[sidecar]") {
+TEST_CASE("sidecar_path_for falls back to writable temp dir with user suffix when no XDG", "[sidecar]") {
     const char* saved = std::getenv("XDG_RUNTIME_DIR");
     unset_env_var("XDG_RUNTIME_DIR");
 
     auto p = sidecar_path_for("/x.toml");
-#if defined(_WIN32)
     CHECK(p.find("autowhisper-settings-") != std::string::npos);
+    CHECK(p.ends_with(".info"));
+#if defined(_WIN32)
+    CHECK(p.find(stable_temp_dir().string()) != std::string::npos);
 #else
-    CHECK(p.find("/tmp/autowhisper-settings-") == 0);
+    std::error_code ec;
+    CHECK(fs::weakly_canonical(fs::path(p).parent_path(), ec) == fs::weakly_canonical(stable_temp_dir(), ec));
     CHECK(p.find("-" + std::to_string(::getuid()) + "-") != std::string::npos);
 #endif
 

@@ -172,7 +172,7 @@ jobs:
 
             ### Changes
 
-            See [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+            See [CHANGELOG](https://github.com/${{ github.repository }}/blob/core/CHANGELOG.md) for details.
 
             ---
             *Package uploaded to [Launchpad PPA](https://launchpad.net/~primemanifold/+archive/ubuntu/autowhisper)*

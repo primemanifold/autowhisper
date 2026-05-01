@@ -398,3 +398,66 @@ Remaining boundary:
 - Windows runtime E2E is still not claimed; it requires a Windows host, VM, or proven Wine-capable x86_64 runner.
 Next:
 - Start the next focused production slice from clean `core` (recommended: macOS permission/onboarding or menu-bar polish gate).
+
+## 2026-05-01 12:59 UTC — macOS app bundle gate built and verified
+
+[HAT: Engineering] On branch `primeodin/macos-app-bundle-gate`, made the existing `autowhisper_bundle` target part of the default macOS build so a normal `cmake --build <build-dir>` emits `AutoWhisper.app`. The bundle target now ad-hoc signs by default and verifies the signature fail-closed with `codesign --verify --deep --strict`.
+
+[HAT: Engineering] Added `NSAppleEventsUsageDescription` alongside the existing microphone purpose string, plus `scripts/macos_app_smoke.sh` and `tests/static/test_macos_app_bundle_assets.py` to keep the bundle contract covered. Fixed the stale sidecar fallback test to match the portable temp-directory contract on macOS instead of assuming literal `/tmp`.
+
+[HAT: Engineering] Local verification passed: `cmake --build build-macos-app-gate`, `BUILD_DIR="$PWD/build-macos-app-gate" scripts/macos_app_smoke.sh`, `ctest --test-dir build-macos-app-gate --output-on-failure` (117/117), `python3 -m unittest tests.static.test_settings_design_assets tests.static.test_macos_app_bundle_assets -v` (16/16), `node --check src/settings/web/app.js`, and `git diff --check`. App proof: `build-macos-app-gate/AutoWhisper.app/Contents/MacOS/autowhisper` is a universal Mach-O binary (`x86_64` + `arm64`), `Info.plist` has bundle id `us.primemanifold.autowhisper`, `LSUIElement=true`, microphone and Apple Events purpose strings, and `codesign --verify --deep --strict` passes.
+
+[HAT: Engineering] Additional signing check after user clarified development signing access: the active keychains expose a valid `Apple Development: [REDACTED]` identity, and `build-macos-app-devsign` successfully produced an Apple Development-signed `AutoWhisper.app` with hardened runtime. `codesign --display --verbose=4` reported authority chain `Apple Development` → `Apple Worldwide Developer Relations Certification Authority` → `Apple Root CA`, team id `[REDACTED]`, and `codesign --verify --deep --strict` passed via the smoke script. `spctl --assess` still rejects this local development build, which is expected without a notarized Developer ID release signature.
+
+[HAT: CEO] Proof boundary: this establishes host-local macOS `.app` bundle build/smoke proof and Apple Development signing proof. It still does not establish Developer ID Application distribution signing, notarization, DMG/PKG distribution, permission-onboarding UX, LaunchAgent install smoke, or real end-to-end hotkey→record→transcribe→insert runtime proof. At that point the active keychains showed Apple Development signing identity only; `Developer ID Application` private-key identity was not visible yet.
+
+## Run 2026-05-01T14:35:50Z
+Phase: macOS Developer ID signing proof
+Hats used: Engineering
+Shipped:
+- Verified a valid `Developer ID Application` code-signing identity is now visible in the active macOS keychains. Certificate fingerprints and identity details are treated as credentials and redacted from summaries.
+- Built `AutoWhisper.app` in `build-macos-app-devid` with `-DAUTOWHISPER_SIGN_IDENTITY` set to the local Developer ID Application identity.
+- Verified `codesign --display --verbose=4` reports hardened runtime and the Developer ID Application authority chain.
+- Updated the macOS app smoke script wording so `spctl` evidence covers ad-hoc, Apple Development, and unnotarized Developer ID builds.
+Learned:
+- `codesign --verify --deep --strict` passes for the Developer ID-signed app.
+- `spctl --assess --type execute --verbose=4 build-macos-app-devid/AutoWhisper.app` rejects with `source=Unnotarized Developer ID`; this proves Developer ID signing exists but notarization has not been completed yet.
+Verification:
+- `security find-identity -v -p codesigning` shows one valid Developer ID Application identity, redacted.
+- `cmake -S . -B build-macos-app-devid ... -DAUTOWHISPER_SIGN_IDENTITY=<redacted Developer ID Application identity>` passed.
+- `cmake --build build-macos-app-devid` passed and emitted `build-macos-app-devid/AutoWhisper.app`.
+- `BUILD_DIR=$PWD/build-macos-app-devid scripts/macos_app_smoke.sh` passed.
+Blocked on:
+- Full Gatekeeper distribution acceptance remains blocked until the Developer ID-signed app is notarized and stapled.
+Next:
+- Add a notarization release gate using `xcrun notarytool`, then staple and re-run `spctl` to prove Gatekeeper acceptance.
+
+## Run 2026-05-01T16:30:00Z
+Phase: macOS 0.7.0 release candidate /ship
+Hats used: Engineering, CEO
+Shipped:
+- [HAT: Engineering] Inspected Channa's local changes after the Developer ID proof and preserved the intended fixes: copy `config.toml` into `AutoWhisper.app/Contents/Resources`, search that bundled config after user config on macOS, timestamp Developer ID signatures, and make Finder/LaunchServices `.app` launch synthesize the foreground `run` path instead of falling through to bare CLI help.
+- [HAT: Engineering] Hardened `.app` launch detection to tolerate LaunchServices `-psn_*` arguments and to terminate synthesized argv with a null pointer.
+- [HAT: Engineering] Added/updated static bundle regression coverage, added a top-level `CHANGELOG.md` for the v0.7.0 release, updated the Debian changelog entry, and corrected the release workflow changelog link to the repository's `core` default branch.
+- [HAT: Engineering] Rebuilt the Developer ID-signed `build-macos-app-devid/AutoWhisper.app`, submitted it to Apple notarization, stapled the ticket, and proved Gatekeeper accepts it as `source=Notarized Developer ID`.
+Learned:
+- [HAT: Engineering] A double-clicked app needs a bundled default config fallback because the process working directory is not the repository root.
+- [HAT: Engineering] Finder/LaunchServices may pass `-psn_*` arguments, so macOS app-launch detection must not depend on `argc == 1` only.
+- [HAT: Engineering] The repo's default branch is `core`; user-facing "main" release language maps to shipping into `core` unless the repository default branch changes.
+Verification:
+- GREEN: `cmake --build build-macos-app-gate -j$(sysctl -n hw.ncpu || echo 2)`.
+- GREEN: `BUILD_DIR=$PWD/build-macos-app-gate scripts/macos_app_smoke.sh`.
+- GREEN: `ctest --test-dir build-macos-app-gate --output-on-failure` — 117/117 tests.
+- GREEN: `cmake -S . -B build-macos-app-devid ... -DAUTOWHISPER_SIGN_IDENTITY=<redacted Developer ID Application identity>`.
+- GREEN: `cmake --build build-macos-app-devid -j$(sysctl -n hw.ncpu || echo 2)`.
+- GREEN: `BUILD_DIR=$PWD/build-macos-app-devid scripts/macos_app_smoke.sh`.
+- GREEN: app-run config proof from `/tmp` with empty `HOME` returned `build-macos-app-devid/AutoWhisper.app/Contents/Resources/config.toml`.
+- GREEN: `python3 -m unittest tests.static.test_settings_design_assets tests.static.test_macos_app_bundle_assets -v` — 18/18 tests.
+- GREEN: `node --check src/settings/web/app.js`.
+- GREEN: `git diff --check`.
+- GREEN: `xcrun notarytool submit ... --wait` returned `Accepted`; `xcrun stapler staple` and `xcrun stapler validate` passed; `spctl --assess --type execute --verbose=4` returned accepted with `source=Notarized Developer ID`.
+- Independent read-only review initially failed on missing `-psn_*` handling; the blocker was fixed and covered in static tests.
+Blocked on:
+- Nothing for the v0.7.0 macOS app bundle release candidate.
+Next:
+- Commit/amend this release candidate, push `primeodin/macos-app-bundle-gate`, open/merge a PR into `core`, tag `v0.7.0`, upload the notarized macOS ZIP release asset, and monitor hosted release validation.

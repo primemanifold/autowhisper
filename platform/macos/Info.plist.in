@@ -28,5 +28,7 @@
     <!-- Usage descriptions for TCC prompts. -->
     <key>NSMicrophoneUsageDescription</key>
     <string>AutoWhisper uses your microphone to transcribe speech locally. Audio never leaves this device.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>AutoWhisper may use Apple Events to open settings, logs, or hand off text safely when macOS requires explicit permission.</string>
 </dict>
 </plist>

@@ -15,6 +15,9 @@
 #include <string>
 #include <string_view>
 #include <utility>
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -90,6 +93,27 @@ bool is_allowed_enum(std::string_view section, std::string_view key, const std::
     return std::any_of(d->enum_values.begin(), d->enum_values.end(), [&](auto allowed) {
         return value == allowed;
     });
+}
+
+std::string find_bundled_config_file() {
+#if defined(__APPLE__)
+    uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);
+    if (size == 0) return {};
+
+    std::string executable_path(size, '\0');
+    if (_NSGetExecutablePath(executable_path.data(), &size) != 0) return {};
+    executable_path.resize(std::char_traits<char>::length(executable_path.c_str()));
+
+    std::error_code ec;
+    const fs::path canonical_executable = fs::weakly_canonical(executable_path, ec);
+    const fs::path path = ec ? fs::path(executable_path) : canonical_executable;
+    const fs::path resources_config = path.parent_path().parent_path() / "Resources" / "config.toml";
+    if (fs::is_regular_file(resources_config)) {
+        return resources_config.string();
+    }
+#endif
+    return {};
 }
 
 void collect_unknown_toml_issues(const toml::table& tbl, std::vector<ValidationIssue>& issues) {
@@ -444,10 +468,13 @@ void Config::save(const std::string& path) const {
 }
 
 std::string find_config_file() {
+    const std::string bundled_config = find_bundled_config_file();
+
     // Search hierarchy
     std::vector<std::string> search_paths = {
         "config.toml",
         get_user_config_path(),
+        bundled_config,
         "/etc/autowhisper/config.toml",
         "/opt/autowhisper/config.toml",
     };

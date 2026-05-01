@@ -9,7 +9,11 @@ autowhisper (0.7.0-1) noble; urgency=medium
     - AVCaptureDevice-backed microphone permission detection
     - NSMicrophoneUsageDescription in Info.plist
     - Metal inference auto-enabled via whisper.cpp (no config change)
-    - LSUIElement .app bundle with hardened runtime + ad-hoc signing
+    - LSUIElement .app bundle with hardened runtime signing, Developer ID
+      timestamping, notarization, stapling, and Gatekeeper acceptance proof
+    - Bundled config.toml fallback for double-clicked app launches outside the
+      repository working directory
+    - Finder/LaunchServices app launch defaults to foreground daemon behavior
     - Universal binary (arm64 + x86_64), deployment target macOS 12.0
   * Architectural seams for cross-platform support:
     - PlatformOutput interface (X11/macos/fake) replaces ifdef'd output
