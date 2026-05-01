@@ -628,3 +628,15 @@ Next:
 - Captured browser screenshot evidence report at `/Users/odin-mac-730/.hermes/cache/screenshots/browser_screenshot_3ac93a4b7b304f3a9e72cc8d083adcef.png`; source report is `/tmp/autowhisper-install-screenshots/report.html`.
 - Release-prep changes added on the onboarding branch: bumped CMake version to `0.7.1`, added `CHANGELOG.md` 0.7.1 notes, and updated static website download references/tests from `v0.7.0` to `v0.7.1`.
 - Local gates after release-prep passed: CMake configure/build app bundle, static tests `27/27`, CTest `117/117`, `scripts/macos_app_smoke.sh`, `git diff --check`, app bundle plist version `0.7.1`, and CLI `--version` `0.7.1`.
+
+## 2026-05-01T23:52:01Z — macOS v0.7.1 release published and public landing updated
+
+- Confirmed user report: public macOS download was still `v0.7.0` until the release artifact and landing CTAs were updated.
+- PR #10 was already merged to `core`; local `core` fast-forwarded to `093ee7a604f445e4c56e139789a3f9fef6bb321a`, with `project(autowhisper VERSION 0.7.1 ...)`.
+- Built release app at `build-macos-release-0.7.1/AutoWhisper.app` with Developer ID signing and local Xcode 26.4.1 toolchain.
+- Local gates passed before publishing: static tests `27/27`, CTest `117/117`, app smoke, codesign verification, bundle plist version `0.7.1`, and CLI `--version` `0.7.1`.
+- Created `/tmp/AutoWhisper-macOS-v0.7.1.zip` with `ditto -c -k --keepParent`, submitted to Apple notarization, received `Accepted`, stapled the app, validated the staple, recreated the ZIP from the stapled app, and verified Gatekeeper accepted as `source=Notarized Developer ID`.
+- Published GitHub release `v0.7.1` as latest with assets `AutoWhisper-macOS-v0.7.1.zip` and `.sha256`; direct URL `https://github.com/primemanifold/autowhisper/releases/download/v0.7.1/AutoWhisper-macOS-v0.7.1.zip`.
+- Verified a fresh public release download: checksum OK, plist and CLI version `0.7.1`, Gatekeeper accepted, clean-HOME first run exited `0`, and user config was created.
+- Release-event CI run `25238033133` completed success for build, build-source, and build-deb. Existing PPA workflow remains noisy/failing separately.
+- Updated public landing repo `primemanifold/autowhisper-landing` commit `968274c` so homepage and roadmap CTAs point to `v0.7.1`; GitHub Pages run `25238071749` passed and hosted homepage/roadmap returned HTTP 200 with `v0.7.1` content.
