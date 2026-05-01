@@ -544,3 +544,14 @@ Boundaries:
 Next:
 - Fix or rerun Launchpad/PPA upload outside the blocked FTP path.
 - Add installer UX and end-to-end macOS dictation acceptance testing in the next release slice.
+
+## Run 2026-05-01T17:42:00Z
+Phase: macOS hotkey teardown follow-up
+Hats used: Engineering
+Shipped:
+- [HAT: Engineering] Included macOS CGEventTap cleanup hardening: the listener thread now releases its run-loop source/event tap instead of relying on main-thread teardown after join.
+Verification:
+- Static regression coverage exists for listener-thread event tap release in `tests/static/test_macos_app_bundle_assets.py`.
+- This change was present in the worktree for the prior local build/notarized release artifact; committing it aligns source history/tag with the shipped binary.
+Next:
+- Push, retag, recreate release event, and verify hosted CI.

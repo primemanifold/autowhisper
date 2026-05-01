@@ -234,12 +234,34 @@ void HotkeyManager::start() {
         // running_ here before entering CFRunLoopRun — if false, skip.
         if (!running_.load()) {
             spdlog::info("CGEventTap: early stop signaled before run loop");
+            CFRunLoopRemoveSource(impl_->run_loop, impl_->src, kCFRunLoopCommonModes);
+            CFRelease(impl_->src);
+            impl_->src = nullptr;
+            CGEventTapEnable(impl_->tap, false);
+            CFRelease(impl_->tap);
+            impl_->tap = nullptr;
+            impl_->run_loop = nullptr;
             return;
         }
 
         spdlog::info("CGEventTap listening (listen-only)");
         CFRunLoopRun();
         spdlog::info("CGEventTap run loop exited");
+
+        // The listener thread releases the event tap because the run-loop source
+        // belongs to this thread's CFRunLoop. Removing it later from the main
+        // thread can trip CoreFoundation pointer-auth checks on modern macOS.
+        if (impl_->src) {
+            CFRunLoopRemoveSource(impl_->run_loop, impl_->src, kCFRunLoopCommonModes);
+            CFRelease(impl_->src);
+            impl_->src = nullptr;
+        }
+        if (impl_->tap) {
+            CGEventTapEnable(impl_->tap, false);
+            CFRelease(impl_->tap);
+            impl_->tap = nullptr;
+        }
+        impl_->run_loop = nullptr;
     });
 }
 
@@ -255,19 +277,8 @@ void HotkeyManager::stop() {
     if (impl_->run_loop) CFRunLoopStop(impl_->run_loop);
     if (impl_->listener.joinable()) impl_->listener.join();
 
-    if (impl_->src) {
-        if (impl_->run_loop) {
-            CFRunLoopRemoveSource(impl_->run_loop, impl_->src, kCFRunLoopCommonModes);
-        }
-        CFRelease(impl_->src);
-        impl_->src = nullptr;
-    }
-    if (impl_->tap) {
-        CGEventTapEnable(impl_->tap, false);
-        CFRelease(impl_->tap);
-        impl_->tap = nullptr;
-    }
-    impl_->run_loop = nullptr;
+    // The listener thread releases the event tap/run-loop source because they
+    // belong to its CFRunLoop. Only clear logical state here after join.
     pressed_modifiers_.clear();
     trigger_pressed_ = false;
     active_trigger_.reset();
