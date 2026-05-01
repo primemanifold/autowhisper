@@ -72,18 +72,20 @@ jobs:
       - name: Build Debian package
         run: |
           dpkg-buildpackage -us -uc -b
-          ls -la ../autowhisper_*.deb
+          mkdir -p "$RUNNER_TEMP/debian-package"
+          cp ../autowhisper_*.deb "$RUNNER_TEMP/debian-package/"
+          ls -la "$RUNNER_TEMP/debian-package"/*.deb
 
       - name: Verify package contents
         run: |
-          dpkg -c ../autowhisper_*.deb
-          dpkg -I ../autowhisper_*.deb
+          dpkg -c "$RUNNER_TEMP/debian-package"/*.deb
+          dpkg -I "$RUNNER_TEMP/debian-package"/*.deb
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: debian-package
-          path: ../autowhisper_*.deb
+          path: ${{ runner.temp }}/debian-package/*.deb
           retention-days: 7
 
   build-source:

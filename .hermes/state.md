@@ -480,3 +480,17 @@ Blocked on:
 - Launchpad/PPA publication for `v0.7.0` is blocked by remote FTP connectivity from the GitHub runner, not by local package build/signing evidence.
 Next:
 - Rerun the PPA workflow or manually upload the signed source package when Launchpad/GitHub runner connectivity is healthy.
+
+## Run 2026-05-01T17:12:00Z
+Phase: v0.7.0 release artifact workflow follow-up
+Hats used: Engineering
+Shipped:
+- [HAT: Engineering] Fixed release-event Debian artifact upload by copying built `.deb` files into `$RUNNER_TEMP/debian-package` before `actions/upload-artifact`, because upload-artifact v4 rejects `../` paths.
+Learned:
+- [HAT: Engineering] GitHub's upload-artifact v4 does not allow relative parent-directory patterns like `../autowhisper_*.deb`.
+Verification:
+- Pending hosted rerun after retag/release recreation.
+Blocked on:
+- Launchpad/PPA upload remains subject to the previously observed FTP connectivity issue.
+Next:
+- Retag/recreate the v0.7.0 release and verify the release-event CI passes.
