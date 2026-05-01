@@ -3,10 +3,21 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <iomanip>
 #include <sstream>
 #include <sys/stat.h>
 #include <sys/types.h>
+#if defined(_WIN32)
+#include <process.h>
+#include <io.h>
+#ifndef W_OK
+#define W_OK 2
+#endif
+#define access _access
+#define getpid _getpid
+#else
 #include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 
@@ -22,9 +33,9 @@ uint64_t fnv64(std::string_view bytes) {
 }
 
 std::string to_hex16(uint64_t v) {
-    char buf[17];
-    std::snprintf(buf, sizeof(buf), "%016lx", static_cast<unsigned long>(v));
-    return std::string(buf);
+    std::ostringstream os;
+    os << std::hex << std::nouppercase << std::setfill('0') << std::setw(16) << v;
+    return os.str();
 }
 
 std::string weak_canonical(const std::string& path) {
@@ -41,14 +52,26 @@ static bool is_dir_writable(const std::string& dir) {
     return access(dir.c_str(), W_OK) == 0;
 }
 
+static std::string sidecar_user_suffix() {
+#if defined(_WIN32)
+    const char* user = std::getenv("USERNAME");
+    if (user && user[0]) return std::string(user);
+    return "windows";
+#else
+    return std::to_string(::getuid());
+#endif
+}
+
 std::string sidecar_path_for(const std::string& canonical_config_path) {
     const std::string hash = to_hex16(fnv64(canonical_config_path));
     const char* xdg = std::getenv("XDG_RUNTIME_DIR");
     if (xdg && xdg[0] && is_dir_writable(xdg)) {
         return std::string(xdg) + "/autowhisper-settings-" + hash + ".info";
     }
-    return "/tmp/autowhisper-settings-" + std::to_string(::getuid()) +
-           "-" + hash + ".info";
+    std::error_code ec;
+    fs::path tmp = fs::temp_directory_path(ec);
+    if (ec || tmp.empty()) tmp = fs::path("/tmp");
+    return (tmp / ("autowhisper-settings-" + sidecar_user_suffix() + "-" + hash + ".info")).string();
 }
 
 std::optional<SidecarContents> parse_sidecar(std::string_view raw) {

@@ -6,10 +6,49 @@
 #include <filesystem>
 #include <fstream>
 #include <thread>
+#if defined(_WIN32)
+#include <process.h>
+#else
 #include <unistd.h>
+#endif
 
 namespace fs = std::filesystem;
 using namespace autowhisper::settings;
+
+namespace {
+
+fs::path stable_temp_dir() {
+    std::error_code ec;
+    auto tmp = fs::temp_directory_path(ec);
+    if (ec || !fs::is_directory(tmp)) return fs::path("/tmp");
+    return tmp;
+}
+
+int current_process_id() {
+#if defined(_WIN32)
+    return _getpid();
+#else
+    return getpid();
+#endif
+}
+
+void set_env_var(const char* key, const std::string& value) {
+#if defined(_WIN32)
+    _putenv_s(key, value.c_str());
+#else
+    setenv(key, value.c_str(), 1);
+#endif
+}
+
+void unset_env_var(const char* key) {
+#if defined(_WIN32)
+    _putenv_s(key, "");
+#else
+    unsetenv(key);
+#endif
+}
+
+}  // namespace
 
 TEST_CASE("fnv64 is deterministic and non-trivial", "[sidecar]") {
     CHECK(fnv64("abc") == fnv64("abc"));
@@ -20,6 +59,8 @@ TEST_CASE("fnv64 is deterministic and non-trivial", "[sidecar]") {
 TEST_CASE("to_hex16 returns exactly 16 chars, lowercase", "[sidecar]") {
     CHECK(to_hex16(0) == "0000000000000000");
     CHECK(to_hex16(0xdeadbeefULL).size() == 16);
+    CHECK(to_hex16(0x100000000ULL) == "0000000100000000");
+    CHECK(to_hex16(0xfeedfacedeadbeefULL) == "feedfacedeadbeef");
     auto s = to_hex16(0xfeedfaceULL);
     CHECK(s.size() == 16);
     for (char ch : s) {
@@ -29,7 +70,7 @@ TEST_CASE("to_hex16 returns exactly 16 chars, lowercase", "[sidecar]") {
 }
 
 TEST_CASE("weak_canonical tolerates non-existent suffix", "[sidecar]") {
-    auto tmp = fs::temp_directory_path();
+    auto tmp = stable_temp_dir();
     auto p = (tmp / "autowhisper_nonexistent_dir" / "new.toml").string();
     auto c = weak_canonical(p);
     CHECK(c.find("autowhisper_nonexistent_dir") != std::string::npos);
@@ -39,10 +80,10 @@ TEST_CASE("weak_canonical tolerates non-existent suffix", "[sidecar]") {
 
 TEST_CASE("sidecar_path_for uses XDG_RUNTIME_DIR when set", "[sidecar]") {
     const char* saved = std::getenv("XDG_RUNTIME_DIR");
-    auto tmp = fs::temp_directory_path() /
-               ("autowhisper_xdg_" + std::to_string(::getpid()));
+    auto tmp = stable_temp_dir() /
+               ("autowhisper_xdg_" + std::to_string(current_process_id()));
     fs::create_directories(tmp);
-    setenv("XDG_RUNTIME_DIR", tmp.c_str(), 1);
+    set_env_var("XDG_RUNTIME_DIR", tmp.string());
 
     auto p = sidecar_path_for("/home/isura/.config/autowhisper/config.toml");
     CHECK(p.find(tmp.string()) == 0);
@@ -50,19 +91,23 @@ TEST_CASE("sidecar_path_for uses XDG_RUNTIME_DIR when set", "[sidecar]") {
     CHECK(p.ends_with(".info"));
 
     fs::remove_all(tmp);
-    if (saved) setenv("XDG_RUNTIME_DIR", saved, 1);
-    else unsetenv("XDG_RUNTIME_DIR");
+    if (saved) set_env_var("XDG_RUNTIME_DIR", saved);
+    else unset_env_var("XDG_RUNTIME_DIR");
 }
 
 TEST_CASE("sidecar_path_for falls back to /tmp with UID when no XDG", "[sidecar]") {
     const char* saved = std::getenv("XDG_RUNTIME_DIR");
-    unsetenv("XDG_RUNTIME_DIR");
+    unset_env_var("XDG_RUNTIME_DIR");
 
     auto p = sidecar_path_for("/x.toml");
+#if defined(_WIN32)
+    CHECK(p.find("autowhisper-settings-") != std::string::npos);
+#else
     CHECK(p.find("/tmp/autowhisper-settings-") == 0);
     CHECK(p.find("-" + std::to_string(::getuid()) + "-") != std::string::npos);
+#endif
 
-    if (saved) setenv("XDG_RUNTIME_DIR", saved, 1);
+    if (saved) set_env_var("XDG_RUNTIME_DIR", saved);
 }
 
 TEST_CASE("parse_sidecar round-trip with format_sidecar", "[sidecar]") {

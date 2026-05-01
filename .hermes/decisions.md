@@ -111,3 +111,22 @@ Treat iOS as a native sibling product surface. The first honest iOS product loop
 - The first iOS model catalog should prefer small bundled models such as `tiny.en`, not the large desktop default.
 - SwiftUI, AVFoundation, simulator/device builds, signing, and App Store privacy review are next phases once full Xcode and iOS SDKs are available.
 - Existing Linux desktop behavior remains preserved while iOS foundations are added in a separate `ios/` subtree.
+
+
+## ADR-0007 — Desktop platform proof distinguishes buildability from runtime readiness
+
+Date: 2026-05-01T02:30:00Z
+
+### Context
+
+Channa asked for macOS and Windows next, including Docker local end-to-end checks and screenshots. Docker on macOS runs Linux containers, not macOS containers, and standard Docker on this host cannot execute native Windows GUI/runtime flows. The repo can, however, prove macOS host-local build/test behavior and Windows MinGW cross-build artifact generation.
+
+### Decision
+
+Treat this slice as a desktop-platform foundation gate: macOS is validated host-locally with native CMake/CTest and settings UI screenshots; Docker validates Linux focused tests and Windows x86_64 MinGW cross-build artifacts only. Do not claim Windows runtime end-to-end until a Windows host/VM or proven Wine-capable runner executes the Windows `.exe` tests.
+
+### Consequences
+
+- Platform diagnostics explicitly expose ready/partial/placeholder/unsupported feature states.
+- `engineering/desktop-platform-foundation.md` documents Docker limits and avoids claiming macOS containers or Windows runtime execution.
+- Cross-compiled tests are not registered unless `CMAKE_CROSSCOMPILING_EMULATOR` is present.

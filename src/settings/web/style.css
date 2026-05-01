@@ -316,6 +316,47 @@ p { margin: 0; }
 .aw-note strong { color: var(--aw-ink-0); }
 .aw-note code,
 .aw-config-key { word-break: break-word; }
+.aw-platform-summary {
+  margin: 12px 16px 0;
+  color: var(--aw-ink-2);
+}
+.aw-platform-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+.aw-platform-feature {
+  min-height: 112px;
+  padding: 12px;
+  border: 1px solid var(--aw-line);
+  border-radius: var(--aw-radius-2);
+  background: var(--aw-paper-0);
+}
+.aw-platform-feature h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.25;
+}
+.aw-platform-feature p {
+  margin-top: 8px;
+  color: var(--aw-ink-2);
+  font-size: 12px;
+}
+.aw-platform-state {
+  display: inline-flex;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-family: var(--aw-font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--aw-ink-1);
+  background: var(--aw-paper-2);
+}
+.aw-platform-feature.ready .aw-platform-state { color: var(--aw-ok); background: var(--aw-ok-soft); }
+.aw-platform-feature.partial .aw-platform-state,
+.aw-platform-feature.placeholder .aw-platform-state { color: var(--aw-warn); background: var(--aw-warn-soft); }
+.aw-platform-feature.unsupported .aw-platform-state { color: var(--aw-err); background: var(--aw-err-soft); }
 .aw-empty { padding: 18px 16px; color: var(--aw-ink-2); }
 
 @media (max-width: 820px) {

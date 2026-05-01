@@ -311,3 +311,37 @@ Blocked on:
 Next:
 - Install/select full Xcode, then add SwiftUI app shell with `NSMicrophoneUsageDescription` and simulator/device build gates.
 - After app shell, bind AVFoundation recording and `whisper.cpp` inference behind the Swift package seams.
+
+
+## Run 2026-05-01T02:30:00Z
+Phase: Desktop platform foundation — macOS/Windows build truth
+Hats used: Research, Engineering, CEO
+Shipped:
+- [HAT: Engineering] Created branch `primeodin/desktop-platform-foundation` from the verified iOS foundation branch.
+- [HAT: Engineering] Added `src/platform/capabilities.*` with stable platform capability JSON for Linux/macOS/Windows/current builds, using honest `ready`/`partial`/`placeholder`/`unsupported` states.
+- [HAT: Engineering] Added `GET /api/platform` to the settings server and surfaced a Desktop platform readiness card in the Diagnostics settings pane.
+- [HAT: Engineering] Added static/UI and C++ regression tests for the platform diagnostics contract.
+- [HAT: Engineering] Added Docker desktop smoke infrastructure: `docker/desktop-ci/Dockerfile`, `scripts/desktop_docker_smoke.sh`, and `cmake/toolchains/mingw-w64-x86_64.cmake`.
+- [HAT: Engineering] Added `engineering/desktop-platform-foundation.md` documenting macOS host-local validation, Docker Linux validation, Windows MinGW cross-build proof, and the remaining Windows runtime gate.
+- [HAT: Engineering] Fixed Windows-portability issues found during cross-build work: WinSock link libs, POSIX settings-server guard for Windows, portable sidecar paths, and 64-bit sidecar hash formatting without LLP64 truncation.
+- [HAT: Engineering] Improved macOS settings UI browser launch to use `open` instead of `xdg-open`.
+- [HAT: Research] Captured browser screenshot evidence for Dictation behavior, Model & performance, and Diagnostics/Desktop platform readiness settings screens.
+Learned:
+- [HAT: Engineering] Docker on this macOS host cannot validate macOS runtime behavior; macOS proof must be host-local.
+- [HAT: Engineering] Docker/MinGW can build Windows PE32+ x86-64 `autowhisper.exe` and `autowhisper_tests.exe`, but Windows runtime execution remains unproven until a Windows host/VM or Wine-capable runner is added.
+- [HAT: CEO] The right 1.0 path is to make platform incompleteness visible and testable instead of pretending placeholders are product-ready.
+Verification:
+- GREEN native macOS host preflight: `cmake -S . -B build-audit -DCMAKE_BUILD_TYPE=Debug -DAUTOWHISPER_ENABLE_TESTS=ON`.
+- GREEN native macOS build: `cmake --build build-audit --target autowhisper autowhisper_tests`.
+- GREEN native CTest: `ctest --test-dir build-audit --output-on-failure` — 101/101 tests passed.
+- GREEN static UI tests: `python3 -m unittest tests.static.test_settings_design_assets -v` — 11/11 tests passed.
+- GREEN JS syntax: `node --check src/settings/web/app.js`.
+- GREEN whitespace check: `git diff --check`.
+- GREEN Docker smoke: Linux focused Docker tests passed 31/31; Windows MinGW cross-build produced PE32+ x86-64 `autowhisper.exe` and `autowhisper_tests.exe` artifacts; runtime execution intentionally deferred.
+- Independent read-only review found four blockers; fixed docs overclaiming, cross-compiled CTest registration, 64-bit hash formatting, and Windows settings-server caveat. Also fixed macOS browser launcher recommendation.
+Blocked on:
+- True Windows runtime/end-to-end validation requires a Windows host/VM or a proven Wine-capable x86_64 runner.
+- Full native macOS product readiness remains blocked on real menu bar, permission onboarding, hotkey, insertion, and packaging slices.
+Next:
+- Commit and push this desktop-platform foundation slice to `origin/primeodin/desktop-platform-foundation`.
+- Next engineering slice should implement one real native macOS integration gate, likely microphone permission/onboarding or menu-bar app shell, before expanding feature claims.

@@ -33,6 +33,7 @@ set(CORE_LIB_SOURCES
     src/config/schema.cpp
     src/hotkey/hotkey_common.cpp
     src/models/models.cpp
+    src/platform/capabilities.cpp
     src/settings/handlers.cpp
     src/settings/sidecar.cpp
     src/tray/tray_common.cpp
@@ -158,6 +159,8 @@ elseif(APPLE)
         ${CARBON_FRAMEWORK}
         ${COREGRAPHICS_FRAMEWORK}
     )
+elseif(WIN32)
+    target_link_libraries(autowhisper PRIVATE ws2_32)
 endif()
 
 # Apply compiler warnings
@@ -178,6 +181,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_keycombo.cpp
         tests/cpp/test_logging.cpp
         tests/cpp/test_models.cpp
+        tests/cpp/test_platform_capabilities.cpp
         tests/cpp/test_schema.cpp
         tests/cpp/test_settings_handlers.cpp
         tests/cpp/test_settings_http.cpp
@@ -190,7 +194,16 @@ if(AUTOWHISPER_ENABLE_TESTS)
         cpp_httplib
         Catch2::Catch2WithMain
     )
+    if(WIN32)
+        target_link_libraries(autowhisper_tests PRIVATE ws2_32)
+    endif()
     autowhisper_set_warnings(autowhisper_tests)
 
-    catch_discover_tests(autowhisper_tests)
+    if(CMAKE_CROSSCOMPILING AND CMAKE_CROSSCOMPILING_EMULATOR)
+        add_test(NAME autowhisper_tests COMMAND autowhisper_tests "[platform]" "[settings_http]" "[config]" "[schema]")
+    elseif(CMAKE_CROSSCOMPILING)
+        message(STATUS "Cross-compiling without CMAKE_CROSSCOMPILING_EMULATOR; skipping autowhisper_tests runtime registration")
+    else()
+        catch_discover_tests(autowhisper_tests)
+    endif()
 endif()

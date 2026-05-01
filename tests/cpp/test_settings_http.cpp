@@ -2,6 +2,7 @@
 
 #include "config/config.h"
 #include "config/schema.h"
+#include "platform/capabilities.h"
 #include "settings/handlers.h"
 
 #include <httplib.h>
@@ -23,6 +24,9 @@ void register_routes(httplib::Server& srv, const std::string& path) {
     });
     srv.Get("/api/defaults", [](const httplib::Request&, httplib::Response& r) {
         r.set_content(settings::defaults_json().dump(), "application/json");
+    });
+    srv.Get("/api/platform", [](const httplib::Request&, httplib::Response& r) {
+        r.set_content(platform_capabilities_json(current_platform_capabilities()).dump(), "application/json");
     });
     srv.Get("/api/config", [path](const httplib::Request&, httplib::Response& r) {
         try {
@@ -82,7 +86,13 @@ struct ServerFixture {
 struct TempDir {
     fs::path path;
     TempDir() {
-        path = fs::temp_directory_path() / ("aw_http_" + std::to_string(::getpid()) + "_" +
+        fs::path base;
+        std::error_code ec;
+        base = fs::temp_directory_path(ec);
+        if (ec || !fs::is_directory(base)) {
+            base = fs::path("/tmp");
+        }
+        path = base / ("aw_http_" + std::to_string(::getpid()) + "_" +
             std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id())));
         fs::create_directories(path);
     }
@@ -117,6 +127,22 @@ TEST_CASE("GET /api/defaults matches Config::default_config", "[settings_http]")
     CHECK(res->status == 200);
     auto j = nlohmann::json::parse(res->body);
     CHECK(j["model"]["size"] == Config::default_config().model.size);
+}
+
+TEST_CASE("GET /api/platform returns desktop capability diagnostics", "[settings_http]") {
+    TempDir tmp;
+    ServerFixture s((tmp.path / "c.toml").string());
+
+    httplib::Client cli("127.0.0.1", s.port);
+    auto res = cli.Get("/api/platform");
+    REQUIRE(res);
+    CHECK(res->status == 200);
+    auto j = nlohmann::json::parse(res->body);
+    CHECK(j["platform"].is_string());
+    CHECK(j["build_target"].is_string());
+    REQUIRE(j["features"].is_array());
+    CHECK(j["features"].size() >= 4);
+    CHECK(j["summary"].is_string());
 }
 
 TEST_CASE("GET /api/config returns defaults for nonexistent file", "[settings_http]") {

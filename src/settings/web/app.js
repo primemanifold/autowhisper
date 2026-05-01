@@ -73,14 +73,16 @@
   let schema;
   let config;
   let defaults;
+  let platformDiagnostics;
   let sections = [];
 
   setBusy(true, "Loading local settings...");
   try {
-    [schema, config, defaults] = await Promise.all([
+    [schema, config, defaults, platformDiagnostics] = await Promise.all([
       loadJson("/api/schema"),
       loadJson("/api/config"),
       loadJson("/api/defaults"),
+      loadJson("/api/platform"),
     ]);
     sections = Object.keys(schema);
   } catch (e) {
@@ -185,6 +187,10 @@
         article.appendChild(note);
       }
 
+      if (pane.id === "diagnostics" && platformDiagnostics) {
+        article.appendChild(renderPlatformDiagnostics(platformDiagnostics));
+      }
+
       const paneSections = pane.sections === "all" ? sections : pane.sections;
       if (paneSections.length === 0 && !pane.note) {
         const empty = document.createElement("div");
@@ -199,6 +205,48 @@
       }
       form.appendChild(article);
     }
+  }
+
+  function renderPlatformDiagnostics(info) {
+    const card = document.createElement("section");
+    card.className = "aw-card aw-platform-card";
+    card.setAttribute("aria-label", "Desktop platform readiness");
+
+    const header = document.createElement("div");
+    header.className = "aw-card-header";
+    const title = document.createElement("div");
+    title.className = "aw-card-title";
+    title.textContent = "Desktop platform readiness";
+    const meta = document.createElement("div");
+    meta.className = "aw-card-meta";
+    const platformLabel = info.platform || "unknown";
+    const targetLabel = info.build_target || "host";
+    meta.textContent = platformLabel === targetLabel ? platformLabel : `${platformLabel} · ${targetLabel}`;
+    header.append(title, meta);
+    card.appendChild(header);
+
+    const summary = document.createElement("p");
+    summary.className = "aw-platform-summary";
+    summary.textContent = info.summary || "Platform capability status is reported by the local build.";
+    card.appendChild(summary);
+
+    const grid = document.createElement("div");
+    grid.className = "aw-platform-grid";
+    for (const feature of info.features || []) {
+      const item = document.createElement("article");
+      item.className = `aw-platform-feature ${feature.state || "unknown"}`;
+      const featureTitle = document.createElement("h3");
+      featureTitle.textContent = feature.name || feature.id || "Feature";
+      const state = document.createElement("span");
+      state.className = "aw-platform-state";
+      state.textContent = feature.state || "unknown";
+      const detail = document.createElement("p");
+      detail.textContent = feature.detail || "No detail available.";
+      item.append(featureTitle, state, detail);
+      grid.appendChild(item);
+    }
+    card.appendChild(grid);
+    return card;
   }
 
   function renderSectionCard(section, keys, paneId, showSectionPrefix) {

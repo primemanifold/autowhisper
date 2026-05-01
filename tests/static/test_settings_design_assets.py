@@ -53,6 +53,7 @@ class SettingsDesignAssetsTest(unittest.TestCase):
         self.assertIn("/api/schema", self.js)
         self.assertIn("/api/config", self.js)
         self.assertIn("/api/defaults", self.js)
+        self.assertIn("/api/platform", self.js)
         self.assertIn("const IA_SECTIONS", self.js)
         self.assertIn("dirtyKeys", self.js)
         self.assertIn("data-config-key", self.js)
@@ -103,6 +104,17 @@ class SettingsDesignAssetsTest(unittest.TestCase):
             "var(--aw-warn)",
         ]:
             self.assertIn(snippet, self.css)
+
+    def test_platform_diagnostics_surface_desktop_port_readiness(self):
+        for snippet in [
+            "platformDiagnostics",
+            "renderPlatformDiagnostics",
+            "aw-platform-grid",
+            "aw-platform-feature",
+            "placeholder",
+            "unsupported",
+        ]:
+            self.assertIn(snippet, self.js + self.css)
 
 
 if __name__ == "__main__":
