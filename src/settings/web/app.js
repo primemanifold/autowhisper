@@ -102,6 +102,7 @@
 
   saveBtn.addEventListener("click", async () => {
     const body = collect();
+    clearIssues();
     setBusy(true, "Saving settings...");
     try {
       const res = await fetch("/api/config", {
@@ -112,13 +113,18 @@
       if (res.status === 204) {
         config = body;
         dirtyKeys.clear();
+        clearIssues();
         updateDirtyState();
         setStatus("Saved. Changes are ready for the next AutoWhisper run.", "ok");
       } else {
         let detail = res.statusText;
         try {
-          const j = await res.json();
-          detail = j.errors?.join("; ") || j.error || detail;
+          const body = await res.json();
+          const normalized = normalizeSaveError(body, detail);
+          detail = normalized.summary;
+          if (normalized.issues.length > 0) {
+            applyIssues(normalized.issues);
+          }
         } catch (_) {}
         setStatus("Could not save: " + detail, "err");
       }
@@ -217,9 +223,11 @@
   function renderRow(paneId, section, keyDef, value, showSectionPrefix) {
     const row = document.createElement("div");
     row.className = "aw-field";
+    row.dataset.configKey = `${section}.${keyDef.key}`;
     const labelWrap = document.createElement("div");
     const label = document.createElement("label");
-    label.htmlFor = inputId(paneId, section, keyDef.key);
+    const id = inputId(paneId, section, keyDef.key);
+    label.htmlFor = id;
     label.textContent = humanize(keyDef.key);
     const key = document.createElement("span");
     key.className = "aw-config-key";
@@ -230,15 +238,23 @@
     const controlWrap = document.createElement("div");
     controlWrap.className = "aw-control";
     controlWrap.appendChild(renderInput(paneId, section, keyDef, value));
+    const describedBy = [];
     if (keyDef.description) {
       const desc = document.createElement("div");
       desc.className = "aw-desc";
-      desc.id = inputId(paneId, section, keyDef.key) + "-desc";
+      desc.id = id + "-desc";
       desc.textContent = keyDef.description;
       controlWrap.appendChild(desc);
-      const describedControl = controlWrap.querySelector("input, select");
-      describedControl?.setAttribute("aria-describedby", desc.id);
+      describedBy.push(desc.id);
     }
+    const issue = document.createElement("div");
+    issue.className = "aw-issue";
+    issue.id = id + "-issue";
+    issue.hidden = true;
+    controlWrap.appendChild(issue);
+    describedBy.push(issue.id);
+    const describedControl = controlWrap.querySelector("input, select");
+    describedControl?.setAttribute("aria-describedby", describedBy.join(" "));
 
     row.append(labelWrap, controlWrap);
     return row;
@@ -335,6 +351,7 @@
     const input = event.target.closest("input, select");
     if (!input?.name) return;
     dirtyKeys.add(input.name);
+    clearIssues(input.name);
     syncMatchingInputs(input);
     updateDirtyState();
   }
@@ -380,6 +397,53 @@
         target.value = source.value;
       }
     });
+  }
+
+  function normalizeSaveError(body, fallback) {
+    const issues = Array.isArray(body?.issues) ? body.issues : [];
+    const errors = Array.isArray(body?.errors) ? body.errors : [];
+    const issueMessages = issues.map((issue) => issue?.message).filter(Boolean);
+    return {
+      issues,
+      summary: issueMessages.join("; ") || errors.join("; ") || body?.error || fallback,
+    };
+  }
+
+  function applyIssues(issues) {
+    for (const issue of issues) {
+      if (!issue?.path) continue;
+      const tone = issue.severity === "warning" ? "warning" : "error";
+      controlsForConfigKey(issue.path).forEach((control) => {
+        const row = control.closest(".aw-field");
+        const message = row?.querySelector(".aw-issue");
+        row?.classList.add(tone === "warning" ? "has-warning" : "has-error");
+        if (tone === "error") control.setAttribute("aria-invalid", "true");
+        if (message) {
+          message.hidden = false;
+          message.className = `aw-issue ${tone === "warning" ? "warn" : "err"}`;
+          message.textContent = `${tone === "warning" ? "Warning" : "Error"}: ${issue.message || issue.code || "Invalid value"}`;
+        }
+      });
+    }
+  }
+
+  function clearIssues(configKey = "") {
+    const controls = configKey ? controlsForConfigKey(configKey) : document.querySelectorAll(".aw-field input, .aw-field select");
+    controls.forEach((control) => {
+      control.removeAttribute("aria-invalid");
+      const row = control.closest(".aw-field");
+      row?.classList.remove("has-error", "has-warning");
+      const message = row?.querySelector(".aw-issue");
+      if (message) {
+        message.hidden = true;
+        message.className = "aw-issue";
+        message.textContent = "";
+      }
+    });
+  }
+
+  function controlsForConfigKey(configKey) {
+    return Array.from(document.querySelectorAll("[data-config-key]")).filter((control) => control.dataset.configKey === configKey);
   }
 
   function updateDirtyState() {

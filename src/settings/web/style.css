@@ -279,6 +279,19 @@ p { margin: 0; }
   font-weight: 400;
 }
 .aw-desc { margin-top: 7px; color: var(--aw-ink-2); font-size: 13px; }
+.aw-field.has-error { background: color-mix(in oklch, var(--aw-err-soft) 46%, transparent); }
+.aw-field.has-warning { background: color-mix(in oklch, var(--aw-warn-soft) 46%, transparent); }
+.aw-field.has-error input:not([type="checkbox"]),
+.aw-field.has-error select { border-color: var(--aw-err); }
+.aw-field.has-warning input:not([type="checkbox"]),
+.aw-field.has-warning select { border-color: var(--aw-warn); }
+.aw-issue {
+  margin-top: 7px;
+  font-family: var(--aw-font-mono);
+  font-size: 12px;
+}
+.aw-issue.err { color: var(--aw-err); }
+.aw-issue.warn { color: var(--aw-warn); }
 .aw-control { width: 100%; min-height: 36px; }
 .aw-control input:not([type="checkbox"]),
 .aw-control select {

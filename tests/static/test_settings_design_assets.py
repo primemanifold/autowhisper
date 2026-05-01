@@ -62,7 +62,8 @@ class SettingsDesignAssetsTest(unittest.TestCase):
 
     def test_script_avoids_duplicate_ids_for_advanced_controls(self):
         self.assertIn("inputId(paneId, section, keyDef.key)", self.js)
-        self.assertIn("inputId(paneId, section, keyDef.key) + \"-desc\"", self.js)
+        self.assertIn('id + "-desc"', self.js)
+        self.assertIn('id + "-issue"', self.js)
         self.assertIn("document.querySelectorAll(`[data-config-key=\"${section}.${keyDef.key}\"]`)", self.js)
 
     def test_checkbox_descriptions_attach_to_form_controls(self):
@@ -79,6 +80,29 @@ class SettingsDesignAssetsTest(unittest.TestCase):
         section_ids = set(re.findall(r'id: "([a-z-]+)"', self.js))
         nav_targets = set(re.findall(r'data-target="([a-z-]+)"', self.index))
         self.assertEqual(nav_targets, section_ids)
+
+    def test_save_errors_surface_structured_field_issues(self):
+        for snippet in [
+            "applyIssues",
+            "clearIssues",
+            "body?.issues",
+            "aria-invalid",
+            "data-config-key",
+            "aw-issue",
+            "has-error",
+            "has-warning",
+        ]:
+            self.assertIn(snippet, self.js)
+
+    def test_field_issue_styles_distinguish_errors_and_warnings(self):
+        for snippet in [
+            ".aw-field.has-error",
+            ".aw-field.has-warning",
+            ".aw-issue",
+            "var(--aw-err)",
+            "var(--aw-warn)",
+        ]:
+            self.assertIn(snippet, self.css)
 
 
 if __name__ == "__main__":

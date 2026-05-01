@@ -262,3 +262,28 @@ Blocked on:
 - Nothing for the clean-run hygiene fix.
 Next:
 - Commit and push this `.gitignore` hygiene fix, then continue Phase 1 from a clean working tree.
+
+## Run 2026-05-01T01:05:18Z
+Phase: Phase 1 — Settings UI structured validation issues
+Hats used: Engineering, CEO
+Shipped:
+- [HAT: Engineering] Continued from a clean branch and selected the next bounded slice from the prior HTTP diagnostics handoff: make the embedded settings UI consume structured validation issues.
+- [HAT: Engineering] Added field-level issue rendering in `src/settings/web/app.js` for structured `issues` responses, including error/warning row states, `aria-invalid` on error controls, issue text in `aria-describedby`, duplicate Advanced-pane control support, and safe dataset matching instead of interpolating issue paths into selectors.
+- [HAT: Engineering] Added design-token-based error/warning styles in `src/settings/web/style.css`.
+- [HAT: Engineering] Updated production `src/cli/cli_settings_ui.cpp` so the real embedded `PUT /api/config` route emits the same `issues` array contract for malformed JSON and validation failures, while keeping legacy `errors` for compatibility.
+- [HAT: Engineering] Added static regression checks in `tests/static/test_settings_design_assets.py`; verified RED before implementation, then GREEN after implementation.
+Learned:
+- [HAT: Engineering] The earlier structured issues contract was covered by settings test helpers, but production `cli_settings_ui.cpp` still returned only `errors`; the UI slice needed that companion fix to be real in the embedded settings server.
+- [HAT: Engineering] Independent review passed and noted `textContent` prevents validation-message XSS; it also suggested avoiding CSS selector interpolation for issue paths, which was addressed before final verification.
+Verification:
+- RED: `python3 -m unittest tests.static.test_settings_design_assets -v` failed on the new structured field-issue/static style assertions before implementation.
+- GREEN: `python3 -m unittest tests.static.test_settings_design_assets -v` — 10/10 tests.
+- GREEN: `node --check src/settings/web/app.js`.
+- GREEN: `cmake --build build-audit -j$(sysctl -n hw.ncpu || nproc || echo 2)`.
+- GREEN: targeted CTest subset `ctest --test-dir build-audit --output-on-failure -R 'validate_json|issue_to_json|api/config|settings|config'` — 20/20 tests.
+- GREEN: full native CTest `ctest --test-dir build-audit --output-on-failure` — 97/97 tests.
+- GREEN: `git diff --check`.
+Blocked on:
+- Nothing for this slice.
+Next:
+- Commit and push the settings UI structured validation issue slice, then continue Phase 1 with either browser/manual UI smoke coverage for the settings save error path or first-party build-warning cleanup.

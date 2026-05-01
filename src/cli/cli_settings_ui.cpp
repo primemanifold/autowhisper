@@ -51,14 +51,26 @@ void register_api_routes(httplib::Server& srv, const std::string& config_path) {
             body = nlohmann::json::parse(req.body);
         } catch (const std::exception& e) {
             res.status = 400;
-            res.set_content(nlohmann::json{{"errors", {e.what()}}}.dump(),
+            const auto message = std::string(e.what());
+            res.set_content(nlohmann::json{
+                                {"errors", {message}},
+                                {"issues", {settings::issue_to_json(ValidationIssue{
+                                                ValidationSeverity::Error,
+                                                "",
+                                                "json_parse_error",
+                                                message})}}}
+                                .dump(),
                             "application/json");
             return;
         }
         auto v = settings::validate_json(body);
         if (!v.ok()) {
+            nlohmann::json issues = nlohmann::json::array();
+            for (const auto& issue : v.issues) {
+                issues.push_back(settings::issue_to_json(issue));
+            }
             res.status = 400;
-            res.set_content(nlohmann::json{{"errors", v.errors}}.dump(),
+            res.set_content(nlohmann::json{{"errors", v.errors}, {"issues", issues}}.dump(),
                             "application/json");
             return;
         }
