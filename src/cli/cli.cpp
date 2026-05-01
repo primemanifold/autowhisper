@@ -6,6 +6,9 @@
 #include "service/service.h"
 #include "util/logging.h"
 #include "util/subprocess.h"
+#if defined(__APPLE__)
+#include "platform/macos/onboarding.h"
+#endif
 
 #include <spdlog/spdlog.h>
 #include <toml++/toml.hpp>
@@ -156,10 +159,25 @@ int cmd_logs(bool follow, int lines) {
 
 int cmd_run(const std::string& config_path, const std::string& device,
             const std::string& model, bool verbose) {
+    const bool app_bundle_launch =
+#if defined(__APPLE__)
+        aw_macos_is_app_bundle_launch();
+#else
+        false;
+#endif
+    std::string path;
     try {
-        std::string path = config_path.empty() ? find_config_file() : config_path;
+        path = config_path.empty()
+            ? (app_bundle_launch ? ensure_user_config_file() : find_config_file())
+            : config_path;
         std::cout << "Loading configuration from " << path << "\n";
         Config config = Config::load(path);
+
+#if defined(__APPLE__)
+        if (app_bundle_launch) {
+            aw_macos_prompt_required_permissions();
+        }
+#endif
 
         // Apply overrides
         if (verbose) config.daemon.log_level = "debug";
@@ -178,6 +196,21 @@ int cmd_run(const std::string& config_path, const std::string& device,
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
+#if defined(__APPLE__)
+        if (app_bundle_launch) {
+            if (path.empty()) {
+                try {
+                    path = ensure_user_config_file();
+                } catch (...) {
+                    path.clear();
+                }
+            }
+            aw_macos_prompt_required_permissions();
+            if (aw_macos_launch_setup_helper(path, e.what())) {
+                return 0;
+            }
+        }
+#endif
         return 1;
     }
 }

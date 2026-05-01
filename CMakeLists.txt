@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(autowhisper VERSION 0.7.0 LANGUAGES CXX)
+project(autowhisper VERSION 0.7.1 LANGUAGES CXX)
 
 # macOS: Objective-C++ for .mm files, ARC, minimum target, universal binary.
 if(APPLE)
@@ -107,6 +107,7 @@ elseif(APPLE)
         src/doctor/platform/doctor_macos.mm
         src/service/service_macos.mm
         src/daemon/daemon_macos.mm
+        src/platform/macos/onboarding.mm
         src/pulseaudio/pulseaudio.cpp  # stub on macOS
     )
 elseif(WIN32)

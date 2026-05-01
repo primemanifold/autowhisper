@@ -115,4 +115,8 @@ std::string get_user_config_path();
 // match from find_config_file(), else the user-config path (for writes).
 std::string resolve_config_path();
 
+// Ensure a writable per-user config exists. If the user config is absent,
+// copy the bundled/default config when available, otherwise write defaults.
+std::string ensure_user_config_file();
+
 } // namespace autowhisper

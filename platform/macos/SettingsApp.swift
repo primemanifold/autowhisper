@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import SwiftUI
 
 struct ConfigDraft {
@@ -171,8 +172,131 @@ final class ConfigStore: ObservableObject {
     }
 }
 
+struct OnboardingView: View {
+    @ObservedObject var store: ConfigStore
+    let setupError: String?
+    @State private var modelStatus = "Not downloaded yet"
+    @State private var isDownloading = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("First-run setup").font(.title2.bold())
+                Text("Finish these one-time steps before AutoWhisper can listen globally and type into other apps.")
+                    .foregroundStyle(.secondary)
+                if let setupError, !setupError.isEmpty {
+                    Label(setupError, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            HStack(alignment: .top, spacing: 12) {
+                setupCard(title: "1. Download the local model",
+                          subtitle: "Recommended: \(store.draft.modelSize). This can be a large download, but stays local after it finishes.",
+                          systemImage: "arrow.down.circle") {
+                    Button(isDownloading ? "Downloading…" : "Download recommended model") {
+                        downloadRecommendedModel()
+                    }
+                    .disabled(isDownloading)
+                    Text(modelStatus).font(.caption).foregroundStyle(.secondary)
+                }
+
+                setupCard(title: "2. Enable Mac permissions",
+                          subtitle: "macOS requires explicit trust for the global hotkey, text injection, and microphone.",
+                          systemImage: "lock.shield") {
+                    Button("Open Input Monitoring") { openPrivacyPane("Privacy_ListenEvent") }
+                    Button("Open Accessibility") { openPrivacyPane("Privacy_Accessibility") }
+                    Button("Request Microphone") {
+                        AVCaptureDevice.requestAccess(for: .audio) { _ in }
+                        openPrivacyPane("Privacy_Microphone")
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Color.accentColor.opacity(0.08)))
+        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Color.accentColor.opacity(0.25), lineWidth: 1))
+    }
+
+    private func setupCard<Content: View>(title: String, subtitle: String, systemImage: String,
+                                          @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: systemImage).font(.headline)
+            Text(subtitle).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 8) { content() }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color(nsColor: .controlBackgroundColor)))
+    }
+
+    private func openPrivacyPane(_ anchor: String) {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(anchor)") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+
+    private func downloadRecommendedModel() {
+        guard !isDownloading else { return }
+        isDownloading = true
+        modelStatus = "Starting download…"
+        let model = store.draft.modelSize
+        DispatchQueue.global(qos: .userInitiated).async {
+            let process = Process()
+            let pipe = Pipe()
+            let outputHandle = pipe.fileHandleForReading
+            let helperDir = Bundle.main.executableURL?.deletingLastPathComponent()
+            process.executableURL = helperDir?.appendingPathComponent("autowhisper") ?? URL(fileURLWithPath: "/usr/local/bin/autowhisper")
+            process.arguments = ["model", "download", model]
+            process.standardOutput = pipe
+            process.standardError = pipe
+
+            let outputLock = NSLock()
+            var capturedOutput = ""
+            outputHandle.readabilityHandler = { handle in
+                let data = handle.availableData
+                guard !data.isEmpty else { return }
+                let chunk = String(data: data, encoding: .utf8) ?? ""
+                if !chunk.isEmpty {
+                    outputLock.lock()
+                    capturedOutput.append(chunk)
+                    outputLock.unlock()
+                    let trimmed = chunk.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty {
+                        DispatchQueue.main.async {
+                            modelStatus = trimmed.components(separatedBy: .newlines).last ?? "Downloading…"
+                        }
+                    }
+                }
+            }
+
+            do {
+                try process.run()
+                process.waitUntilExit()
+                outputHandle.readabilityHandler = nil
+                _ = outputHandle.readDataToEndOfFile()
+                let finalOutput: String
+                outputLock.lock()
+                finalOutput = capturedOutput
+                outputLock.unlock()
+                DispatchQueue.main.async {
+                    isDownloading = false
+                    modelStatus = process.terminationStatus == 0 ? "Model is ready" : "Download failed: \(finalOutput.prefix(180))"
+                }
+            } catch {
+                outputHandle.readabilityHandler = nil
+                DispatchQueue.main.async {
+                    isDownloading = false
+                    modelStatus = "Download failed: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+}
+
 struct SettingsView: View {
     @ObservedObject var store: ConfigStore
+    let setupError: String?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -181,6 +305,7 @@ struct SettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     hero
+                    OnboardingView(store: store, setupError: setupError)
                     section("Dictation", subtitle: "How AutoWhisper listens and cancels.") {
                         Picker("Mode", selection: $store.draft.hotkeyMode) {
                             Text("Push to talk").tag("push_to_talk")
@@ -285,14 +410,20 @@ final class AutoWhisperSettingsApp: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let args = CommandLine.arguments
         let configPath: String
+        let setupError: String?
         if let index = args.firstIndex(of: "--config"), args.indices.contains(index + 1) {
             configPath = args[index + 1]
         } else {
             configPath = FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent(".config/autowhisper/config.toml").path
         }
+        if let index = args.firstIndex(of: "--setup-error"), args.indices.contains(index + 1) {
+            setupError = args[index + 1]
+        } else {
+            setupError = nil
+        }
 
-        let view = SettingsView(store: ConfigStore(configPath: configPath))
+        let view = SettingsView(store: ConfigStore(configPath: configPath), setupError: setupError)
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 760),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered,

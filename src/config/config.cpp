@@ -506,4 +506,40 @@ std::string resolve_config_path() {
     }
 }
 
+std::string ensure_user_config_file() {
+    const std::string user_config = get_user_config_path();
+    const fs::path user_config_path(user_config);
+    if (fs::is_regular_file(user_config_path)) {
+        return user_config;
+    }
+
+    const fs::path parent = user_config_path.parent_path();
+    if (!parent.empty()) {
+        std::error_code mkdir_ec;
+        fs::create_directories(parent, mkdir_ec);
+        if (mkdir_ec) {
+            throw std::runtime_error("Cannot create config directory: " + parent.string());
+        }
+    }
+
+    std::string source;
+    try {
+        source = find_config_file();
+    } catch (...) {
+        source.clear();
+    }
+
+    if (!source.empty() && fs::is_regular_file(source) && fs::path(source) != user_config_path) {
+        std::error_code copy_ec;
+        fs::copy_file(source, user_config_path, fs::copy_options::overwrite_existing, copy_ec);
+        if (!copy_ec) {
+            return user_config;
+        }
+        spdlog::warn("Could not copy default config from {} to {}: {}", source, user_config, copy_ec.message());
+    }
+
+    Config::default_config().save(user_config);
+    return user_config;
+}
+
 } // namespace autowhisper

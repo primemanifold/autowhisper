@@ -29,7 +29,7 @@ class WebsiteAssetsTest(unittest.TestCase):
             "offline",
             "local-first",
             "Download for macOS",
-            "AutoWhisper-macOS-v0.7.0.zip",
+            "AutoWhisper-macOS-v0.7.1.zip",
             "sudo add-apt-repository ppa:primemanifold/autowhisper",
             "github.com/primemanifold/autowhisper",
             "Notarized Developer ID",
@@ -37,7 +37,7 @@ class WebsiteAssetsTest(unittest.TestCase):
             self.assertIn(snippet, html)
         self.assertRegex(
             html,
-            r"https://github\.com/primemanifold/autowhisper/releases/(?:latest|download/v0\.7\.0/AutoWhisper-macOS-v0\.7\.0\.zip)",
+            r"https://github\.com/primemanifold/autowhisper/releases/(?:latest|download/v0\.7\.1/AutoWhisper-macOS-v0\.7\.1\.zip)",
         )
 
     def test_landing_page_sets_baseline_metadata_and_accessibility(self):

@@ -594,3 +594,37 @@ Boundaries:
 - Public downloads still require either making the repo/release public or mirroring release assets to a public location.
 Next:
 - Push the guard fix to `core`, verify CI, and ask Channa whether to make the repo public or mirror the website/downloads separately.
+
+## Run 2026-05-01T19:44:56Z
+Phase: macOS first-run onboarding / DMG launch fix
+Hats used: Engineering, CEO
+Changed:
+- [HAT: Engineering] Reproduced the first-run failure shape from an app bundle/DMG-like path: a fresh HOME had no user config/model, so `autowhisper run` failed with a missing model and Finder-style launch would appear to do nothing.
+- [HAT: Engineering] Added macOS onboarding helpers so app-bundle launches create/copy a writable user config, request/prompt required macOS permissions, and open the native setup helper with the startup error instead of silently exiting.
+- [HAT: Engineering] Expanded the native SwiftUI settings helper with a clear First-run setup panel: model download, Input Monitoring, Accessibility, and Microphone actions.
+- [HAT: Engineering] Fixed the model-download setup action to drain subprocess output with `readabilityHandler` while waiting, avoiding pipe-buffer deadlock during large/slow downloads.
+- [HAT: Engineering] Added static regression checks for app-bundle launch fallback, setup-helper launch, permission prompts, and first-run onboarding actions.
+Verification:
+- RED: Focused new macOS onboarding static tests failed before implementation.
+- GREEN: `xcrun swiftc -target arm64-apple-macos12.0 -framework SwiftUI -framework AppKit -framework AVFoundation platform/macos/SettingsApp.swift` passed.
+- GREEN: `cmake --build build-macos-onboarding` passed and rebuilt `AutoWhisper.app` plus bundled `AutoWhisperSettings`.
+- GREEN: `python3 -m unittest discover tests/static -v` passed, 27/27 tests.
+- GREEN: `ctest` in `build-macos-onboarding` passed, 117/117 tests.
+- GREEN: `BUILD_DIR=$PWD/build-macos-onboarding ./scripts/macos_app_smoke.sh` passed; `spctl` rejection remains expected for this local non-notarized build.
+- GREEN: Manual fresh-HOME run from `build-macos-onboarding/AutoWhisper.app/Contents/MacOS/autowhisper run` exited 0, created `~/.config/autowhisper/config.toml`, and launched `AutoWhisperSettings --setup-error` for the missing model.
+- GREEN: Created a local DMG smoke artifact and mounted it; running the app executable from `/Volumes/AutoWhisper/AutoWhisper.app` exited 0, created user config, and launched the settings helper.
+- GREEN: Independent second-pass review returned PASS with no blocking release risks after the subprocess pipe-drain fix.
+Boundaries:
+- This verifies local app-bundle/DMG-like launch behavior and ad-hoc/local signing smoke; it is not yet a notarized Developer ID release artifact.
+- The setup helper opens the relevant macOS privacy panes and requests microphone/TCC prompts, but users may still need to manually toggle permissions in System Settings and relaunch after granting them.
+Next:
+- Commit on `primeodin/macos-first-run-onboarding`, push, open PR to `core`, and monitor CI.
+
+## 2026-05-01T21:07:32Z — macOS downloaded release install reproduction and 0.7.1 release-prep evidence
+
+- Reproduced the public `v0.7.0` macOS ZIP from GitHub release with a fresh download/unzip install-style flow.
+- Evidence from clean HOME first run: Gatekeeper accepted the app, but first run exited `1`, did not create `~/.config/autowhisper/config.toml`, and stopped on missing `distil-small.en` before onboarding/setup. This matches user report that the downloaded app appears not to open and setup is unclear.
+- Verified the existing first-run onboarding branch fix locally as `0.7.1`: clean HOME app-bundle launch exited `0`, created writable user config, and routed the missing-model failure to setup/onboarding instead of silent/non-zero failure.
+- Captured browser screenshot evidence report at `/Users/odin-mac-730/.hermes/cache/screenshots/browser_screenshot_3ac93a4b7b304f3a9e72cc8d083adcef.png`; source report is `/tmp/autowhisper-install-screenshots/report.html`.
+- Release-prep changes added on the onboarding branch: bumped CMake version to `0.7.1`, added `CHANGELOG.md` 0.7.1 notes, and updated static website download references/tests from `v0.7.0` to `v0.7.1`.
+- Local gates after release-prep passed: CMake configure/build app bundle, static tests `27/27`, CTest `117/117`, `scripts/macos_app_smoke.sh`, `git diff --check`, app bundle plist version `0.7.1`, and CLI `--version` `0.7.1`.
