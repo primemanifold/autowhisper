@@ -92,3 +92,22 @@ For AppleClang 21+ on macOS only, define `FMT_CONSTEVAL=` on the vendored spdlog
 - macOS audit builds pass with the current vendored dependency set.
 - fmt's consteval keyword path is disabled only for affected AppleClang builds; runtime formatting and dependency topology are unchanged.
 - This should be revisited when spdlog/fmt submodules are intentionally upgraded.
+
+## ADR-0006 — Build iOS as a native foreground app, not a desktop behavior clone
+
+Date: 2026-05-01T01:30:49Z
+
+### Context
+
+Channa asked to build the iOS version of AutoWhisper. The current repo is a desktop-first C++ daemon/CLI app with Linux/X11 as the working product path and macOS platform files still placeholder-level. Read-only iOS scouts found no first-party iOS app target, no Xcode project, and no iOS SDK on the current machine. iOS does not allow third-party apps to provide global hotkeys, a menu-bar daemon, or arbitrary text injection into other apps.
+
+### Decision
+
+Treat iOS as a native sibling product surface. The first honest iOS product loop is foreground app → microphone permission → tap to record → local `whisper.cpp` transcription → transcript display → copy/share. Start with a Foundation-only Swift package under `ios/` so product defaults, permission/capability messaging, model catalog policy, and record/transcribe workflow seams are locally verifiable before full Xcode/iOS SDK installation.
+
+### Consequences
+
+- AutoWhisper must not market iOS as supporting desktop global hotkeys or arbitrary app text injection.
+- The first iOS model catalog should prefer small bundled models such as `tiny.en`, not the large desktop default.
+- SwiftUI, AVFoundation, simulator/device builds, signing, and App Store privacy review are next phases once full Xcode and iOS SDKs are available.
+- Existing Linux desktop behavior remains preserved while iOS foundations are added in a separate `ios/` subtree.

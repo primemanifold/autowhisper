@@ -287,3 +287,27 @@ Blocked on:
 - Nothing for this slice.
 Next:
 - Commit and push the settings UI structured validation issue slice, then continue Phase 1 with either browser/manual UI smoke coverage for the settings save error path or first-party build-warning cleanup.
+
+## Run 2026-05-01T01:30:49Z
+Phase: Phase I0 — iOS foundation contract
+Hats used: Research, Engineering, CEO
+Shipped:
+- Created branch `primeodin/ios-foundation` from `primeodin/design-system-settings-ui` at `81d23f9`.
+- Ran two read-only iOS scouts: one for product/platform architecture and one for local build/tooling reality.
+- Added first-party Swift package under `ios/` with `AutoWhisperCore` and a CLI verification target `AutoWhisperCoreChecks`.
+- Added iOS domain foundations for mobile defaults, small bundled model catalog, permission/capability messaging, and record/transcribe workflow seams.
+- Added `ios/README.md` and `engineering/ios-implementation-plan.md` documenting the honest iOS path and Xcode gate.
+- Added ADR-0006 documenting that iOS is a native foreground app product surface, not a desktop behavior clone.
+Learned:
+- Current machine has Swift CLI and CMake, but active developer directory is Command Line Tools only; `xcodebuild` requires full Xcode and iOS SDKs are not available.
+- Existing repo has no first-party iOS target; Swift sources are only vendored `whisper.cpp` examples.
+- iOS cannot support AutoWhisper's desktop global hotkey, daemon/tray, PulseAudio, or arbitrary text injection assumptions.
+Verification:
+- RED observed first: `swift run --package-path ios AutoWhisperCoreChecks` failed on missing iOS domain types before implementation.
+- GREEN passed: `swift run --package-path ios AutoWhisperCoreChecks` prints `AutoWhisperCoreChecks passed`.
+- Independent review found no blockers and flagged `RecordingSession` concurrency/error-state issues; fixed by making `RecordingSession` an actor and adding a `.failed` state regression check.
+Blocked on:
+- Runnable iOS simulator/device app build is blocked until full Xcode is installed/selected and `iphoneos`/`iphonesimulator` SDKs plus `simctl` are available.
+Next:
+- Install/select full Xcode, then add SwiftUI app shell with `NSMicrophoneUsageDescription` and simulator/device build gates.
+- After app shell, bind AVFoundation recording and `whisper.cpp` inference behind the Swift package seams.
