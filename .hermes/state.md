@@ -243,3 +243,22 @@ Blocked on:
 Next:
 - Surface the new structured issues in the embedded settings UI (per-field error messaging, warning vs error styling) once the HTTP contract has soaked.
 - Continue Phase 1 with the remaining first-party build warnings (e.g., `audio.h` unused `silence_threshold_samples_`, PulseAudio stub fields) or with sourced competitor benchmark work.
+
+## Run 2026-05-01T00:45:45Z
+Phase: Phase 1 — Clean run hygiene after settings/config diagnostics
+Hats used: Engineering, CEO
+Shipped:
+- Investigated the apparent dirty status after Claude Code completed the settings/config diagnostics slice.
+- Confirmed the only remaining uncommitted item was generated CMake output under `build-audit/`, not source code.
+- Updated `.gitignore` to ignore `build-*/` directories so audit/release build trees do not make future runs look dirty.
+Verification:
+- Built existing `build-audit` tree successfully with `cmake --build build-audit -j$(sysctl -n hw.ncpu || nproc || echo 2)`.
+- Passed targeted settings/config CTest subset: 15/15 tests.
+- Passed full native CTest suite: 97/97 tests.
+- Passed `python3 -m unittest tests.static.test_settings_design_assets -v`: 8/8 tests.
+- Passed `node --check src/settings/web/app.js`.
+- Passed `git diff --check`.
+Blocked on:
+- Nothing for the clean-run hygiene fix.
+Next:
+- Commit and push this `.gitignore` hygiene fix, then continue Phase 1 from a clean working tree.

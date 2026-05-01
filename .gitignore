@@ -12,6 +12,7 @@
 
 # Build
 build/
+build-*/
 cmake-build-*/
 
 # Downloaded packages
