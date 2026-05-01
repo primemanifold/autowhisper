@@ -37,6 +37,12 @@ const std::vector<KeyDef>& all();
 // Returns nullptr if (section, key) is not in the schema.
 const KeyDef* find(std::string_view section, std::string_view key);
 
+// Stable schema version for settings/config migrations.
+int version();
+
+bool is_known_section(std::string_view section);
+bool is_known_key(std::string_view section, std::string_view key);
+
 // Serialize the schema for the UI.
 // Shape: { "<section>": [ { "key": "...", "type": "enum", "enum_values": [...],
 //                           "min_numeric": <num or null>, "max_numeric": <num or null>,

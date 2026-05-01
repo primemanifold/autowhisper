@@ -2,6 +2,7 @@
 #include "config/config.h"
 #include "config/schema.h"
 #include "settings/assets.h"
+#include "platform/capabilities.h"
 #include "settings/handlers.h"
 #include "settings/sidecar.h"
 
@@ -9,11 +10,13 @@
 #include <nlohmann/json.hpp>
 #include <spdlog/spdlog.h>
 
+#if !defined(_WIN32)
 #include <fcntl.h>
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#endif
 
 #include <cerrno>
 #include <chrono>
@@ -26,6 +29,16 @@
 
 namespace autowhisper {
 
+#if defined(_WIN32)
+
+int cmd_config_ui(const std::string&, bool) {
+    std::cerr << "Settings UI server is not implemented on Windows yet. "
+              << "Use the desktop platform diagnostics to track Windows readiness.\n";
+    return 1;
+}
+
+#else
+
 namespace {
 
 void register_api_routes(httplib::Server& srv, const std::string& config_path) {
@@ -34,6 +47,9 @@ void register_api_routes(httplib::Server& srv, const std::string& config_path) {
     });
     srv.Get("/api/defaults", [](const httplib::Request&, httplib::Response& res) {
         res.set_content(settings::defaults_json().dump(), "application/json");
+    });
+    srv.Get("/api/platform", [](const httplib::Request&, httplib::Response& res) {
+        res.set_content(platform_capabilities_json(current_platform_capabilities()).dump(), "application/json");
     });
     srv.Get("/api/config", [config_path](const httplib::Request&, httplib::Response& res) {
         try {
@@ -51,14 +67,26 @@ void register_api_routes(httplib::Server& srv, const std::string& config_path) {
             body = nlohmann::json::parse(req.body);
         } catch (const std::exception& e) {
             res.status = 400;
-            res.set_content(nlohmann::json{{"errors", {e.what()}}}.dump(),
+            const auto message = std::string(e.what());
+            res.set_content(nlohmann::json{
+                                {"errors", {message}},
+                                {"issues", {settings::issue_to_json(ValidationIssue{
+                                                ValidationSeverity::Error,
+                                                "",
+                                                "json_parse_error",
+                                                message})}}}
+                                .dump(),
                             "application/json");
             return;
         }
         auto v = settings::validate_json(body);
         if (!v.ok()) {
+            nlohmann::json issues = nlohmann::json::array();
+            for (const auto& issue : v.issues) {
+                issues.push_back(settings::issue_to_json(issue));
+            }
             res.status = 400;
-            res.set_content(nlohmann::json{{"errors", v.errors}}.dump(),
+            res.set_content(nlohmann::json{{"errors", v.errors}, {"issues", issues}}.dump(),
                             "application/json");
             return;
         }
@@ -115,7 +143,7 @@ void shutdown_signal_handler(int /*signo*/) {
     }
 }
 
-void launch_xdg_open(const std::string& url) {
+void launch_browser(const std::string& url) {
     pid_t pid = ::fork();
     if (pid < 0) {
         spdlog::warn("fork failed; cannot launch browser");
@@ -188,7 +216,7 @@ int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
                     std::cout << "Settings UI already running at http://127.0.0.1:"
                               << parsed->port << "\n";
                     if (open_browser) {
-                        launch_xdg_open("http://127.0.0.1:" + std::to_string(parsed->port));
+                        launch_browser("http://127.0.0.1:" + std::to_string(parsed->port));
                     }
                     ::close(fd);
                     return 0;
@@ -253,7 +281,7 @@ int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
     std::cout << "Press Ctrl+C to close\n";
 
     if (open_browser) {
-        launch_xdg_open("http://127.0.0.1:" + std::to_string(port));
+        launch_browser("http://127.0.0.1:" + std::to_string(port));
     }
 
     srv.listen_after_bind();
@@ -263,5 +291,7 @@ int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
     ::close(fd);
     return 0;
 }
+
+#endif
 
 }  // namespace autowhisper

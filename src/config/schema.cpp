@@ -29,17 +29,17 @@ const std::vector<KeyDef>& table() {
               "int8_float32", "int8_bfloat16", "bfloat16"},
             std::nullopt, std::nullopt,
             "Numeric precision for inference."},
-        {"model", "beam_size", Type::Int, V{}, 1.0, std::nullopt,
+        {"model", "beam_size", Type::Int, V{}, 1.0, 10.0,
             "Beam search width. 1 = greedy."},
         {"model", "language", Type::String, V{}, std::nullopt, std::nullopt,
             "ISO 639-1 language code (e.g. 'en')."},
-        {"model", "num_threads", Type::Int, V{}, 1.0, std::nullopt,
+        {"model", "num_threads", Type::Int, V{}, 1.0, 256.0,
             "CPU threads for inference."},
 
         // [audio]
         {"audio", "sample_rate", Type::Int, V{}, 1.0, std::nullopt,
             "Capture sample rate in Hz. Whisper expects 16000."},
-        {"audio", "channels", Type::Int, V{}, 1.0, std::nullopt,
+        {"audio", "channels", Type::Int, V{}, 1.0, 8.0,
             "Capture channel count."},
         {"audio", "buffer_size", Type::Int, V{}, 1.0, std::nullopt,
             "Audio buffer size in frames."},
@@ -133,6 +133,21 @@ const KeyDef* find(std::string_view section, std::string_view key) {
         return d.section == section && d.key == key;
     });
     return (it == t.end()) ? nullptr : &*it;
+}
+
+int version() {
+    return 1;
+}
+
+bool is_known_section(std::string_view section) {
+    const auto& t = table();
+    return std::any_of(t.begin(), t.end(), [&](const KeyDef& d) {
+        return d.section == section;
+    });
+}
+
+bool is_known_key(std::string_view section, std::string_view key) {
+    return find(section, key) != nullptr;
 }
 
 nlohmann::json to_json() {

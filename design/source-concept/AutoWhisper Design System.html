@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AutoWhisper · Design System & UX Direction</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="tokens.css" />
+<style>
+  @keyframes awspin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+  @keyframes awpulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.55; transform: scale(0.85); } }
+  @keyframes awblink { 50% { opacity: 0; } }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="foundations.jsx"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="ia-map.jsx"></script>
+<script type="text/babel" src="surfaces.jsx"></script>
+<script type="text/babel" src="prototype.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "light",
+  "accent": "#B8412A",
+  "density": "regular",
+  "showSchemaKeys": true
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  React.useEffect(() => {
+    document.documentElement.dataset.theme = t.theme === 'dark' ? 'dark' : 'light';
+    document.documentElement.style.setProperty('--aw-signal', t.accent);
+  }, [t.theme, t.accent]);
+
+  return (
+    <>
+      <DesignCanvas>
+
+        <DCSection id="00-thesis" title="00 · Thesis" subtitle="What AutoWhisper should feel like — and why those words matter.">
+          <DCArtboard id="thesis" label="Product design thesis" width={980} height={620}>
+            <ThesisArtboard />
+          </DCArtboard>
+          <DCArtboard id="principles" label="Six design principles" width={980} height={780}>
+            <PrinciplesArtboard />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="01-foundations" title="01 · Foundations" subtitle="Tokens that engineering can lift directly into CSS.">
+          <DCArtboard id="color" label="Color · paper, ink, signal, states" width={760} height={780}>
+            <ColorArtboard />
+          </DCArtboard>
+          <DCArtboard id="type" label="Type · IBM Plex Sans / Mono / Serif" width={820} height={780}>
+            <TypeArtboard />
+          </DCArtboard>
+          <DCArtboard id="space" label="Space · radius · elevation · motion" width={680} height={780}>
+            <SpacingArtboard />
+          </DCArtboard>
+          <DCArtboard id="voice" label="Voice · UI / CLI / privacy registers" width={720} height={780}>
+            <VoiceArtboard />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="02-components" title="02 · Components" subtitle="Buttons, fields, status pills, kbd, waveform.">
+          <DCArtboard id="components" label="Component library" width={820} height={820}>
+            <ComponentsArtboard />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="03-ia" title="03 · Information architecture" subtitle="Settings regrouped by user intent, not raw config schema.">
+          <DCArtboard id="iamap" label="Settings IA — eight groups" width={1080} height={760}>
+            <IAMapArtboard />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="04-surfaces" title="04 · Surfaces" subtitle="Tray, recording HUD, CLI, first-run, diagnostics.">
+          <DCArtboard id="tray" label="Tray · states & menu" width={420} height={680}>
+            <TrayArtboard />
+          </DCArtboard>
+          <DCArtboard id="hud" label="Recording HUD · 4 states + compact" width={620} height={680}>
+            <HudArtboard />
+          </DCArtboard>
+          <DCArtboard id="cli" label="CLI · autowhisper doctor" width={760} height={760}>
+            <CliArtboard />
+          </DCArtboard>
+          <DCArtboard id="firstrun" label="First-run · model picker" width={1040} height={720}>
+            <FirstRunArtboard />
+          </DCArtboard>
+          <DCArtboard id="diag" label="Diagnostics · remediation cards" width={780} height={820}>
+            <DiagnosticsArtboard />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="05-prototype" title="05 · Interactive prototype" subtitle="The redesigned settings app — clickable. Save, reset, navigate, simulate recording.">
+          <DCArtboard id="settings" label="Settings — fully interactive" width={1180} height={760}>
+            <SettingsPrototype />
+          </DCArtboard>
+        </DCSection>
+
+        <DCPostIt top={20} right={40} rotate={2} width={220}>
+          Drag the grip to reorder · click any label to focus fullscreen · pan the canvas with two fingers or middle-click.
+        </DCPostIt>
+
+      </DesignCanvas>
+
+      <TweaksPanel>
+        <TweakSection label="Theme" />
+        <TweakRadio label="Mode" value={t.theme} options={['light', 'dark']} onChange={(v) => setTweak('theme', v)} />
+        <TweakColor label="Signal accent" value={t.accent} onChange={(v) => setTweak('accent', v)} />
+        <TweakSection label="Density (preview)" />
+        <TweakRadio label="Density" value={t.density} options={['compact', 'regular', 'comfy']} onChange={(v) => setTweak('density', v)} />
+        <TweakSection label="Settings prototype" />
+        <TweakToggle label="Show config keys" value={t.showSchemaKeys} onChange={(v) => setTweak('showSchemaKeys', v)} />
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

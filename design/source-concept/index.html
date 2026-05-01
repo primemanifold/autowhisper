@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AutoWhisper · Design System & Redesign</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="tokens.css" />
+
+<style>
+  @keyframes awspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes awpulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(1.1); } }
+  @keyframes awblink { 50% { opacity: 0; } }
+  html, body, #root { height: 100%; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="foundations.jsx"></script>
+<script type="text/babel" src="components.jsx"></script>
+<script type="text/babel" src="ia-map.jsx"></script>
+<script type="text/babel" src="surfaces.jsx"></script>
+<script type="text/babel" src="settings-app.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "light",
+  "accent": "#B8412A",
+  "density": "regular",
+  "fontFamily": "plex"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [t, setTweak] = window.useTweaks(TWEAK_DEFAULTS);
+
+  // Apply tweaks to the document root (tokens cascade from there).
+  React.useEffect(() => {
+    const r = document.documentElement;
+    r.setAttribute('data-theme', t.theme);
+    r.style.setProperty('--aw-signal', t.accent);
+    if (t.fontFamily === 'jetbrains') {
+      r.style.setProperty('--aw-font-mono', '"JetBrains Mono", ui-monospace, Menlo, monospace');
+    } else if (t.fontFamily === 'system') {
+      r.style.setProperty('--aw-font-sans', 'system-ui, -apple-system, sans-serif');
+      r.style.setProperty('--aw-font-mono', 'ui-monospace, Menlo, monospace');
+    } else {
+      r.style.removeProperty('--aw-font-sans');
+      r.style.removeProperty('--aw-font-mono');
+    }
+  }, [t.theme, t.accent, t.fontFamily]);
+
+  // Wide artboard for the prototype settings app, narrower for spec/foundation panels.
+  const proto = { width: 1080, height: 720 };
+  const spec  = { width: 920,  height: 720 };
+  const wide  = { width: 1080, height: 720 };
+  const tall  = { width: 720,  height: 720 };
+
+  return (
+    <>
+      <window.DesignCanvas>
+
+        <window.DCSection id="thesis" title="01 · Thesis & Principles" subtitle="What AutoWhisper is, and the six commitments behind every screen.">
+          <window.DCArtboard id="thesis" label="Design thesis" {...wide}>
+            <window.ThesisArtboard />
+          </window.DCArtboard>
+          <window.DCArtboard id="principles" label="Six principles" {...wide}>
+            <window.PrinciplesArtboard />
+          </window.DCArtboard>
+          <window.DCPostIt top={-12} left={-200} rotate={-3} width={170}>
+            Start here. The principles drive every other decision in this canvas.
+          </window.DCPostIt>
+        </window.DCSection>
+
+        <window.DCSection id="foundations" title="02 · Foundations" subtitle="Color, type, spacing, motion, voice — the atoms.">
+          <window.DCArtboard id="color"   label="Color"   {...spec}><window.ColorArtboard /></window.DCArtboard>
+          <window.DCArtboard id="type"    label="Type"    {...spec}><window.TypeArtboard /></window.DCArtboard>
+          <window.DCArtboard id="spacing" label="Space, radius, motion" {...spec}><window.SpacingArtboard /></window.DCArtboard>
+          <window.DCArtboard id="voice"   label="Voice"   {...spec}><window.VoiceArtboard /></window.DCArtboard>
+        </window.DCSection>
+
+        <window.DCSection id="components" title="03 · Components" subtitle="Buttons, fields, pills, kbd, waveforms — the molecules.">
+          <window.DCArtboard id="components" label="Component library" {...spec}>
+            <window.ComponentsArtboard />
+          </window.DCArtboard>
+        </window.DCSection>
+
+        <window.DCSection id="ia" title="04 · Information architecture" subtitle="From config-shape navigation to user-intent navigation.">
+          <window.DCArtboard id="iamap" label="Settings IA · 8 groups" {...spec}>
+            <window.IAMapArtboard />
+          </window.DCArtboard>
+        </window.DCSection>
+
+        <window.DCSection id="prototype" title="05 · Settings prototype" subtitle="The redesigned settings app, clickable. Try the sidebar.">
+          <window.DCArtboard id="settings" label="Settings · clickable prototype" {...proto}>
+            <window.SettingsAppArtboard />
+          </window.DCArtboard>
+          <window.DCPostIt top={-12} right={-200} rotate={2} width={180}>
+            Click sidebar items. Change a value to see the unsaved-changes pill light up.
+          </window.DCPostIt>
+        </window.DCSection>
+
+        <window.DCSection id="surfaces" title="06 · Other surfaces" subtitle="Tray, recording HUD, CLI, first-run, diagnostics.">
+          <window.DCArtboard id="tray"      label="Tray · states & menu"  {...tall}><window.TrayArtboard /></window.DCArtboard>
+          <window.DCArtboard id="hud"       label="Recording HUD"          {...tall}><window.HudArtboard /></window.DCArtboard>
+          <window.DCArtboard id="cli"       label="CLI · doctor"           {...spec}><window.CliArtboard /></window.DCArtboard>
+          <window.DCArtboard id="firstrun"  label="First run · step 1"     {...wide}><window.FirstRunArtboard /></window.DCArtboard>
+          <window.DCArtboard id="diag"      label="Diagnostics"            {...spec}><window.DiagnosticsArtboard /></window.DCArtboard>
+        </window.DCSection>
+
+      </window.DesignCanvas>
+
+      <window.TweaksPanel title="Tweaks">
+        <window.TweakSection label="Theme" />
+        <window.TweakRadio label="Mode" value={t.theme}
+          options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]}
+          onChange={(v) => setTweak('theme', v)} />
+        <window.TweakColor label="Signal accent" value={t.accent}
+          onChange={(v) => setTweak('accent', v)} />
+
+        <window.TweakSection label="Type" />
+        <window.TweakRadio label="Family" value={t.fontFamily}
+          options={[
+            { value: 'plex', label: 'Plex' },
+            { value: 'jetbrains', label: 'JB Mono' },
+            { value: 'system', label: 'System' },
+          ]}
+          onChange={(v) => setTweak('fontFamily', v)} />
+
+        <window.TweakSection label="Density" />
+        <window.TweakRadio label="UI density" value={t.density}
+          options={['compact', 'regular', 'comfy']}
+          onChange={(v) => setTweak('density', v)} />
+      </window.TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

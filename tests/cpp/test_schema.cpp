@@ -25,9 +25,20 @@ TEST_CASE("schema::find locates known keys", "[schema]") {
     CHECK(!d->enum_values.empty());
 }
 
+TEST_CASE("schema exposes a stable schema version", "[schema]") {
+    CHECK(schema::version() == 1);
+}
+
 TEST_CASE("schema::find returns nullptr for unknown keys", "[schema]") {
     CHECK(schema::find("nonexistent_section", "foo") == nullptr);
     CHECK(schema::find("model", "nonexistent_key") == nullptr);
+}
+
+TEST_CASE("schema helpers distinguish known sections and keys", "[schema]") {
+    CHECK(schema::is_known_section("model"));
+    CHECK(schema::is_known_key("model", "size"));
+    CHECK_FALSE(schema::is_known_section("unknown_section"));
+    CHECK_FALSE(schema::is_known_key("model", "unknown_key"));
 }
 
 TEST_CASE("schema enum allow-lists match Config::validate", "[schema]") {
@@ -88,4 +99,21 @@ TEST_CASE("schema::to_json serializes numeric bounds", "[schema]") {
     CHECK((*it)["type"] == "float");
     CHECK((*it)["min_numeric"] == 0.0);
     CHECK((*it)["max_numeric"] == 1.0);
+}
+
+TEST_CASE("schema numeric bounds include Config::validate upper limits", "[schema]") {
+    const auto* beam = schema::find("model", "beam_size");
+    REQUIRE(beam != nullptr);
+    REQUIRE(beam->max_numeric.has_value());
+    CHECK(*beam->max_numeric == 10.0);
+
+    const auto* threads = schema::find("model", "num_threads");
+    REQUIRE(threads != nullptr);
+    REQUIRE(threads->max_numeric.has_value());
+    CHECK(*threads->max_numeric == 256.0);
+
+    const auto* channels = schema::find("audio", "channels");
+    REQUIRE(channels != nullptr);
+    REQUIRE(channels->max_numeric.has_value());
+    CHECK(*channels->max_numeric == 8.0);
 }

@@ -17,6 +17,19 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/deps/CLI11)
 set(SPDLOG_FMT_EXTERNAL OFF CACHE BOOL "" FORCE)
 add_subdirectory(${CMAKE_SOURCE_DIR}/deps/spdlog)
 
+# AppleClang 21 rejects bundled fmt 10.2.1's consteval compile-time format
+# checking in spdlog 1.14.1 with "call to consteval function ... is not a
+# constant expression". Keep bundled fmt/no runtime dependency, but disable only
+# fmt's consteval keyword path for this compiler family/version.
+if(APPLE
+    AND CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang"
+    AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 21)
+    target_compile_definitions(spdlog PUBLIC FMT_CONSTEVAL=)
+    if(TARGET spdlog_header_only)
+        target_compile_definitions(spdlog_header_only INTERFACE FMT_CONSTEVAL=)
+    endif()
+endif()
+
 # miniaudio 0.11.21 - Audio capture/playback (header-only)
 add_library(miniaudio INTERFACE)
 target_include_directories(miniaudio INTERFACE ${CMAKE_SOURCE_DIR}/deps/miniaudio)

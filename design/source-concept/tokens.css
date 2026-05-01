@@ -1,0 +1,168 @@
+/* AutoWhisper Design Tokens
+   Engineered precision: paper-light, mono-numerics, restrained accent.
+   Light-first; dark mode tokens flip via [data-theme="dark"]. */
+
+:root {
+  /* ─── Paper / surfaces ─── */
+  --aw-paper-0: #fafaf7;          /* canvas background — bone white */
+  --aw-paper-1: #ffffff;           /* card / elevated surface */
+  --aw-paper-2: #f4f3ee;           /* recessed wells, code blocks */
+  --aw-paper-3: #ecebe4;           /* hover, subtle dividers */
+  --aw-line:    #d9d7cf;           /* primary divider */
+  --aw-line-2:  #e6e4dd;           /* hairline */
+
+  /* ─── Ink ─── */
+  --aw-ink-0:   #16140f;           /* primary text */
+  --aw-ink-1:   #2a2620;           /* secondary heading */
+  --aw-ink-2:   #5a5448;           /* body / labels */
+  --aw-ink-3:   #8a8472;           /* muted, captions */
+  --aw-ink-4:   #b5b0a0;           /* placeholders, disabled */
+
+  /* ─── Signal palette ─── single saturated accent + functional states */
+  --aw-signal:        #b8412a;     /* the accent — a brick red, like a record dot. used SPARSELY. */
+  --aw-signal-soft:   #f3e0d9;
+  --aw-signal-ink:    #7a2a1a;
+
+  --aw-ok:            #3f7a3a;     /* success / connected / saved */
+  --aw-ok-soft:       #e2ecdf;
+  --aw-warn:          #a8721b;     /* warn / advisory */
+  --aw-warn-soft:     #f1e6cf;
+  --aw-err:           #a83232;     /* error / blocking */
+  --aw-err-soft:      #f1d9d6;
+  --aw-info:          #2e5d8a;     /* informational, technical readout */
+  --aw-info-soft:     #d9e3ee;
+
+  /* ─── Type ─── */
+  --aw-font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --aw-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --aw-font-serif: "IBM Plex Serif", ui-serif, Georgia, serif;
+
+  /* Type scale — paragraph anchored at 14px.
+     Names follow function not size so we can retune them. */
+  --aw-text-micro:   10px;   /* legal, ALL CAPS labels */
+  --aw-text-mini:    11px;   /* meta */
+  --aw-text-small:   12px;   /* table data, secondary */
+  --aw-text-body:    14px;   /* default */
+  --aw-text-lead:    16px;   /* lead paragraph, form labels */
+  --aw-text-h4:      18px;
+  --aw-text-h3:      22px;
+  --aw-text-h2:      28px;
+  --aw-text-h1:      36px;
+  --aw-text-display: 56px;   /* marketing only */
+
+  /* Numeric / data */
+  --aw-text-num-sm:  13px;
+  --aw-text-num-md:  16px;
+  --aw-text-num-lg:  22px;
+  --aw-text-num-xl:  44px;   /* big readouts: latency, dB */
+
+  /* ─── Spacing — 4px base, no half-steps ─── */
+  --aw-s-1:  4px;
+  --aw-s-2:  8px;
+  --aw-s-3:  12px;
+  --aw-s-4:  16px;
+  --aw-s-5:  24px;
+  --aw-s-6:  32px;
+  --aw-s-7:  48px;
+  --aw-s-8:  64px;
+  --aw-s-9:  96px;
+
+  /* ─── Radius — small only. precise, not playful. ─── */
+  --aw-r-1: 2px;
+  --aw-r-2: 4px;
+  --aw-r-3: 6px;
+  --aw-r-4: 10px;   /* the largest we go — for hero cards */
+  --aw-r-pill: 999px;
+
+  /* ─── Elevation — paper, never glow ─── */
+  --aw-shadow-1: 0 1px 0 rgba(20,16,8,0.04), 0 1px 2px rgba(20,16,8,0.04);
+  --aw-shadow-2: 0 1px 0 rgba(20,16,8,0.04), 0 2px 8px rgba(20,16,8,0.06), 0 8px 24px rgba(20,16,8,0.04);
+  --aw-shadow-3: 0 1px 0 rgba(20,16,8,0.04), 0 6px 16px rgba(20,16,8,0.08), 0 24px 48px rgba(20,16,8,0.06);
+  --aw-shadow-inset: inset 0 1px 0 rgba(20,16,8,0.04);
+
+  /* ─── Motion — short, mechanical, never bouncy ─── */
+  --aw-dur-1: 80ms;
+  --aw-dur-2: 140ms;
+  --aw-dur-3: 220ms;
+  --aw-ease-out: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --aw-ease-in:  cubic-bezier(0.6, 0.0, 0.8, 0.4);
+  --aw-ease-step: steps(8, end);          /* for terminal/data feel */
+
+  /* ─── Focus ring — 2px signal ring + 1px ink halo. WCAG-pass. ─── */
+  --aw-focus: 0 0 0 2px var(--aw-paper-0), 0 0 0 4px var(--aw-signal);
+}
+
+[data-theme="dark"] {
+  --aw-paper-0: #14130f;
+  --aw-paper-1: #1c1a15;
+  --aw-paper-2: #24221c;
+  --aw-paper-3: #2c2a23;
+  --aw-line:    #36332a;
+  --aw-line-2:  #2a2820;
+
+  --aw-ink-0:   #f0eee5;
+  --aw-ink-1:   #d9d6c8;
+  --aw-ink-2:   #a8a392;
+  --aw-ink-3:   #7a7464;
+  --aw-ink-4:   #4f4a3e;
+
+  --aw-signal:        #d96148;
+  --aw-signal-soft:   #3a1d14;
+  --aw-signal-ink:    #f0a48f;
+
+  --aw-ok:            #6fa868;
+  --aw-ok-soft:       #1f2c1c;
+  --aw-warn:          #d4a247;
+  --aw-warn-soft:     #2e2515;
+  --aw-err:           #d56862;
+  --aw-err-soft:      #2e1816;
+  --aw-info:          #6a9bcb;
+  --aw-info-soft:     #142433;
+
+  --aw-shadow-1: 0 1px 0 rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4);
+  --aw-shadow-2: 0 2px 8px rgba(0,0,0,0.5), 0 8px 24px rgba(0,0,0,0.4);
+  --aw-shadow-3: 0 6px 16px rgba(0,0,0,0.6), 0 24px 48px rgba(0,0,0,0.4);
+  --aw-focus: 0 0 0 2px var(--aw-paper-0), 0 0 0 4px var(--aw-signal);
+}
+
+/* ─── Base ─── */
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--aw-font-sans);
+  font-size: var(--aw-text-body);
+  line-height: 1.5;
+  color: var(--aw-ink-0);
+  background: var(--aw-paper-0);
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "ss02", "cv11";  /* IBM Plex stylistic — single-storey g, alt 4 */
+}
+
+/* Numerics: tabular wherever data appears */
+.aw-num, code, kbd, pre, samp, .aw-mono {
+  font-family: var(--aw-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "zero", "ss05";  /* slashed zero */
+}
+
+.aw-tabular { font-variant-numeric: tabular-nums; }
+
+/* Eyebrow / section caps — uppercase mono micro */
+.aw-eyebrow {
+  font-family: var(--aw-font-mono);
+  font-size: var(--aw-text-micro);
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--aw-ink-3);
+}
+
+/* Selection */
+::selection { background: var(--aw-signal-soft); color: var(--aw-signal-ink); }
+
+/* Focus — visible only on keyboard */
+:focus-visible {
+  outline: none;
+  box-shadow: var(--aw-focus);
+  border-radius: var(--aw-r-2);
+}

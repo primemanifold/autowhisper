@@ -12,7 +12,10 @@
 
 # Build
 build/
+build-*/
 cmake-build-*/
+.build/
+.swiftpm/
 
 # Downloaded packages
 *.deb
@@ -31,6 +34,10 @@ debian/.debhelper/
 *.swp
 *.swo
 *~
+
+# Python
+__pycache__/
+*.py[cod]
 
 # OS
 .DS_Store

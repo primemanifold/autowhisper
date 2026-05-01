@@ -2,22 +2,56 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AutoWhisper Settings</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <main>
-    <header>
-      <h1>AutoWhisper Settings</h1>
-      <p id="config-path"></p>
-    </header>
-    <form id="settings-form"></form>
-    <footer>
-      <button id="save-btn" type="button">Save</button>
-      <button id="reset-btn" type="button">Reset to defaults</button>
-      <span id="status"></span>
-    </footer>
-  </main>
+  <div class="aw-shell">
+    <aside class="aw-sidebar" aria-label="Settings sections">
+      <div class="aw-brand">
+        <span class="aw-mark" aria-hidden="true"></span>
+        <div>
+          <div class="aw-brand-name">AutoWhisper</div>
+          <div class="aw-brand-note">local dictation</div>
+        </div>
+      </div>
+
+      <nav id="settings-nav" class="aw-nav">
+        <button type="button" class="aw-nav-item is-active" data-target="dictation"><span>01</span>Dictation behavior</button>
+        <button type="button" class="aw-nav-item" data-target="model" aria-label="Model & performance"><span>02</span>Model &amp; performance</button>
+        <button type="button" class="aw-nav-item" data-target="audio"><span>03</span>Audio input</button>
+        <button type="button" class="aw-nav-item" data-target="output" aria-label="Output & insertion"><span>04</span>Output &amp; insertion</button>
+        <button type="button" class="aw-nav-item" data-target="privacy"><span>05</span>Privacy</button>
+        <button type="button" class="aw-nav-item" data-target="feedback" aria-label="Feedback & tray"><span>06</span>Feedback &amp; tray</button>
+        <button type="button" class="aw-nav-item" data-target="diagnostics"><span>07</span>Diagnostics</button>
+        <button type="button" class="aw-nav-item" data-target="advanced"><span>08</span>Advanced</button>
+      </nav>
+
+      <div class="aw-sidebar-status" aria-label="Runtime summary">
+        <span class="aw-dot aw-dot-ok" aria-hidden="true"></span>
+        <span>settings served locally</span>
+      </div>
+    </aside>
+
+    <main class="aw-main">
+      <header class="aw-topbar">
+        <div>
+          <p class="aw-eyebrow" id="active-section-kicker">01 · Settings</p>
+          <h1 id="active-section-title">Dictation behavior</h1>
+          <p id="active-section-lede">Choose how AutoWhisper listens, cancels, and gets out of your way.</p>
+        </div>
+        <div class="aw-actions">
+          <span id="dirty-pill" class="aw-pill aw-pill-ok">saved</span>
+          <button id="reset-btn" class="aw-button" type="button">Reset to defaults</button>
+          <button id="save-btn" class="aw-button aw-button-primary" type="button">Save changes</button>
+        </div>
+      </header>
+
+      <div id="status" class="aw-status" role="status" aria-live="polite"></div>
+      <form id="settings-form" class="aw-form" aria-describedby="status"></form>
+    </main>
+  </div>
   <script src="/app.js"></script>
 </body>
 </html>
