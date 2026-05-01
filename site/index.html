@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="AutoWhisper is an offline, local-first desktop dictation app powered by whisper.cpp.">
+  <title>AutoWhisper — local-first desktop dictation</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header" aria-label="Primary navigation">
+    <a class="brand" href="./" aria-label="AutoWhisper home">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>AutoWhisper</span>
+    </a>
+    <nav class="nav-links" aria-label="Site links">
+      <a href="#download">Download</a>
+      <a href="#privacy">Privacy</a>
+      <a href="https://github.com/primemanifold/autowhisper">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero" aria-labelledby="hero-title">
+      <p class="eyebrow">Offline speech-to-text for desktop power users</p>
+      <h1 id="hero-title">Press a hotkey, speak, and keep your words on your machine.</h1>
+      <p class="hero-copy">
+        AutoWhisper is an offline, local-first dictation app powered by whisper.cpp.
+        It is built for fast push-to-talk transcription, local models, and a privacy-first workflow.
+      </p>
+      <div class="hero-actions" id="download">
+        <a class="button button-primary" href="https://github.com/primemanifold/autowhisper/releases/download/v0.7.0/AutoWhisper-macOS-v0.7.0.zip">
+          Download for macOS
+        </a>
+        <a class="button" href="https://github.com/primemanifold/autowhisper/releases/latest">
+          View latest release
+        </a>
+      </div>
+      <p class="release-note">
+        v0.7.0 macOS build: <strong>AutoWhisper-macOS-v0.7.0.zip</strong>, Notarized Developer ID, stapled, and Gatekeeper accepted.
+      </p>
+    </section>
+
+    <section class="panel-grid" aria-label="Product highlights">
+      <article class="panel">
+        <span class="panel-number">01</span>
+        <h2>Local-first by default</h2>
+        <p>Audio is processed on-device with local Whisper models. No cloud transcription service is required.</p>
+      </article>
+      <article class="panel">
+        <span class="panel-number">02</span>
+        <h2>Built for flow</h2>
+        <p>Use push-to-talk dictation and insert text into your desktop workflow without switching contexts.</p>
+      </article>
+      <article class="panel">
+        <span class="panel-number">03</span>
+        <h2>Native desktop path</h2>
+        <p>Linux packages and a notarized macOS app bundle are the current distribution targets.</p>
+      </article>
+    </section>
+
+    <section class="install-card" aria-labelledby="linux-title">
+      <div>
+        <p class="eyebrow">Linux install</p>
+        <h2 id="linux-title">Ubuntu / Debian via PPA</h2>
+        <p>AutoWhisper started as a Linux-first desktop dictation tool and keeps that install path simple.</p>
+      </div>
+      <pre aria-label="Linux install commands"><code>sudo add-apt-repository ppa:primemanifold/autowhisper
+sudo apt update
+sudo apt install autowhisper</code></pre>
+    </section>
+
+    <section class="split" id="privacy" aria-labelledby="privacy-title">
+      <div>
+        <p class="eyebrow">Privacy posture</p>
+        <h2 id="privacy-title">Your microphone audio stays local.</h2>
+      </div>
+      <p>
+        AutoWhisper is designed around offline transcription, local configuration, and transparent release artifacts.
+        The project repository is at <a href="https://github.com/primemanifold/autowhisper">github.com/primemanifold/autowhisper</a>.
+      </p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>AutoWhisper</span>
+    <a href="https://github.com/primemanifold/autowhisper/releases/latest">Releases</a>
+  </footer>
+</body>
+</html>

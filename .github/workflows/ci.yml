@@ -39,6 +39,9 @@ jobs:
       - name: Build
         run: cmake --build build -j$(nproc)
 
+      - name: Run static asset tests
+        run: python3 -m unittest discover tests/static -v
+
       - name: Run tests
         run: cd build && ctest --output-on-failure
 

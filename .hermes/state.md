@@ -555,3 +555,26 @@ Verification:
 - This change was present in the worktree for the prior local build/notarized release artifact; committing it aligns source history/tag with the shipped binary.
 Next:
 - Push, retag, recreate release event, and verify hosted CI.
+
+## Run 2026-05-01T18:46:44Z
+Phase: Website/GitHub Pages setup
+Hats used: Engineering, Marketing, CEO
+Shipped:
+- [HAT: Engineering] Added a simple framework-free static landing site under `site/` for GitHub Pages.
+- [HAT: Engineering] Added `.github/workflows/pages.yml` using GitHub Actions Pages deployment from `core` and guarded manual deploys to `refs/heads/core`.
+- [HAT: Engineering] Added static regression coverage in `tests/static/test_website_assets.py` and wired static asset tests into CI.
+- [HAT: Marketing] Landing page copy focuses on offline/local-first dictation, macOS release download, Linux PPA install, and privacy posture without adding analytics or a frontend runtime.
+Verification:
+- RED: New website static tests failed before `site/` and the Pages workflow existed.
+- GREEN: `python3 -m unittest discover tests/static -v` passed — 25/25 tests.
+- GREEN: `node --check src/settings/web/app.js` passed.
+- GREEN: Parsed `site/index.html` with Python `HTMLParser`.
+- GREEN: Parsed `.github/workflows/ci.yml` and `.github/workflows/pages.yml` with Ruby YAML.
+- GREEN: `git diff --check` passed.
+- Browser visual smoke on local `python3 -m http.server` found the landing page coherent with no obvious desktop layout defects.
+- Independent read-only review found the workflow structurally valid and static/privacy-safe; it flagged that repo/release links are private until the repo is made public or artifacts are mirrored.
+Boundaries:
+- GitHub Pages deployment will occur only after this branch lands on `core` and Pages is enabled for GitHub Actions.
+- Because `primemanifold/autowhisper` is currently private, public visitors cannot access the linked GitHub repo/release assets unless repo visibility changes or downloads are mirrored elsewhere.
+Next:
+- Push branch `primeodin/github-pages-site`, open PR to `core`, verify CI, then decide whether to merge/deploy now or wait for public-release visibility policy.
