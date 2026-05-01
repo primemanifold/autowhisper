@@ -40,6 +40,12 @@ public:
     void stop();
     void signal_stop();  // Non-blocking: signal thread to exit without joining
 
+    // Called by platform impl when the event source has been disabled and
+    // re-enabled (e.g., macOS tap timeout / user-input disable). The
+    // modifier state cached in this manager may no longer reflect reality,
+    // so clear it — the next real event will rebuild correct state.
+    void reset_input_state();
+
 private:
     HotkeyConfig config_;
     EventCallback callback_;

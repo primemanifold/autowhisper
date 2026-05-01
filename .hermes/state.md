@@ -345,3 +345,30 @@ Blocked on:
 Next:
 - Commit and push this desktop-platform foundation slice to `origin/primeodin/desktop-platform-foundation`.
 - Next engineering slice should implement one real native macOS integration gate, likely microphone permission/onboarding or menu-bar app shell, before expanding feature claims.
+
+
+## Run 2026-05-01T11:25:28Z
+Phase: PR landing and desktop branch reconciliation
+Hats used: Engineering, CEO
+Shipped:
+- Merged GitHub PR #5 (`macos-port`) into `core` with squash merge after GitHub build check passed.
+- Reconciled `primeodin/desktop-platform-foundation` with the updated `origin/core` that now includes the native macOS port.
+- Resolved merge conflicts in `CMakeLists.txt`, `src/cli/cli_settings_ui.cpp`, and `tests/cpp/test_sidecar.cpp` by preserving both platform diagnostics and macOS platform abstractions.
+- Fixed Windows cross-build regressions exposed by the merged macOS abstractions:
+  - Replaced stale `OutputManager::Impl` Windows output placeholder with a `PlatformOutput` placeholder.
+  - Added explicit Windows placeholder implementations for `make_service_manager()` and `platform_checks()`.
+  - Wired Windows doctor/service stubs into CMake.
+Verification:
+- Passed native macOS build target `autowhisper autowhisper_tests`.
+- Passed full native CTest: `117/117`.
+- Passed static settings UI tests: `11/11`.
+- Passed `node --check src/settings/web/app.js`.
+- Passed `git diff --check`.
+- Passed Docker desktop smoke after reconciliation: Linux focused tests `31/31`; Windows MinGW cross-build produced `autowhisper.exe` and `autowhisper_tests.exe` PE32+ artifacts.
+Learned:
+- The macOS PR's platform abstractions moved output/service/doctor seams; Windows placeholders must implement those new interfaces to keep cross-build proof honest.
+- Docker cross-build remains valuable because it caught Windows regressions that native macOS CTest cannot see.
+Blocked on:
+- Windows runtime E2E remains gated on a real Windows host, VM, or proven Wine-capable x86_64 runner.
+Next:
+- Push the reconciled desktop branch, open/merge its PR into `core`, then sync local `core` cleanly.

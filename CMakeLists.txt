@@ -1,5 +1,22 @@
 cmake_minimum_required(VERSION 3.20)
-project(autowhisper VERSION 0.6.0 LANGUAGES CXX)
+project(autowhisper VERSION 0.7.0 LANGUAGES CXX)
+
+# macOS: Objective-C++ for .mm files, ARC, minimum target, universal binary.
+if(APPLE)
+    enable_language(OBJCXX)
+    if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+        set(CMAKE_OSX_DEPLOYMENT_TARGET "12.0" CACHE STRING "" FORCE)
+    endif()
+    if(NOT CMAKE_OSX_ARCHITECTURES)
+        set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "" FORCE)
+    endif()
+    # Enable ARC for all Objective-C++ files. Without this, Obj-C object
+    # pointers stored in C++ structs become dangling references as soon as
+    # the current autorelease pool drains, crashing with EXC_BAD_ACCESS when
+    # later touched (observed: -[NSImage setTemplate:] inside a dispatch_async
+    # block that re-reads NSStatusItem fields).
+    set(CMAKE_OBJCXX_FLAGS "${CMAKE_OBJCXX_FLAGS} -fobjc-arc")
+endif()
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -34,6 +51,7 @@ set(CORE_LIB_SOURCES
     src/hotkey/hotkey_common.cpp
     src/models/models.cpp
     src/platform/capabilities.cpp
+    src/output/output_common.cpp
     src/settings/handlers.cpp
     src/settings/sidecar.cpp
     src/tray/tray_common.cpp
@@ -69,7 +87,6 @@ set(APP_SOURCES
     src/cli/cli.cpp
     src/cli/cli_settings_ui.cpp
     src/doctor/doctor.cpp
-    src/output/output_common.cpp
 )
 
 # === Platform-specific sources ===
@@ -78,6 +95,8 @@ if(LINUX)
         src/hotkey/platform/hotkey_x11.cpp
         src/output/platform/output_x11.cpp
         src/tray/platform/tray_gtk.cpp
+        src/doctor/platform/doctor_linux.cpp
+        src/service/service_linux.cpp
         src/pulseaudio/pulseaudio.cpp
     )
 elseif(APPLE)
@@ -85,6 +104,9 @@ elseif(APPLE)
         src/hotkey/platform/hotkey_macos.mm
         src/output/platform/output_macos.mm
         src/tray/platform/tray_macos.mm
+        src/doctor/platform/doctor_macos.mm
+        src/service/service_macos.mm
+        src/daemon/daemon_macos.mm
         src/pulseaudio/pulseaudio.cpp  # stub on macOS
     )
 elseif(WIN32)
@@ -92,6 +114,8 @@ elseif(WIN32)
         src/hotkey/platform/hotkey_win32.cpp
         src/output/platform/output_win32.cpp
         src/tray/platform/tray_win32.cpp
+        src/doctor/platform/doctor_win32.cpp
+        src/service/service_win32.cpp
         src/pulseaudio/pulseaudio.cpp  # stub on Windows
     )
 endif()
@@ -151,16 +175,30 @@ if(LINUX)
         target_link_libraries(autowhisper PRIVATE ${PULSE_LIBRARIES})
     endif()
 elseif(APPLE)
-    find_library(COCOA_FRAMEWORK Cocoa)
-    find_library(CARBON_FRAMEWORK Carbon)
+    find_library(COCOA_FRAMEWORK    Cocoa)
+    find_library(APPKIT_FRAMEWORK   AppKit)
+    find_library(FOUNDATION_FRAMEWORK Foundation)
+    find_library(CARBON_FRAMEWORK   Carbon)
     find_library(COREGRAPHICS_FRAMEWORK CoreGraphics)
+    find_library(APPSRV_FRAMEWORK   ApplicationServices)
+    find_library(AVFOUNDATION_FRAMEWORK AVFoundation)
+    find_library(COREMEDIA_FRAMEWORK CoreMedia)
+    find_library(METAL_FRAMEWORK    Metal)
+    find_library(IOKIT_FRAMEWORK    IOKit)
     target_link_libraries(autowhisper PRIVATE
         ${COCOA_FRAMEWORK}
+        ${APPKIT_FRAMEWORK}
+        ${FOUNDATION_FRAMEWORK}
         ${CARBON_FRAMEWORK}
         ${COREGRAPHICS_FRAMEWORK}
+        ${APPSRV_FRAMEWORK}
+        ${AVFOUNDATION_FRAMEWORK}
+        ${COREMEDIA_FRAMEWORK}
+        ${METAL_FRAMEWORK}
+        ${IOKIT_FRAMEWORK}
     )
 elseif(WIN32)
-    target_link_libraries(autowhisper PRIVATE ws2_32)
+    target_link_libraries(autowhisper PRIVATE ws2_32 ole32 uuid shell32 user32)
 endif()
 
 # Apply compiler warnings
@@ -170,18 +208,25 @@ autowhisper_set_warnings(autowhisper)
 install(TARGETS autowhisper RUNTIME DESTINATION bin)
 install(DIRECTORY icons/ DESTINATION share/autowhisper/icons)
 
+# macOS .app bundling
+if(APPLE)
+    include(cmake/MacOSBundle.cmake)
+endif()
+
 # Tests
 if(AUTOWHISPER_ENABLE_TESTS)
     enable_testing()
     include(CTest)
     include(Catch)
 
-    add_executable(autowhisper_tests
+    set(TEST_SOURCES
         tests/cpp/test_config.cpp
         tests/cpp/test_keycombo.cpp
         tests/cpp/test_logging.cpp
         tests/cpp/test_models.cpp
         tests/cpp/test_platform_capabilities.cpp
+        tests/cpp/test_output_fallback_order.cpp
+        tests/cpp/test_platform_output_stub.cpp
         tests/cpp/test_schema.cpp
         tests/cpp/test_settings_handlers.cpp
         tests/cpp/test_settings_http.cpp
@@ -189,6 +234,20 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_subprocess.cpp
         tests/cpp/test_tray_display.cpp
     )
+    if(APPLE)
+        list(APPEND TEST_SOURCES
+            tests/cpp/test_keycombo_platform.cpp
+            src/hotkey/platform/hotkey_macos.mm
+        )
+    endif()
+    add_executable(autowhisper_tests ${TEST_SOURCES})
+    if(APPLE)
+        target_link_libraries(autowhisper_tests PRIVATE
+            "-framework ApplicationServices"
+            "-framework Carbon"
+            "-framework CoreGraphics"
+        )
+    endif()
     target_link_libraries(autowhisper_tests PRIVATE
         autowhisper_core
         cpp_httplib

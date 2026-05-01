@@ -43,6 +43,9 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
+# rstack local state (QA reports, checkpoints, review logs)
+.rstack/
+
 # Test audio
 *.wav
 *.mp3

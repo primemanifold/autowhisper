@@ -158,6 +158,7 @@ void launch_browser(const std::string& url) {
                 if (devnull > 2) ::close(devnull);
             }
 #if defined(__APPLE__)
+            // macOS: `open` delegates to LaunchServices (default browser).
             ::execlp("open", "open", url.c_str(), (char*)nullptr);
 #else
             ::execlp("xdg-open", "xdg-open", url.c_str(), (char*)nullptr);
