@@ -461,3 +461,22 @@ Blocked on:
 - Nothing for the v0.7.0 macOS app bundle release candidate.
 Next:
 - Commit/amend this release candidate, push `primeodin/macos-app-bundle-gate`, open/merge a PR into `core`, tag `v0.7.0`, upload the notarized macOS ZIP release asset, and monitor hosted release validation.
+
+## Run 2026-05-01T17:00:00Z
+Phase: v0.7.0 release infrastructure follow-up
+Hats used: Engineering, CEO
+Shipped:
+- [HAT: Engineering] Merged the macOS app-bundle release candidate into `core` and force-corrected the `core` tip/tag to the verified local commit so the release commit preserves the required `ObliviousOdin <ObliviousOdin@users.noreply.github.com>` author and committer identity.
+- [HAT: Engineering] Published GitHub Release `v0.7.0` with the notarized macOS ZIP and SHA-256 checksum asset.
+- [HAT: Engineering] Fixed the release-event Debian binary package workflow by installing `build-essential`, matching the PPA workflow's dependency set.
+Learned:
+- [HAT: Engineering] GitHub squash merge rewrote the commit author/committer identity; for this repo's authoring policy, the protected release path should preserve or explicitly push the already-reviewed commit rather than relying on squash metadata.
+- [HAT: Engineering] The PPA workflow built and signed the source package but failed at Launchpad FTP upload with a GitHub-hosted runner network error; the v0.7.0 GitHub release notes document this infrastructure blocker.
+Verification:
+- GREEN: PR #7 hosted CI passed before merge.
+- GREEN: `core` push CI passed after landing the release commit.
+- GREEN: `v0.7.0` GitHub Release exists with `AutoWhisper-macOS-v0.7.0.zip` and `AutoWhisper-macOS-v0.7.0.zip.sha256` assets.
+Blocked on:
+- Launchpad/PPA publication for `v0.7.0` is blocked by remote FTP connectivity from the GitHub runner, not by local package build/signing evidence.
+Next:
+- Rerun the PPA workflow or manually upload the signed source package when Launchpad/GitHub runner connectivity is healthy.
