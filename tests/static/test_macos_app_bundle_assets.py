@@ -103,6 +103,56 @@ class MacOSAppBundleAssetsTest(unittest.TestCase):
         self.assertNotIn('@"config", @"ui"', tray)
         self.assertNotIn("Grid(", swift)
 
+    def test_native_settings_edits_user_config_not_signed_bundle_resource(self):
+        swift = SWIFT_SETTINGS.read_text(encoding="utf-8")
+        for snippet in [
+            "editableConfigPath",
+            "isBundledAppResourceConfig",
+            "userConfigPath",
+            "createDirectory",
+            "copyItem",
+            "Contents/Resources/config.toml",
+            "ConfigStore(configPath: editableConfigPath)",
+        ]:
+            self.assertIn(snippet, swift)
+        self.assertRegex(
+            swift,
+            r"isBundledAppResourceConfig[\s\S]+userConfigPath[\s\S]+copyItem",
+            "Bundled app Resources/config.toml must be a read-only template copied to the per-user config before editing",
+        )
+        self.assertRegex(
+            swift,
+            r"else \{[\s\S]+configPath = ConfigStore\.userConfigPath\(\)",
+            "Direct helper launches without --config should use the same HOME-aware user config path as bundled-template launches",
+        )
+        self.assertRegex(
+            swift,
+            r"save\(\)[\s\S]+createDirectory\([\s\S]+at:[\s\S]+withIntermediateDirectories: true[\s\S]+write\(",
+            "First-run Save should create ~/.config/autowhisper before writing config.toml",
+        )
+        self.assertRegex(
+            swift,
+            r"static func defaultConfigText\(\)[\s\S]+\[hotkeys\][\s\S]+\[model\][\s\S]+\[output\][\s\S]+\[audio\][\s\S]+\[feedback\][\s\S]+\[tray\][\s\S]+\[daemon\]",
+            "Missing user config must seed a complete TOML template before Save mutates it",
+        )
+        self.assertRegex(
+            swift,
+            r"catch \{\s+originalText = Self\.defaultConfigText\(\)\s+draft = Self\.parse\(originalText\)",
+            "load() must seed parseable defaults after a missing file so first-run Save cannot create duplicate TOML tables",
+        )
+
+    def test_native_settings_default_template_has_no_duplicate_tables(self):
+        swift = SWIFT_SETTINGS.read_text(encoding="utf-8")
+        match = re.search(r"static func defaultConfigText\(\) -> String \{\s+\"\"\"(?P<body>[\s\S]+?)\"\"\"\s+\}", swift)
+        self.assertIsNotNone(match, "Settings helper must keep a concrete default TOML template for first-run Save")
+        body = match.group("body")
+        tables = re.findall(r"^\s*\[([^\]]+)\]", body, flags=re.MULTILINE)
+        self.assertEqual(len(tables), len(set(tables)), f"Default TOML template has duplicate tables: {tables}")
+        self.assertEqual(
+            {"hotkeys", "model", "output", "audio", "feedback", "tray", "daemon"},
+            set(tables),
+        )
+
     def test_macos_signal_sources_do_not_capture_stack_shutdown_pointer(self):
         daemon_cpp = DAEMON_CPP.read_text(encoding="utf-8")
         daemon_macos = DAEMON_MACOS.read_text(encoding="utf-8")

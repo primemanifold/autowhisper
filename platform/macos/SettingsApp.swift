@@ -31,8 +31,79 @@ final class ConfigStore: ObservableObject {
     private var originalText = ""
 
     init(configPath: String) {
-        self.configPath = configPath
+        self.configPath = Self.editableConfigPath(for: configPath)
         load()
+    }
+
+    static func userConfigPath() -> String {
+        let home = ProcessInfo.processInfo.environment["HOME"]
+            ?? FileManager.default.homeDirectoryForCurrentUser.path
+        return URL(fileURLWithPath: home)
+            .appendingPathComponent(".config/autowhisper/config.toml").path
+    }
+
+    static func isBundledAppResourceConfig(_ path: String) -> Bool {
+        URL(fileURLWithPath: path).standardizedFileURL.path.hasSuffix(".app/Contents/Resources/config.toml")
+    }
+
+    static func editableConfigPath(for requestedPath: String) -> String {
+        guard isBundledAppResourceConfig(requestedPath) else { return requestedPath }
+
+        let destination = userConfigPath()
+        guard !FileManager.default.fileExists(atPath: destination) else { return destination }
+
+        do {
+            let destinationURL = URL(fileURLWithPath: destination)
+            try FileManager.default.createDirectory(
+                at: destinationURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try FileManager.default.copyItem(
+                at: URL(fileURLWithPath: requestedPath),
+                to: destinationURL
+            )
+        } catch {
+            // Keep using the per-user path. Saving will create the directory again
+            // and surface any remaining write problem in the UI instead of editing
+            // the signed/notarized app bundle resource.
+        }
+        return destination
+    }
+
+    static func defaultConfigText() -> String {
+        """
+        [hotkeys]
+        mode = 'push_to_talk'
+        trigger = [ 'shift+super' ]
+        cancel = [ 'esc' ]
+
+        [model]
+        size = 'distil-small.en'
+        device = 'auto'
+        compute_type = 'bfloat16'
+        language = 'en'
+
+        [output]
+        auto_paste = true
+        also_copy_to_clipboard = true
+        method = 'inject'
+        ending_action = 'none'
+
+        [audio]
+        vad_enabled = true
+        vad_threshold = 0.50
+        mute_other_apps = false
+
+        [feedback]
+        enabled = true
+        volume = 0.30
+
+        [tray]
+        enabled = true
+
+        [daemon]
+        log_level = 'info'
+        """
     }
 
     func load() {
@@ -42,8 +113,10 @@ final class ConfigStore: ObservableObject {
             status = "Loaded \(URL(fileURLWithPath: configPath).lastPathComponent)"
             errorMessage = nil
         } catch {
-            status = "Could not load config"
-            errorMessage = error.localizedDescription
+            originalText = Self.defaultConfigText()
+            draft = Self.parse(originalText)
+            status = "Using default settings"
+            errorMessage = "Config will be created at \(configPath) when saved."
         }
     }
 
@@ -73,6 +146,11 @@ final class ConfigStore: ObservableObject {
             for (section, key, value) in values {
                 text = Self.replacing(section: section, key: key, value: value, in: text)
             }
+            let destinationURL = URL(fileURLWithPath: configPath)
+            try FileManager.default.createDirectory(
+                at: destinationURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
             try text.write(toFile: configPath, atomically: true, encoding: .utf8)
             originalText = text
             status = "Saved"
@@ -288,11 +366,11 @@ final class AutoWhisperSettingsApp: NSObject, NSApplicationDelegate {
         if let index = args.firstIndex(of: "--config"), args.indices.contains(index + 1) {
             configPath = args[index + 1]
         } else {
-            configPath = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".config/autowhisper/config.toml").path
+            configPath = ConfigStore.userConfigPath()
         }
 
-        let view = SettingsView(store: ConfigStore(configPath: configPath))
+        let editableConfigPath = ConfigStore.editableConfigPath(for: configPath)
+        let view = SettingsView(store: ConfigStore(configPath: editableConfigPath))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 760),
                               styleMask: [.titled, .closable, .miniaturizable, .resizable],
                               backing: .buffered,
