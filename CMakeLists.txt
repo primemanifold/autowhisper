@@ -107,6 +107,7 @@ elseif(APPLE)
         src/doctor/platform/doctor_macos.mm
         src/service/service_macos.mm
         src/daemon/daemon_macos.mm
+        src/platform/macos/onboarding.mm
         src/pulseaudio/pulseaudio.cpp  # stub on macOS
     )
 elseif(WIN32)

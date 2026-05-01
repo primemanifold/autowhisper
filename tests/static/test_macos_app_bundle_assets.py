@@ -103,6 +103,45 @@ class MacOSAppBundleAssetsTest(unittest.TestCase):
         self.assertNotIn('@"config", @"ui"', tray)
         self.assertNotIn("Grid(", swift)
 
+    def test_app_bundle_launch_opens_setup_instead_of_silent_exit_when_not_ready(self):
+        main = MAIN_CPP.read_text(encoding="utf-8")
+        config_cpp = CONFIG_CPP.read_text(encoding="utf-8")
+        self.assertIn("ensure_user_config_file", config_cpp)
+        self.assertRegex(
+            main,
+            r"launched_from_macos_app_bundle[\s\S]+\"run\"",
+            "Double-click app launch should still route through foreground run",
+        )
+        cli = (ROOT / "src" / "cli" / "cli.cpp").read_text(encoding="utf-8")
+        self.assertIn("aw_macos_is_app_bundle_launch", cli)
+        self.assertIn("aw_macos_launch_setup_helper", cli)
+        self.assertIn("aw_macos_prompt_required_permissions", cli)
+        self.assertRegex(
+            cli,
+            r"catch \(const std::exception& e\)[\s\S]+aw_macos_launch_setup_helper",
+            "A first-run model/config/permission failure from the app bundle should open setup UI instead of disappearing",
+        )
+
+    def test_native_settings_contains_first_run_onboarding_actions(self):
+        swift = SWIFT_SETTINGS.read_text(encoding="utf-8")
+        for snippet in [
+            "First-run setup",
+            "Download recommended model",
+            "Input Monitoring",
+            "Accessibility",
+            "Microphone",
+            "Privacy_ListenEvent",
+            "Privacy_Accessibility",
+            "Privacy_Microphone",
+            "--setup-error",
+            "model", "download",
+        ]:
+            self.assertIn(snippet, swift)
+        self.assertIn("Process()", swift)
+        self.assertIn("readabilityHandler", swift)
+        self.assertIn("waitUntilExit", swift)
+        self.assertIn("AVCaptureDevice.requestAccess", swift)
+
     def test_macos_signal_sources_do_not_capture_stack_shutdown_pointer(self):
         daemon_cpp = DAEMON_CPP.read_text(encoding="utf-8")
         daemon_macos = DAEMON_MACOS.read_text(encoding="utf-8")
