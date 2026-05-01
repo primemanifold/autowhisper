@@ -578,3 +578,19 @@ Boundaries:
 - Because `primemanifold/autowhisper` is currently private, public visitors cannot access the linked GitHub repo/release assets unless repo visibility changes or downloads are mirrored elsewhere.
 Next:
 - Push branch `primeodin/github-pages-site`, open PR to `core`, verify CI, then decide whether to merge/deploy now or wait for public-release visibility policy.
+
+## Run 2026-05-01T18:57:32Z
+Phase: Website/GitHub Pages deployment guard follow-up
+Hats used: Engineering, CEO
+Shipped:
+- [HAT: Engineering] Landed the static Pages site on `core` as commit `892e77f`, preserving the local ObliviousOdin author/committer identity.
+- [HAT: Engineering] Observed the first Pages deploy fail because GitHub Pages is not supported for the current private repository plan.
+- [HAT: Engineering] Updated the Pages workflow to skip deployment while the repository is private and to use `configure-pages` `enablement: true` once the repository is public.
+Verification:
+- GitHub API Pages enablement returned: current plan does not support GitHub Pages for this private repository.
+- Follow-up static tests cover the private-repo guard and Pages enablement flag.
+Boundaries:
+- The static site is in `core`, but GitHub Pages will not publish while the repo remains private on the current plan.
+- Public downloads still require either making the repo/release public or mirroring release assets to a public location.
+Next:
+- Push the guard fix to `core`, verify CI, and ask Channa whether to make the repo public or mirror the website/downloads separately.
