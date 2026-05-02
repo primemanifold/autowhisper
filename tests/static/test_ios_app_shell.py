@@ -11,6 +11,8 @@ CONTENT_VIEW = APP_DIR / "ContentView.swift"
 RECORDER = APP_DIR / "IOSAudioRecorder.swift"
 DECODER = APP_DIR / "IOSAudioDecoder.swift"
 TRANSCRIBER = APP_DIR / "IOSWhisperTranscriber.swift"
+MODEL_LOCATOR = APP_DIR / "IOSWhisperModelLocator.swift"
+MODEL_CATALOG = IOS / "Sources" / "AutoWhisperCore" / "ModelCatalog.swift"
 INFO_PLIST = APP_DIR / "Info.plist"
 PRIVACY = APP_DIR / "PrivacyInfo.xcprivacy"
 README = IOS / "README.md"
@@ -151,6 +153,51 @@ class IOSAppShellTests(unittest.TestCase):
             "recordingState = .transcribed",
         ]:
             self.assertNotIn(overclaim, view_text)
+
+    def test_ios_model_resources_have_locator_before_whisper_inference(self):
+        self.assertTrue(MODEL_CATALOG.exists(), "iOS model catalog should declare concrete GGML resource filenames")
+        catalog_text = MODEL_CATALOG.read_text()
+        for snippet in [
+            "ggmlFilename",
+            "bundleResourceName",
+            "\"ggml-tiny.en.bin\"",
+            "\"ggml-base.en.bin\"",
+        ]:
+            self.assertIn(snippet, catalog_text)
+
+        project_text = PROJECT_YML.read_text()
+        for snippet in [
+            "AutoWhisperApp/Models",
+            "ModelResources.plist",
+        ]:
+            self.assertIn(snippet, project_text)
+
+        self.assertTrue(MODEL_LOCATOR.exists(), "iOS app should have a model resource locator seam before real inference")
+        locator_text = MODEL_LOCATOR.read_text()
+        for snippet in [
+            "final class IOSWhisperModelLocator",
+            "Bundle",
+            "url(forResource:",
+            "IOSWhisperModelLocatorError",
+            "case missingBundledModel",
+            "ggmlFilename",
+            "subdirectory: \"Models\"",
+        ]:
+            self.assertIn(snippet, locator_text)
+        self.assertNotIn("whisper_init", locator_text)
+        self.assertNotIn("whisper_full", locator_text)
+
+        transcriber_text = TRANSCRIBER.read_text()
+        for snippet in [
+            "private let modelLocator",
+            "IOSWhisperModelLocator",
+            "try modelLocator.url(for: ModelCatalog.mobileDefault.recommended)",
+            "missingBundledModel",
+            "Model not bundled yet",
+        ]:
+            self.assertIn(snippet, transcriber_text)
+        self.assertNotIn("whisper_init", transcriber_text)
+        self.assertNotIn("whisper_full", transcriber_text)
 
     def test_readme_reflects_runnable_app_shell_gate(self):
         text = README.read_text()

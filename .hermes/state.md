@@ -715,3 +715,25 @@ Verification:
 - Final independent read-only review returned PASS after the race fix.
 Limits:
 - Still not real Whisper transcription, physical-device runtime, signed device install, TestFlight, or App Store readiness.
+
+## Run 2026-05-02T10:39:11Z
+Phase: iOS model-resource locator continuation on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Added concrete GGML resource filenames to the iOS model catalog: `ggml-tiny.en.bin` and `ggml-base.en.bin`.
+- Added `IOSWhisperModelLocator` to resolve bundled model URLs from `Bundle.main` under `Models/` or return a typed `missingBundledModel` error.
+- Added `ModelResources.plist` plus `AutoWhisperApp/Models/README.md` and declared both resource locations in `ios/project.yml`; no large GGML binaries are committed in this slice.
+- Updated `IOSPlaceholderWhisperTranscriber` to check the recommended model locator and include model-ready or `Model not bundled yet` state in bridge-pending placeholder output without calling `whisper.cpp`.
+- Added static regression coverage for model filenames, resource declarations, model locator, no whisper API calls, and no real-inference overclaims.
+- Updated iOS README, implementation plan, and decisions/state docs.
+Verification:
+- RED: `python3 -m unittest tests.static.test_ios_app_shell -v` failed before implementation because `ModelCatalog.swift` lacked `ggmlFilename` and the model locator/resources did not exist.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 34/34 passed.
+- GREEN: `cd ios && xcodegen generate`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-modellocator build`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-modellocator build`: passed.
+- GREEN: `git diff --check`: passed.
+- GREEN: Simulator erase/install/launch screenshot: `/tmp/autowhisper-ios-evidence/ios-model-locator-shell.png`; vision verified the app is visible, no automatic microphone permission prompt appears, and copy avoids claiming real Whisper is implemented.
+- Independent read-only review returned PASS; no blockers or important issues.
+Limits:
+- Still no real bundled model binary, no `whisper.cpp` inference, no real transcript output, no physical-device runtime, no signed device install, no TestFlight, and no App Store readiness.

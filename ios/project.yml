@@ -23,6 +23,8 @@ targets:
     resources:
       - path: AutoWhisperApp/PrivacyInfo.xcprivacy
       - path: AutoWhisperApp/LaunchScreen.storyboard
+      - path: AutoWhisperApp/ModelResources.plist
+      - path: AutoWhisperApp/Models
     dependencies:
       - package: AutoWhisperIOSCore
         product: AutoWhisperCore

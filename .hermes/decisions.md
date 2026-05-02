@@ -168,3 +168,13 @@ Consequences:
 - The UI disables the recorder button while `.preparingTranscript` is in progress so users cannot start a second recording while decode/transcriber work from the previous recording is still pending.
 - SwiftUI copy and microphone permission prompt text now say decode/bridge summary and explicitly avoid saying real Whisper transcription is implemented.
 - Verification language must still avoid claiming physical-device runtime, TestFlight, App Store readiness, or real Whisper transcript output.
+
+## 2026-05-02T10:39:11Z — iOS model resource locator before real inference
+Decision: Extend PR #12 with an explicit bundled GGML model resource contract and locator before binding the `whisper.cpp` C API.
+Rationale: Real inference should not mix model filename mapping, bundle packaging, missing-model UX, C/Swift interop, and transcript output in one slice. The app can first prove it knows which model resource it expects and can report a missing bundled model honestly.
+Consequences:
+- `ModelDescriptor` now carries concrete GGML filenames such as `ggml-tiny.en.bin` and exposes a bundle resource name for app lookup.
+- `ios/project.yml` declares `ModelResources.plist` and `AutoWhisperApp/Models` as resources, with documentation placeholders but no large model binaries committed.
+- `IOSWhisperModelLocator` resolves the recommended model from `Bundle.main` under `Models/` or returns a typed `missingBundledModel` error.
+- The placeholder transcriber checks the locator and reports model readiness/missing-model state while still returning bridge-pending placeholder output.
+- Verification language must still avoid claiming model bundling, real inference, physical-device runtime, TestFlight, or App Store readiness.

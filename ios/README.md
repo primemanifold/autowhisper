@@ -9,7 +9,7 @@ The current checked-in slice includes both:
 1. A Foundation-only Swift package that verifies the mobile product contract.
 2. A runnable SwiftUI iOS app shell generated from `ios/project.yml` with XcodeGen.
 
-This is intentionally still an app-shell milestone: it proves launch, microphone-permission copy, native AVFoundation foreground audio recording to a temporary 16 kHz mono CAF file, recorded-audio decode into normalized PCM for the future inference bridge, copy/share actions, and iOS-safe product constraints. It does not yet bind decoded audio into `whisper.cpp` inference.
+This is intentionally still an app-shell milestone: it proves launch, microphone-permission copy, native AVFoundation foreground audio recording to a temporary 16 kHz mono CAF file, recorded-audio decode into normalized PCM for the future inference bridge, explicit bundled-model resource lookup with clear missing-model state, copy/share actions, and iOS-safe product constraints. It does not yet bind decoded audio into `whisper.cpp` inference.
 
 ## Verified now
 
@@ -38,12 +38,14 @@ The package check executable verifies:
 
 - iOS defaults use 16 kHz mono audio for Whisper compatibility.
 - The first iOS catalog recommends `tiny.en`, not the large desktop default.
-- First-release models are represented as bundled resources.
+- First-release models are represented as bundled resources with concrete GGML filenames.
+- The app has an explicit bundled-model resource locator and clear missing-model placeholder state before real inference.
 - iOS output is copy/share, not desktop text injection.
 - iOS-specific unavailable capabilities are explicit.
 - A fake record -> transcribe -> copy/share workflow works end to end at the domain layer.
 - The SwiftUI app shell uses `IOSAudioRecorder`/`AVAudioRecorder` for real foreground microphone capture before the transcript bridge exists.
 - The app decodes the recorded CAF into normalized PCM through `IOSAudioDecoder` and routes that through an explicit `IOSWhisperTranscribing` seam before real `whisper.cpp` inference is connected.
+- The placeholder transcriber checks `IOSWhisperModelLocator` for the recommended bundled GGML model and reports missing model resources without claiming transcription succeeded.
 
 The SwiftUI shell verifies:
 

@@ -118,6 +118,8 @@ Status: native AVFoundation recording and recorded-audio PCM decode are implemen
 - Implemented: record 16 kHz mono Linear PCM CAF files through `IOSAudioRecorder`.
 - Implemented: decode recorded CAF files into normalized PCM samples through `IOSAudioDecoder`.
 - Implemented: route stop-recording output through an explicit async `IOSWhisperTranscribing` seam with honest placeholder output.
+- Implemented: declare concrete bundled GGML filenames (`ggml-tiny.en.bin`, `ggml-base.en.bin`) in the iOS model catalog.
+- Implemented: add `IOSWhisperModelLocator` and app-bundle resource contract files so the placeholder path can report a clear missing-model state before real inference.
 - Next: feed decoded samples into bundled `deps/whisper.cpp` C API as the first real inference bridge.
 - Keep model loading serialized through an actor or equivalent concurrency boundary.
 

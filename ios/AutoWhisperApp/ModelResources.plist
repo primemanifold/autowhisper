@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>ExpectedBundledModels</key>
+    <array>
+        <string>ggml-tiny.en.bin</string>
+        <string>ggml-base.en.bin</string>
+    </array>
+    <key>RealInferenceEnabled</key>
+    <false/>
+    <key>Notes</key>
+    <string>Model resource contract only; real whisper.cpp inference is not enabled in this slice.</string>
+</dict>
+</plist>
