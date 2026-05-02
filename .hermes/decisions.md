@@ -149,3 +149,12 @@ Use `ios/project.yml` as the source of truth for a generated `AutoWhisperIOS.xco
 - The iOS product line now has a runnable simulator app shell rather than only a Swift package foundation.
 - Local verification distinguishes simulator build, generic iPhoneOS build without signing, and simulator runtime smoke; it still does not claim physical-device install, TestFlight, App Store readiness, or real local Whisper inference.
 - Future iOS work should extend this shell with AVFoundation recording and a `whisper.cpp` bridge while preserving the explicit iOS platform-limit messaging.
+
+
+## 2026-05-02T01:59:11Z — iOS native audio before Whisper bridge
+Decision: Extend PR #12 with native AVFoundation foreground recording before attempting the `whisper.cpp` bridge.
+Rationale: Small reversible slice proves actual microphone-recording plumbing and app lifecycle without overclaiming local inference.
+Consequences:
+- `IOSAudioRecorder` owns `AVAudioSession`/`AVAudioRecorder` lifecycle for 16 kHz mono CAF capture.
+- SwiftUI still uses placeholder transcript text until recorded audio is decoded/fed to `whisper.cpp`.
+- Verification language must distinguish simulator/device builds from physical-device signing/runtime and from real transcription.

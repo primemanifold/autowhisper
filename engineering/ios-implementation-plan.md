@@ -109,12 +109,14 @@ Runtime smoke evidence is simulator install + launch + screenshot.
 
 ## Phase I2: Native audio and whisper bridge
 
+Status: native AVFoundation recording is implemented; `whisper.cpp` inference bridge remains next.
+
 **Objective:** Bind the app shell to AVFoundation recording and `whisper.cpp` local inference.
 
 **Approach:**
-- Use AVFoundation for microphone permission and recording.
-- Record 16 kHz mono PCM where possible.
-- Use bundled `deps/whisper.cpp` C API as the first inference bridge.
+- Implemented: use AVFoundation for microphone permission-gated foreground recording.
+- Implemented: record 16 kHz mono Linear PCM CAF files through `IOSAudioRecorder`.
+- Next: decode/stream that recorded audio into bundled `deps/whisper.cpp` C API as the first inference bridge.
 - Keep model loading serialized through an actor or equivalent concurrency boundary.
 
 ## Phase I3: Distribution-grade iOS behavior

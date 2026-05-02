@@ -14,6 +14,7 @@ final class AutoWhisperAppModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let engine = FakeTranscriptionEngine(result: "This is a local AutoWhisper iOS transcript preview.")
+    private let audioRecorder = IOSAudioRecorder()
     private var session: RecordingSession?
 
     func updateMicrophonePermissionStatus() {
@@ -38,20 +39,34 @@ final class AutoWhisperAppModel: ObservableObject {
         errorMessage = nil
         do {
             if recordingState == .recording, let session {
-                let transcript = try await session.stopAndTranscribe(audio: AudioFixture.fixture(samples: [0, 0.1, 0.2, 0.1, 0]))
-                transcriptText = transcript.text
+                let recording = try audioRecorder.stopRecording()
+                let transcript = try await session.stopAndTranscribe(audio: AudioFixture(samples: [], sampleRate: Int(recording.sampleRate)))
+                transcriptText = """
+                \(transcript.text)
+
+                Recorded \(recording.durationSeconds.formatted(.number.precision(.fractionLength(1))))s of foreground iOS audio.
+                File: \(recording.recordingURL.lastPathComponent)
+                Local Whisper inference bridge is the next slice.
+                """
                 recordingState = await session.state
                 self.session = nil
             } else {
                 let newSession = RecordingSession(engine: engine)
                 try await newSession.startRecording()
+                try audioRecorder.startRecording()
                 session = newSession
                 recordingState = await newSession.state
                 transcriptText = ""
+                updateMicrophonePermissionStatus()
             }
         } catch {
-            recordingState = .failed
-            errorMessage = "Recording failed: \(error)"
+            if recordingState == .recording {
+                recordingState = .idle
+            } else {
+                recordingState = .failed
+            }
+            updateMicrophonePermissionStatus()
+            errorMessage = "Recording failed: \(error.localizedDescription)"
         }
     }
 

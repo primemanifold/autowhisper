@@ -8,6 +8,7 @@ PROJECT_YML = IOS / "project.yml"
 APP_DIR = IOS / "AutoWhisperApp"
 APP_SWIFT = APP_DIR / "AutoWhisperApp.swift"
 CONTENT_VIEW = APP_DIR / "ContentView.swift"
+RECORDER = APP_DIR / "IOSAudioRecorder.swift"
 INFO_PLIST = APP_DIR / "Info.plist"
 PRIVACY = APP_DIR / "PrivacyInfo.xcprivacy"
 README = IOS / "README.md"
@@ -65,6 +66,35 @@ class IOSAppShellTests(unittest.TestCase):
         forbidden = ["global hotkey is available", "inject into any app", "menu bar daemon"]
         for snippet in forbidden:
             self.assertNotIn(snippet, combined.lower())
+
+    def test_ios_shell_uses_native_avfoundation_recorder_before_transcription_bridge(self):
+        self.assertTrue(RECORDER.exists(), "iOS shell should use a native AVFoundation recorder service, not only synthetic fixtures")
+        recorder_text = RECORDER.read_text()
+        view_text = CONTENT_VIEW.read_text()
+        for snippet in [
+            "import AVFoundation",
+            "final class IOSAudioRecorder",
+            "AVAudioRecorder",
+            "AVAudioSession.sharedInstance()",
+            "setCategory(.playAndRecord",
+            "sampleRate: Double = 16_000",
+            "numberOfChannels: Int = 1",
+            "linearPCMBitDepth: Int = 16",
+            "recordingURL",
+            "durationSeconds",
+            "guard newRecorder.record() else",
+            "setActive(false, options: [.notifyOthersOnDeactivation])",
+            "throw IOSAudioRecorderError.failedToStart",
+        ]:
+            self.assertIn(snippet, recorder_text)
+        for snippet in [
+            "private let audioRecorder = IOSAudioRecorder()",
+            "try audioRecorder.startRecording()",
+            "let recording = try audioRecorder.stopRecording()",
+            "Recorded \\(recording.durationSeconds",
+        ]:
+            self.assertIn(snippet, view_text)
+        self.assertNotIn("AudioFixture.fixture(samples: [0, 0.1, 0.2, 0.1, 0])", view_text)
 
     def test_readme_reflects_runnable_app_shell_gate(self):
         text = README.read_text()

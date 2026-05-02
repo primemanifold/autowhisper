@@ -670,3 +670,24 @@ Blocked on:
 Next:
 - Commit and push this branch, open PR into `core`.
 - Next iOS slice should implement real AVFoundation recording and the first `whisper.cpp` inference bridge without claiming TestFlight/App Store readiness until signing/provisioning gates pass.
+
+
+## Run 2026-05-02T01:59:11Z
+Phase: iOS native-audio continuation on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Added `IOSAudioRecorder` using AVFoundation/AVAudioRecorder for explicit-permission foreground recording.
+- Recording target is 16 kHz mono 16-bit Linear PCM CAF in a temporary file, returning URL/duration metadata.
+- Wired SwiftUI Start Recording / Stop & Transcribe through native recorder while retaining placeholder transcript copy and explicit "Whisper bridge next" messaging.
+- Kept microphone permission behind explicit button; erased-simulator launch screenshot confirmed no automatic permission prompt.
+- Updated iOS README, implementation plan, and static regression tests.
+Verification:
+- `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- `python3 -m unittest discover -s tests/static -v`: 32/32 passed.
+- `cd ios && xcodegen generate`: passed.
+- `xcodebuild ... generic/platform=iOS Simulator ... CODE_SIGNING_ALLOWED=NO`: passed.
+- `xcodebuild ... generic/platform=iOS ... CODE_SIGNING_ALLOWED=NO`: passed.
+- `git diff --check`: passed.
+- Simulator erase/install/launch screenshot: `/tmp/autowhisper-ios-evidence/ios-av-recorder-shell.png`.
+- Independent review: PASS, no blockers; fixed non-blocking recorder-start failure cleanup by deactivating audio session if `record()` fails.
+Limits:
+- Still not real Whisper transcription, physical-device runtime, signed device install, TestFlight, or App Store readiness.
