@@ -4,7 +4,18 @@ GPU-accelerated voice-to-text for Ubuntu. Press a hotkey, speak, release — tex
 
 Native C++ application powered by [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Runs entirely offline.
 
+AutoWhisper is local-first: supported desktop transcription paths run without a cloud account. Platform coverage is evidence-based, so build proof, package proof, first-run proof, and runtime end-to-end proof are tracked separately.
+
+## Platform quick status
+
+- **Linux:** install through the PPA below. Validate first runtime smoke on X11; Wayland hotkeys/text insertion are not release-proven yet.
+- **macOS:** public v0.7.1 ZIP: https://github.com/primemanifold/autowhisper/releases/download/v0.7.1/AutoWhisper-macOS-v0.7.1.zip. Unzip, move `AutoWhisper.app` to `/Applications`, then grant Microphone, Accessibility, and Input Monitoring permissions. Default push-to-talk remains the configured AutoWhisper hotkey.
+- **Windows:** `build_proven` cross-build status only; runtime unproven and coming soon. Do not treat this as Windows support yet.
+- **iOS:** beta app shell only. Foreground recording and a Quick Record widget that opens the foreground app exist, but whisper.cpp bridge pending means no local Whisper transcript output yet and no App Store/TestFlight claim.
+
 ## Install
+
+Linux PPA install:
 
 ```bash
 sudo add-apt-repository ppa:primemanifold/autowhisper
