@@ -640,3 +640,11 @@ Next:
 - Verified a fresh public release download: checksum OK, plist and CLI version `0.7.1`, Gatekeeper accepted, clean-HOME first run exited `0`, and user config was created.
 - Release-event CI run `25238033133` completed success for build, build-source, and build-deb. Existing PPA workflow remains noisy/failing separately.
 - Updated public landing repo `primemanifold/autowhisper-landing` commit `968274c` so homepage and roadmap CTAs point to `v0.7.1`; GitHub Pages run `25238071749` passed and hosted homepage/roadmap returned HTTP 200 with `v0.7.1` content.
+
+
+## 2026-05-02T00:42:33Z — [HAT: Engineering] macOS install UX icon/model-download fix prepared
+- Branch `primeodin/macos-install-ux-model-icons` fixes the macOS-specific issues reported after v0.7.1: missing app icons and brittle native Settings model downloads.
+- Root cause: the app bundle did not declare/copy a `.icns` resource, and the SwiftUI setup helper delegated model downloads through a child CLI process instead of using native macOS networking.
+- Implemented: generated `AutoWhisper.icns` via `scripts/generate_macos_icon.py` + `iconutil`, copied it into `AutoWhisper.app/Contents/Resources`, declared `CFBundleIconFile = AutoWhisper`, switched Settings model downloads to direct `URLSession` writes under `~/.cache/whisper`, improved download status/failure handling, corrected `distil-small.en` size, and bumped candidate version to `0.7.2`.
+- Validation: local CTest `117/117` passed; static tests `27/27` passed; Swift parse passed; app smoke passed; fresh ZIP unzip showed version `0.7.2`, bundled icon present, Gatekeeper accepted as Notarized Developer ID, and clean HOME model download produced `~/.cache/whisper/ggml-tiny.en.bin` with 77,704,715 bytes and `Model tiny.en ready!`.
+- Local notarized/stapled preview artifact: `/tmp/AutoWhisper-macOS-v0.7.2-installux-preview.zip` with SHA256 `f18dd29511d2a797349b76100c623b2d1270435ab57c9ef0d3589283fbf5c5e9`.

@@ -27,6 +27,10 @@ class MacOSAppBundleAssetsTest(unittest.TestCase):
         )
         self.assertIn("DEPENDS autowhisper", cmake)
         self.assertIn('"${CMAKE_SOURCE_DIR}/config.toml" "${AUTOWHISPER_RESOURCES_DIR}/config.toml"', cmake)
+        self.assertIn('"${AUTOWHISPER_ICON_FILE}" "${AUTOWHISPER_RESOURCES_DIR}/AutoWhisper.icns"', cmake)
+        self.assertIn("autowhisper_macos_icon", cmake)
+        self.assertIn("generate_macos_icon.py", cmake)
+        self.assertIn("iconutil", cmake)
         self.assertIn("codesign --force", cmake)
         self.assertIn("codesign --verify --deep --strict", cmake)
         self.assertNotIn("codesign failed (ignored for dev)", cmake)
@@ -44,6 +48,8 @@ class MacOSAppBundleAssetsTest(unittest.TestCase):
             "APPL",
             "CFBundleExecutable",
             "autowhisper",
+            "CFBundleIconFile",
+            "AutoWhisper",
             "LSUIElement",
             "NSMicrophoneUsageDescription",
             "NSAppleEventsUsageDescription",
@@ -134,12 +140,15 @@ class MacOSAppBundleAssetsTest(unittest.TestCase):
             "Privacy_Accessibility",
             "Privacy_Microphone",
             "--setup-error",
-            "model", "download",
+            "URLSession.shared.downloadTask",
+            "modelCatalog",
+            "modelCacheDirectory",
+            "Hugging Face",
+            "ggml-distil-small.en.bin",
         ]:
             self.assertIn(snippet, swift)
-        self.assertIn("Process()", swift)
-        self.assertIn("readabilityHandler", swift)
-        self.assertIn("waitUntilExit", swift)
+        self.assertNotIn("Process()", swift)
+        self.assertNotIn("waitUntilExit", swift)
         self.assertIn("AVCaptureDevice.requestAccess", swift)
 
     def test_macos_signal_sources_do_not_capture_stack_shutdown_pointer(self):

@@ -19,7 +19,7 @@ const ModelInfo MODELS[] = {
      "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"},
     {"small.en",        "Balanced",                     "~500MB", "211ms", "ggml-small.en.bin",
      "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin"},
-    {"distil-small.en", "Optimized small (recommended)","~166MB", "198ms", "ggml-distil-small.en.bin",
+    {"distil-small.en", "Optimized small (recommended)","~320MB", "198ms", "ggml-distil-small.en.bin",
      "https://huggingface.co/distil-whisper/distil-small.en/resolve/main/ggml-distil-small.en.bin"},
     {"medium.en",       "Medium accuracy",              "~1.5GB", "381ms", "ggml-medium.en.bin",
      "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin"},

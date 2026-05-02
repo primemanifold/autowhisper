@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.7.2 — 2026-05-01
+
+### Fixed
+- macOS app bundles now include a generated `AutoWhisper.icns` resource and declare `CFBundleIconFile`, so Finder, Dock, and LaunchServices have a real app icon.
+- The native first-run Settings helper now downloads models directly with `URLSession` into `~/.cache/whisper` instead of delegating to a child CLI process from the GUI context.
+- Model download status now reports clearer success/failure states, including HTTP errors, missing output files, unexpectedly tiny downloads, and already-downloaded models.
+- Corrected the displayed `distil-small.en` size from `~166MB` to `~320MB`.
+
+### Validation
+- Verified the generated icon resource is present in `AutoWhisper.app/Contents/Resources/AutoWhisper.icns` and declared as `CFBundleIconFile = AutoWhisper`.
+- Verified a clean HOME model download writes `~/.cache/whisper/ggml-tiny.en.bin` with `77,704,715` bytes and reports `Model tiny.en ready!`.
+- Local macOS CTest suite passed: 117/117.
+- Static settings and macOS bundle asset tests passed: 27/27.
+- macOS app smoke validation passed against the built bundle.
+
 ## 0.7.1 — 2026-05-01
 
 ### Fixed

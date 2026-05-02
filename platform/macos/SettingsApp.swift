@@ -2,6 +2,35 @@ import AppKit
 import AVFoundation
 import SwiftUI
 
+struct ModelCatalogEntry {
+    let name: String
+    let description: String
+    let size: String
+    let fileName: String
+    let url: URL
+}
+
+let modelCatalog: [String: ModelCatalogEntry] = [
+    "tiny.en": ModelCatalogEntry(name: "tiny.en", description: "Fastest, good accuracy", size: "~75 MB", fileName: "ggml-tiny.en.bin", url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin")!),
+    "base.en": ModelCatalogEntry(name: "base.en", description: "Fast, better accuracy", size: "~150 MB", fileName: "ggml-base.en.bin", url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin")!),
+    "small.en": ModelCatalogEntry(name: "small.en", description: "Balanced", size: "~500 MB", fileName: "ggml-small.en.bin", url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en.bin")!),
+    "distil-small.en": ModelCatalogEntry(name: "distil-small.en", description: "Optimized small (recommended)", size: "~320 MB", fileName: "ggml-distil-small.en.bin", url: URL(string: "https://huggingface.co/distil-whisper/distil-small.en/resolve/main/ggml-distil-small.en.bin")!),
+    "medium.en": ModelCatalogEntry(name: "medium.en", description: "Medium accuracy", size: "~1.5 GB", fileName: "ggml-medium.en.bin", url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en.bin")!),
+    "distil-medium.en": ModelCatalogEntry(name: "distil-medium.en", description: "Optimized medium", size: "~800 MB", fileName: "ggml-distil-medium.en.bin", url: URL(string: "https://huggingface.co/distil-whisper/distil-medium.en/resolve/main/ggml-distil-medium.en.bin")!),
+    "distil-large-v3": ModelCatalogEntry(name: "distil-large-v3", description: "Best accuracy", size: "~1.5 GB", fileName: "ggml-distil-large-v3.bin", url: URL(string: "https://huggingface.co/distil-whisper/distil-large-v3-ggml/resolve/main/ggml-distil-large-v3.bin")!),
+    "large-v3": ModelCatalogEntry(name: "large-v3", description: "Maximum accuracy", size: "~3 GB", fileName: "ggml-large-v3.bin", url: URL(string: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3.bin")!),
+]
+
+func modelCacheDirectory() -> URL {
+    FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent(".cache", isDirectory: true)
+        .appendingPathComponent("whisper", isDirectory: true)
+}
+
+func modelDestinationURL(for entry: ModelCatalogEntry) -> URL {
+    modelCacheDirectory().appendingPathComponent(entry.fileName, isDirectory: false)
+}
+
 struct ConfigDraft {
     var hotkeyMode = "push_to_talk"
     var trigger = "shift+super"
@@ -238,59 +267,64 @@ struct OnboardingView: View {
 
     private func downloadRecommendedModel() {
         guard !isDownloading else { return }
-        isDownloading = true
-        modelStatus = "Starting download…"
         let model = store.draft.modelSize
-        DispatchQueue.global(qos: .userInitiated).async {
-            let process = Process()
-            let pipe = Pipe()
-            let outputHandle = pipe.fileHandleForReading
-            let helperDir = Bundle.main.executableURL?.deletingLastPathComponent()
-            process.executableURL = helperDir?.appendingPathComponent("autowhisper") ?? URL(fileURLWithPath: "/usr/local/bin/autowhisper")
-            process.arguments = ["model", "download", model]
-            process.standardOutput = pipe
-            process.standardError = pipe
+        guard let entry = modelCatalog[model] else {
+            modelStatus = "Unknown model: \(model)"
+            return
+        }
 
-            let outputLock = NSLock()
-            var capturedOutput = ""
-            outputHandle.readabilityHandler = { handle in
-                let data = handle.availableData
-                guard !data.isEmpty else { return }
-                let chunk = String(data: data, encoding: .utf8) ?? ""
-                if !chunk.isEmpty {
-                    outputLock.lock()
-                    capturedOutput.append(chunk)
-                    outputLock.unlock()
-                    let trimmed = chunk.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty {
-                        DispatchQueue.main.async {
-                            modelStatus = trimmed.components(separatedBy: .newlines).last ?? "Downloading…"
-                        }
-                    }
+        let destination = modelDestinationURL(for: entry)
+        if FileManager.default.fileExists(atPath: destination.path) {
+            modelStatus = "Model is already ready at \(destination.path)"
+            return
+        }
+
+        isDownloading = true
+        modelStatus = "Downloading \(entry.name) (\(entry.size)) from Hugging Face…"
+
+        URLSession.shared.downloadTask(with: entry.url) { temporaryURL, response, error in
+            func finish(_ message: String) {
+                DispatchQueue.main.async {
+                    isDownloading = false
+                    modelStatus = message
                 }
+            }
+
+            if let error {
+                finish("Download failed: \(error.localizedDescription)")
+                return
+            }
+
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                finish("Download failed: HTTP \(http.statusCode) from Hugging Face")
+                return
+            }
+
+            guard let temporaryURL else {
+                finish("Download failed: no file was produced")
+                return
             }
 
             do {
-                try process.run()
-                process.waitUntilExit()
-                outputHandle.readabilityHandler = nil
-                _ = outputHandle.readDataToEndOfFile()
-                let finalOutput: String
-                outputLock.lock()
-                finalOutput = capturedOutput
-                outputLock.unlock()
-                DispatchQueue.main.async {
-                    isDownloading = false
-                    modelStatus = process.terminationStatus == 0 ? "Model is ready" : "Download failed: \(finalOutput.prefix(180))"
+                try FileManager.default.createDirectory(at: modelCacheDirectory(),
+                                                        withIntermediateDirectories: true)
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.removeItem(at: destination)
                 }
+                try FileManager.default.moveItem(at: temporaryURL, to: destination)
+                let attrs = try FileManager.default.attributesOfItem(atPath: destination.path)
+                let bytes = attrs[.size] as? UInt64 ?? 0
+                guard bytes > 1_000_000 else {
+                    try? FileManager.default.removeItem(at: destination)
+                    finish("Download failed: file was unexpectedly small")
+                    return
+                }
+                finish("Model is ready: \(destination.path)")
             } catch {
-                outputHandle.readabilityHandler = nil
-                DispatchQueue.main.async {
-                    isDownloading = false
-                    modelStatus = "Download failed: \(error.localizedDescription)"
-                }
+                try? FileManager.default.removeItem(at: destination)
+                finish("Download failed: \(error.localizedDescription)")
             }
-        }
+        }.resume()
     }
 }
 
