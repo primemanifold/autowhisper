@@ -763,3 +763,21 @@ Limits:
 - Still no real Whisper transcription, no widget/background microphone capture, no Ghost Pepper code reuse, no physical-device runtime proof, no signed device install, no TestFlight, and no App Store readiness.
 Next:
 - Commit/push this slice if final precommit stays clean; next runtime proof should be a real widget-tap or accepted deep-link flow on simulator/physical device.
+
+## Run 2026-05-02T16:31:20Z
+Phase: plan-only cross-platform readiness PRD + Claude batch prompt pack on `primeodin/ios-swiftui-app-shell`.
+Changes:
+- Added `engineering/cross-platform-readiness-prd.md` as the discussion spec for a macOS/Linux/Windows/mobile readiness foundation.
+- Added `engineering/claude-cross-platform-batch-plan.md` with read-only scout prompts, model selection, implementation lanes, verification gates, and stop conditions.
+- Incorporated README usage-guide/media planning into the PRD/batch plan, including screenshot captions, `docs/usage-guide.md`, `docs/media/`, and a future Manim explainer video plan.
+- This was intentionally plan-only: no platform implementation, release link changes, public release creation, or Claude batch launch.
+Verification:
+- GREEN: custom Python doc smoke verified required sections/snippets in both new docs.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 36/36 passed.
+- GREEN: `git diff --check`: passed.
+Limits:
+- New docs are uncommitted draft files for discussion.
+- No read-only Claude scout batch has been launched yet.
+- No new platform readiness status is proven by this planning slice.
+Next:
+- Review with Channa, then if approved launch Phase 1 read-only Claude scouts before implementation.
