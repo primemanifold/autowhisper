@@ -23,7 +23,7 @@
     <key>LSRequiresIPhoneOS</key>
     <true/>
     <key>NSMicrophoneUsageDescription</key>
-    <string>AutoWhisper records your voice only when you tap record so it can transcribe locally on this device.</string>
+	<string>AutoWhisper records your voice only when you tap record so it can decode audio locally for the transcription bridge.</string>
     <key>UIApplicationSceneManifest</key>
     <dict>
         <key>UIApplicationSupportsMultipleScenes</key>

@@ -1,7 +1,7 @@
 import AVFoundation
 import Foundation
 
-struct IOSAudioRecording: Equatable {
+struct IOSAudioRecording: Equatable, Sendable {
     let recordingURL: URL
     let durationSeconds: TimeInterval
     let sampleRate: Double

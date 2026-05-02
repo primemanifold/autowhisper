@@ -13,9 +13,12 @@ final class AutoWhisperAppModel: ObservableObject {
     @Published var transcriptText: String = ""
     @Published var errorMessage: String?
 
-    private let engine = FakeTranscriptionEngine(result: "This is a local AutoWhisper iOS transcript preview.")
     private let audioRecorder = IOSAudioRecorder()
-    private var session: RecordingSession?
+    private let transcriber: IOSWhisperTranscribing
+
+    init(transcriber: IOSWhisperTranscribing = IOSPlaceholderWhisperTranscriber()) {
+        self.transcriber = transcriber
+    }
 
     func updateMicrophonePermissionStatus() {
         switch AVCaptureDevice.authorizationStatus(for: .audio) {
@@ -36,26 +39,18 @@ final class AutoWhisperAppModel: ObservableObject {
     }
 
     func toggleRecording() async {
+        guard recordingState != .preparingTranscript else { return }
+
         errorMessage = nil
         do {
-            if recordingState == .recording, let session {
+            if recordingState == .recording {
+                recordingState = .preparingTranscript
                 let recording = try audioRecorder.stopRecording()
-                let transcript = try await session.stopAndTranscribe(audio: AudioFixture(samples: [], sampleRate: Int(recording.sampleRate)))
-                transcriptText = """
-                \(transcript.text)
-
-                Recorded \(recording.durationSeconds.formatted(.number.precision(.fractionLength(1))))s of foreground iOS audio.
-                File: \(recording.recordingURL.lastPathComponent)
-                Local Whisper inference bridge is the next slice.
-                """
-                recordingState = await session.state
-                self.session = nil
+                transcriptText = try await transcriber.transcribe(recording: recording)
+                recordingState = .idle
             } else {
-                let newSession = RecordingSession(engine: engine)
-                try await newSession.startRecording()
                 try audioRecorder.startRecording()
-                session = newSession
-                recordingState = await newSession.state
+                recordingState = .recording
                 transcriptText = ""
                 updateMicrophonePermissionStatus()
             }
@@ -100,7 +95,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Local voice notes for iPhone")
                 .font(.largeTitle.bold())
-            Text("Record in the foreground, transcribe locally, then copy or share the transcript. No desktop daemon promises on iOS.")
+            Text("Record in the foreground, decode locally, then copy or share the bridge result. Real Whisper transcription is still the next iOS slice.")
                 .font(.body)
                 .foregroundStyle(.secondary)
             Label("Recommended model: \(model.settings.defaultModel.id)", systemImage: "waveform")
@@ -122,15 +117,27 @@ struct ContentView: View {
         }
     }
 
+    private var recordingButtonTitle: String {
+        switch model.recordingState {
+        case .recording:
+            return "Stop & Decode Audio"
+        case .preparingTranscript:
+            return "Decoding Audio…"
+        default:
+            return "Start Recording"
+        }
+    }
+
     private var recorderCard: some View {
         GroupBox("Recorder") {
             VStack(alignment: .leading, spacing: 12) {
                 Text("16 kHz mono recording target for Whisper-compatible audio.")
                     .foregroundStyle(.secondary)
-                Button(model.recordingState == .recording ? "Stop & Transcribe" : "Start Recording") {
+                Button(recordingButtonTitle) {
                     Task { await model.toggleRecording() }
                 }
                 .buttonStyle(.borderedProminent)
+                .disabled(model.recordingState == .preparingTranscript)
                 if let errorMessage = model.errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(.red)
@@ -143,7 +150,7 @@ struct ContentView: View {
     private var transcriptCard: some View {
         GroupBox("Transcript") {
             VStack(alignment: .leading, spacing: 12) {
-                Text(model.transcriptText.isEmpty ? "Your transcript appears here after recording." : model.transcriptText)
+                Text(model.transcriptText.isEmpty ? "Your decoded bridge summary appears here after recording." : model.transcriptText)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
                     .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))

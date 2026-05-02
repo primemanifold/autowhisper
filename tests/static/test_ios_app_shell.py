@@ -9,6 +9,8 @@ APP_DIR = IOS / "AutoWhisperApp"
 APP_SWIFT = APP_DIR / "AutoWhisperApp.swift"
 CONTENT_VIEW = APP_DIR / "ContentView.swift"
 RECORDER = APP_DIR / "IOSAudioRecorder.swift"
+DECODER = APP_DIR / "IOSAudioDecoder.swift"
+TRANSCRIBER = APP_DIR / "IOSWhisperTranscriber.swift"
 INFO_PLIST = APP_DIR / "Info.plist"
 PRIVACY = APP_DIR / "PrivacyInfo.xcprivacy"
 README = IOS / "README.md"
@@ -35,7 +37,10 @@ class IOSAppShellTests(unittest.TestCase):
         info = plistlib.loads(INFO_PLIST.read_bytes())
         self.assertEqual(info["CFBundleDisplayName"], "AutoWhisper")
         self.assertEqual(info["CFBundleIdentifier"], "$(PRODUCT_BUNDLE_IDENTIFIER)")
-        self.assertIn("records your voice only when you tap record", info["NSMicrophoneUsageDescription"])
+        mic_usage = info["NSMicrophoneUsageDescription"]
+        self.assertIn("records your voice only when you tap record", mic_usage)
+        self.assertIn("decode audio locally for the transcription bridge", mic_usage)
+        self.assertNotIn("transcribe locally on this device", mic_usage)
         self.assertEqual(info["UILaunchStoryboardName"], "LaunchScreen")
         self.assertIn("UIInterfaceOrientationPortrait", info["UISupportedInterfaceOrientations"])
 
@@ -57,7 +62,7 @@ class IOSAppShellTests(unittest.TestCase):
             "@main",
             "AutoWhisperIOSApp",
             "AutoWhisperSettings.mobileDefaults",
-            "FakeTranscriptionEngine",
+            "IOSPlaceholderWhisperTranscriber",
             "Copy Transcript",
             "Share Transcript",
             "iOS does not allow global hotkeys",
@@ -91,10 +96,61 @@ class IOSAppShellTests(unittest.TestCase):
             "private let audioRecorder = IOSAudioRecorder()",
             "try audioRecorder.startRecording()",
             "let recording = try audioRecorder.stopRecording()",
-            "Recorded \\(recording.durationSeconds",
         ]:
             self.assertIn(snippet, view_text)
         self.assertNotIn("AudioFixture.fixture(samples: [0, 0.1, 0.2, 0.1, 0])", view_text)
+
+    def test_ios_shell_decodes_recorded_audio_for_whisper_bridge(self):
+        self.assertTrue(DECODER.exists(), "Recorded CAF audio should be decoded into normalized PCM before inference")
+        self.assertTrue(TRANSCRIBER.exists(), "The app should have an explicit iOS Whisper transcriber seam")
+        decoder_text = DECODER.read_text()
+        transcriber_text = TRANSCRIBER.read_text()
+        view_text = CONTENT_VIEW.read_text()
+
+        for snippet in [
+            "import AVFoundation",
+            "struct IOSDecodedAudio",
+            "final class IOSAudioDecoder",
+            "AVAudioFile(forReading:",
+            "AVAudioPCMBuffer",
+            "read(into:",
+            "floatChannelData",
+            "maxFrameCount",
+            "sampleRate",
+            "samples: [Float]",
+        ]:
+            self.assertIn(snippet, decoder_text)
+
+        for snippet in [
+            "protocol IOSWhisperTranscribing",
+            "final class IOSPlaceholderWhisperTranscriber",
+            "IOSAudioDecoder",
+            "func transcribe(recording: IOSAudioRecording) async throws -> String",
+            "Task.detached(priority: .userInitiated)",
+            "decoded.samples.count",
+            "Whisper bridge pending",
+        ]:
+            self.assertIn(snippet, transcriber_text)
+
+        for snippet in [
+            "private let transcriber: IOSWhisperTranscribing",
+            "IOSPlaceholderWhisperTranscriber()",
+            "guard recordingState != .preparingTranscript else { return }",
+            "recordingState = .preparingTranscript",
+            "transcriptText = try await transcriber.transcribe(recording: recording)",
+            "private var recordingButtonTitle: String",
+            "case .preparingTranscript:",
+            "return \"Decoding Audio…\"",
+            ".disabled(model.recordingState == .preparingTranscript)",
+        ]:
+            self.assertIn(snippet, view_text)
+        self.assertNotIn("stopAndTranscribe(audio: AudioFixture(samples: []", view_text)
+        for overclaim in [
+            "transcribe locally",
+            "Stop & Transcribe",
+            "recordingState = .transcribed",
+        ]:
+            self.assertNotIn(overclaim, view_text)
 
     def test_readme_reflects_runnable_app_shell_gate(self):
         text = README.read_text()

@@ -88,7 +88,7 @@ Status: implemented as the first runnable SwiftUI app-shell slice.
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>AutoWhisper records your voice only when you tap record so it can transcribe locally on this device.</string>
+<string>AutoWhisper records your voice only when you tap record so it can decode audio locally for the transcription bridge.</string>
 ```
 
 **Verification:**
@@ -109,14 +109,16 @@ Runtime smoke evidence is simulator install + launch + screenshot.
 
 ## Phase I2: Native audio and whisper bridge
 
-Status: native AVFoundation recording is implemented; `whisper.cpp` inference bridge remains next.
+Status: native AVFoundation recording and recorded-audio PCM decode are implemented; `whisper.cpp` inference bridge remains next.
 
 **Objective:** Bind the app shell to AVFoundation recording and `whisper.cpp` local inference.
 
 **Approach:**
 - Implemented: use AVFoundation for microphone permission-gated foreground recording.
 - Implemented: record 16 kHz mono Linear PCM CAF files through `IOSAudioRecorder`.
-- Next: decode/stream that recorded audio into bundled `deps/whisper.cpp` C API as the first inference bridge.
+- Implemented: decode recorded CAF files into normalized PCM samples through `IOSAudioDecoder`.
+- Implemented: route stop-recording output through an explicit async `IOSWhisperTranscribing` seam with honest placeholder output.
+- Next: feed decoded samples into bundled `deps/whisper.cpp` C API as the first real inference bridge.
 - Keep model loading serialized through an actor or equivalent concurrency boundary.
 
 ## Phase I3: Distribution-grade iOS behavior

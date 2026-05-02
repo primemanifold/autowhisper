@@ -158,3 +158,13 @@ Consequences:
 - `IOSAudioRecorder` owns `AVAudioSession`/`AVAudioRecorder` lifecycle for 16 kHz mono CAF capture.
 - SwiftUI still uses placeholder transcript text until recorded audio is decoded/fed to `whisper.cpp`.
 - Verification language must distinguish simulator/device builds from physical-device signing/runtime and from real transcription.
+
+## 2026-05-02T03:07:35Z — iOS audio decode seam before real Whisper inference
+Decision: Extend PR #12 with a bounded recorded-audio decode and transcriber-seam slice before binding `whisper.cpp`.
+Rationale: The app should not jump from AVFoundation recording straight to model integration without first proving the recorded CAF can be decoded into normalized PCM and routed through a reviewable inference seam.
+Consequences:
+- `IOSAudioDecoder` decodes recorded CAF audio into normalized float PCM and guards the preview path against overly long recordings.
+- `IOSWhisperTranscribing` is an async/sendable seam so decode/inference work can stay off the main actor.
+- The UI disables the recorder button while `.preparingTranscript` is in progress so users cannot start a second recording while decode/transcriber work from the previous recording is still pending.
+- SwiftUI copy and microphone permission prompt text now say decode/bridge summary and explicitly avoid saying real Whisper transcription is implemented.
+- Verification language must still avoid claiming physical-device runtime, TestFlight, App Store readiness, or real Whisper transcript output.

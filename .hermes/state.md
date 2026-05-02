@@ -691,3 +691,27 @@ Verification:
 - Independent review: PASS, no blockers; fixed non-blocking recorder-start failure cleanup by deactivating audio session if `record()` fails.
 Limits:
 - Still not real Whisper transcription, physical-device runtime, signed device install, TestFlight, or App Store readiness.
+
+## Run 2026-05-02T03:07:35Z
+Phase: iOS audio-decode bridge continuation on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Added `IOSAudioDecoder` to decode recorded CAF files into normalized float PCM samples for the future inference bridge, with a preview guard for overly long recordings.
+- Added async/sendable `IOSWhisperTranscribing` seam and `IOSPlaceholderWhisperTranscriber` so stop-recording output now passes through recorded-audio decode before returning honest bridge-pending UI output.
+- Updated SwiftUI copy from "Stop & Transcribe"/"transcribe locally" to decode/bridge language that explicitly says real Whisper transcription is still the next iOS slice.
+- Updated the iOS microphone permission prompt copy to decode/bridge language so the system permission sheet does not claim real local transcription yet.
+- Fixed the `.preparingTranscript` state race by guarding duplicate toggle actions, changing the button title to `Decoding Audio…`, and disabling the recorder button while decode/transcriber work is pending.
+- Added static regression checks for the decoder, transcriber seam, off-main decode path, no real-transcription overclaims while placeholder output remains active, and the `.preparingTranscript` button guard.
+- Updated iOS README, implementation plan, and decisions/state docs.
+Verification:
+- RED: `python3 -m unittest tests.static.test_ios_app_shell -v` failed for missing `IOSAudioDecoder`, async transcriber seam, and overclaim guard expectations before implementation.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 33/33 passed.
+- GREEN: `cd ios && xcodegen generate`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-bridge build`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-bridge build`: passed.
+- GREEN: `git diff --check`: passed.
+- GREEN: Simulator erase/install/launch screenshot: `/tmp/autowhisper-ios-evidence/ios-audio-decode-bridge-shell.png`; vision verified the app is visible, no automatic microphone permission prompt appears, and hero copy avoids claiming real Whisper is implemented.
+- Independent review initially requested changes for overclaiming copy, main-actor decode, microphone permission wording, and a `.preparingTranscript` duplicate-tap race; those issues were fixed and reverified.
+- Final independent read-only review returned PASS after the race fix.
+Limits:
+- Still not real Whisper transcription, physical-device runtime, signed device install, TestFlight, or App Store readiness.

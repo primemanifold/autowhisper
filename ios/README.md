@@ -9,7 +9,7 @@ The current checked-in slice includes both:
 1. A Foundation-only Swift package that verifies the mobile product contract.
 2. A runnable SwiftUI iOS app shell generated from `ios/project.yml` with XcodeGen.
 
-This is intentionally still an app-shell milestone: it proves launch, microphone-permission copy, native AVFoundation foreground audio recording to a temporary 16 kHz mono CAF file, placeholder local transcript flow, copy/share actions, and iOS-safe product constraints. It does not yet bind recorded audio into `whisper.cpp` inference.
+This is intentionally still an app-shell milestone: it proves launch, microphone-permission copy, native AVFoundation foreground audio recording to a temporary 16 kHz mono CAF file, recorded-audio decode into normalized PCM for the future inference bridge, copy/share actions, and iOS-safe product constraints. It does not yet bind decoded audio into `whisper.cpp` inference.
 
 ## Verified now
 
@@ -43,6 +43,7 @@ The package check executable verifies:
 - iOS-specific unavailable capabilities are explicit.
 - A fake record -> transcribe -> copy/share workflow works end to end at the domain layer.
 - The SwiftUI app shell uses `IOSAudioRecorder`/`AVAudioRecorder` for real foreground microphone capture before the transcript bridge exists.
+- The app decodes the recorded CAF into normalized PCM through `IOSAudioDecoder` and routes that through an explicit `IOSWhisperTranscribing` seam before real `whisper.cpp` inference is connected.
 
 The SwiftUI shell verifies:
 
@@ -50,7 +51,7 @@ The SwiftUI shell verifies:
 - The app declares `NSMicrophoneUsageDescription`.
 - The app includes an App Store privacy manifest with no tracking or collected-data declarations for this shell.
 - The home screen communicates iOS limits honestly: no global hotkeys and no arbitrary text injection.
-- Users can exercise the foreground Start Recording -> Stop & Transcribe -> Copy Transcript / Share Transcript loop with a native AVFoundation recording file and a placeholder local transcript.
+- Users can exercise the foreground Start Recording -> Stop & Decode Audio -> Copy Transcript / Share Transcript loop with a native AVFoundation recording file and a decoded PCM bridge summary. Real Whisper transcript output is still a future slice.
 
 ## Target first real transcription loop
 
