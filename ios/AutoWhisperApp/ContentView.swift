@@ -34,9 +34,33 @@ final class AutoWhisperAppModel: ObservableObject {
         }
     }
 
-    func requestMicrophonePermission() async {
+    @discardableResult
+    func requestMicrophonePermission() async -> Bool {
         let granted = await AVCaptureDevice.requestAccess(for: .audio)
         permissionStatus = granted ? "Microphone permission granted" : "Microphone permission denied — enable it in Settings to record."
+        return granted
+    }
+
+    func hasMicrophonePermissionForRecording() async -> Bool {
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .authorized:
+            updateMicrophonePermissionStatus()
+            return true
+        case .notDetermined:
+            let granted = await requestMicrophonePermission()
+            if !granted {
+                errorMessage = "Microphone permission is required before recording. Enable it in Settings to use AutoWhisper on iPhone."
+            }
+            return granted
+        case .denied, .restricted:
+            updateMicrophonePermissionStatus()
+            errorMessage = "Microphone permission is required before recording. Enable it in Settings to use AutoWhisper on iPhone."
+            return false
+        @unknown default:
+            updateMicrophonePermissionStatus()
+            errorMessage = "Microphone permission is unavailable on this device."
+            return false
+        }
     }
 
     func handleDeepLink(_ url: URL) async {
@@ -73,6 +97,7 @@ final class AutoWhisperAppModel: ObservableObject {
                 transcriptText = try await transcriber.transcribe(recording: recording)
                 recordingState = .idle
             } else {
+                guard await hasMicrophonePermissionForRecording() else { return }
                 try audioRecorder.startRecording()
                 recordingState = .recording
                 transcriptText = ""

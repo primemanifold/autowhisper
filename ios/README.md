@@ -56,7 +56,7 @@ The SwiftUI shell verifies:
 - The app includes an App Store privacy manifest with no tracking or collected-data declarations for this shell.
 - The home screen communicates iOS limits honestly: no global hotkeys and no arbitrary text injection.
 - A small WidgetKit Quick Record widget opens the foreground app through `autowhisper://record`; it does not attempt background or widget-process microphone recording.
-- Users can exercise the foreground Start Recording -> Stop & Decode Audio -> Copy Transcript / Share Transcript loop with a native AVFoundation recording file and a decoded PCM bridge summary. Real Whisper transcript output is still a future slice.
+- Users can exercise the foreground Start Recording -> Stop & Decode Audio -> Copy Transcript / Share Transcript loop with a native AVFoundation recording file and a decoded PCM bridge summary. The first Start Recording tap requests microphone permission when needed, and denied/restricted permission states stay non-recording with actionable Settings copy. Real Whisper transcript output is still a future slice.
 
 ## Target first real transcription loop
 

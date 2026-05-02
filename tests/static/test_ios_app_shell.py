@@ -202,6 +202,22 @@ class IOSAppShellTests(unittest.TestCase):
         self.assertNotIn("whisper_init", transcriber_text)
         self.assertNotIn("whisper_full", transcriber_text)
 
+    def test_ios_primary_record_button_requests_microphone_permission_first(self):
+        view_text = CONTENT_VIEW.read_text()
+        self.assertIn("@discardableResult", view_text)
+        self.assertIn("func requestMicrophonePermission() async -> Bool", view_text)
+        self.assertIn("func hasMicrophonePermissionForRecording() async -> Bool", view_text)
+        self.assertIn("await requestMicrophonePermission()", view_text)
+        self.assertIn("guard await hasMicrophonePermissionForRecording() else { return }", view_text)
+        toggle_body = view_text.split("func toggleRecording() async", 1)[1]
+        self.assertLess(
+            toggle_body.index("guard await hasMicrophonePermissionForRecording() else { return }"),
+            toggle_body.index("try audioRecorder.startRecording()"),
+            "The primary Start Recording path must request/verify microphone permission before starting AVAudioRecorder",
+        )
+        self.assertIn("Microphone permission is required before recording", view_text)
+        self.assertNotIn("Start Recording requests permission and transcribes locally", view_text)
+
     def test_readme_reflects_runnable_app_shell_gate(self):
         text = README.read_text()
         self.assertIn("runnable SwiftUI iOS app shell", text)

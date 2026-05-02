@@ -803,3 +803,27 @@ Limits:
 - Windows remains build-proven/runtime-unverified; iOS still has no real local Whisper transcription or TestFlight/App Store readiness.
 Next:
 - Push the local commits to `origin/primeodin/ios-swiftui-app-shell` to update PR #12, then watch hosted checks.
+
+## Run 2026-05-02T20:56:02Z
+Phase: iOS first-run microphone permission hardening on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Used read-only scouts to choose the next small reversible iOS slice after the green PR #12 docs/widget foundation.
+- Updated `AutoWhisperAppModel.requestMicrophonePermission()` to return whether permission was granted while preserving existing button/deep-link callers.
+- Added `hasMicrophonePermissionForRecording()` so the primary Start Recording path requests/verifies microphone permission before `IOSAudioRecorder.startRecording()`.
+- Denied/restricted/unavailable microphone states now remain non-recording and surface actionable foreground-app copy instead of falling through to recorder failure.
+- Updated iOS README and static regression tests for the primary record-button permission gate.
+Verification:
+- RED: `python3 -m unittest tests.static.test_ios_app_shell.IOSAppShellTests.test_ios_primary_record_button_requests_microphone_permission_first -v` failed before implementation because the permission gate did not exist.
+- GREEN: `python3 -m unittest tests.static.test_ios_app_shell -v`: 10/10 passed.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- GREEN: `cd ios && xcodegen generate`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-permission build`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-permission-device build`: passed.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 53/53 passed.
+- GREEN: `git diff --check`: passed.
+- Independent read-only review returned PASS; no blockers or important issues.
+Limits:
+- This is first-run/onboarding hardening only; it does not prove physical-device microphone runtime, widget tap behavior, real Whisper transcription, model bundling, TestFlight, or App Store readiness.
+- Widget/deep-link behavior remains foreground-app only; no widget/background microphone capture is claimed.
+Next:
+- Commit/push this slice if final preflight stays clean, then watch hosted checks.
