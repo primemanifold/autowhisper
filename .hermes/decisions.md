@@ -130,3 +130,22 @@ Treat this slice as a desktop-platform foundation gate: macOS is validated host-
 - Platform diagnostics explicitly expose ready/partial/placeholder/unsupported feature states.
 - `engineering/desktop-platform-foundation.md` documents Docker limits and avoids claiming macOS containers or Windows runtime execution.
 - Cross-compiled tests are not registered unless `CMAKE_CROSSCOMPILING_EMULATOR` is present.
+
+
+## ADR-0008 — Use XcodeGen source-of-truth for the runnable iOS app shell
+
+Date: 2026-05-02T01:35:17Z
+
+### Context
+
+Full Xcode and iOS SDKs are now available on the local Mac, unblocking work that ADR-0006 intentionally deferred. The first iOS milestone still must avoid desktop behavior overclaims: iOS cannot support global hotkeys, menu-bar daemons, or arbitrary text injection. The repo needs a runnable app shell that can be generated, built for simulator/device SDKs, installed, launched, and screenshot-verified without committing generated Xcode project churn.
+
+### Decision
+
+Use `ios/project.yml` as the source of truth for a generated `AutoWhisperIOS.xcodeproj`. Add a SwiftUI `AutoWhisperApp` target that depends on `AutoWhisperCore`, declares microphone usage copy and a privacy manifest, launches to a foreground record/transcribe/copy-share shell, and gates microphone permission behind an explicit user button. Keep generated `ios/*.xcodeproj/` files ignored.
+
+### Consequences
+
+- The iOS product line now has a runnable simulator app shell rather than only a Swift package foundation.
+- Local verification distinguishes simulator build, generic iPhoneOS build without signing, and simulator runtime smoke; it still does not claim physical-device install, TestFlight, App Store readiness, or real local Whisper inference.
+- Future iOS work should extend this shell with AVFoundation recording and a `whisper.cpp` bridge while preserving the explicit iOS platform-limit messaging.

@@ -72,15 +72,17 @@ swift run --package-path ios AutoWhisperCoreChecks
 
 ## Phase I1: Xcode app shell
 
-Blocked until full Xcode/iOS SDK is installed and selected.
+Status: implemented as the first runnable SwiftUI app-shell slice.
 
 **Objective:** Add a runnable SwiftUI iOS app target.
 
 **Files:**
-- Create: `ios/AutoWhisperApp/AutoWhisperApp.swift`
-- Create: `ios/AutoWhisperApp/ContentView.swift`
-- Create: `ios/AutoWhisperApp/Info.plist`
-- Add app project/workspace once Xcode is available.
+- Created: `ios/project.yml` as the XcodeGen source of truth.
+- Created: `ios/AutoWhisperApp/AutoWhisperApp.swift`
+- Created: `ios/AutoWhisperApp/ContentView.swift`
+- Created: `ios/AutoWhisperApp/Info.plist`
+- Created: `ios/AutoWhisperApp/PrivacyInfo.xcprivacy`
+- Created: `ios/AutoWhisperApp/LaunchScreen.storyboard`
 
 **Required Info.plist key:**
 
@@ -92,8 +94,18 @@ Blocked until full Xcode/iOS SDK is installed and selected.
 **Verification:**
 
 ```bash
-xcodebuild -scheme AutoWhisper -destination 'platform=iOS Simulator,name=iPhone 16' build test
+swift run --package-path ios AutoWhisperCoreChecks
+python3 -m unittest tests.static.test_ios_app_shell -v
+cd ios && xcodegen generate
+xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp \
+  -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator \
+  CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp \
+  -destination 'generic/platform=iOS' -sdk iphoneos \
+  CODE_SIGNING_ALLOWED=NO build
 ```
+
+Runtime smoke evidence is simulator install + launch + screenshot.
 
 ## Phase I2: Native audio and whisper bridge
 

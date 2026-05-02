@@ -1,24 +1,40 @@
 # AutoWhisper iOS Foundation
 
-This directory is the start of the native iOS product line for AutoWhisper.
+This directory is the native iOS product line for AutoWhisper.
 
 ## Current milestone
 
-The current checked-in slice is intentionally a Foundation-only Swift package, not yet a runnable iOS app bundle. It defines and verifies the mobile product contract we need before adding SwiftUI, AVFoundation, signing, simulator, and device builds.
+The current checked-in slice includes both:
 
-Why this first:
+1. A Foundation-only Swift package that verifies the mobile product contract.
+2. A runnable SwiftUI iOS app shell generated from `ios/project.yml` with XcodeGen.
 
-- The current machine only has Command Line Tools selected, not full Xcode.
-- `iphoneos` / `iphonesimulator` SDKs and `simctl` are not available locally yet.
-- AutoWhisper's current desktop daemon model cannot be ported 1:1 to iOS because iOS does not allow global hotkeys, menu-bar daemons, or arbitrary-app text injection.
+This is intentionally still an app-shell milestone: it proves launch, microphone-permission copy, foreground record/stop UI, placeholder local transcript flow, copy/share actions, and iOS-safe product constraints. It does not yet bind AVFoundation recording buffers to `whisper.cpp` inference.
 
 ## Verified now
 
+From the repository root:
+
 ```bash
 swift run --package-path ios AutoWhisperCoreChecks
+python3 -m unittest tests.static.test_ios_app_shell -v
 ```
 
-The check executable verifies:
+From `ios/` after generating the Xcode project:
+
+```bash
+xcodegen generate
+xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp \
+  -destination 'generic/platform=iOS Simulator' \
+  -sdk iphonesimulator \
+  CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp \
+  -destination 'generic/platform=iOS' \
+  -sdk iphoneos \
+  CODE_SIGNING_ALLOWED=NO build
+```
+
+The package check executable verifies:
 
 - iOS defaults use 16 kHz mono audio for Whisper compatibility.
 - The first iOS catalog recommends `tiny.en`, not the large desktop default.
@@ -27,15 +43,23 @@ The check executable verifies:
 - iOS-specific unavailable capabilities are explicit.
 - A fake record -> transcribe -> copy/share workflow works end to end at the domain layer.
 
-## Target first app loop
+The SwiftUI shell verifies:
 
-The first real app milestone is:
+- AutoWhisper launches as a native iOS app target.
+- The app declares `NSMicrophoneUsageDescription`.
+- The app includes an App Store privacy manifest with no tracking or collected-data declarations for this shell.
+- The home screen communicates iOS limits honestly: no global hotkeys and no arbitrary text injection.
+- Users can exercise the foreground Start Recording -> Stop & Transcribe -> Copy Transcript / Share Transcript loop with a placeholder local transcript.
+
+## Target first real transcription loop
+
+The next real app milestone is:
 
 1. Launch AutoWhisper on iPhone.
 2. Request microphone permission.
 3. Tap to record.
 4. Tap to stop.
-5. Transcribe locally with `whisper.cpp`.
+5. Feed recorded 16 kHz mono audio to `whisper.cpp`.
 6. Display transcript in the app.
 7. Copy or share the transcript.
 
@@ -52,16 +76,6 @@ These desktop capabilities are not available in this iOS product surface:
 
 A future iOS keyboard extension or Share extension may provide separate integration surfaces, but those need their own sandbox and App Store review design.
 
-## Full Xcode gate
+## Xcode project policy
 
-Before adding and validating a runnable iOS app target, this machine needs full Xcode selected:
-
-```bash
-sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-xcodebuild -version
-xcrun --sdk iphoneos --show-sdk-path
-xcrun --sdk iphonesimulator --show-sdk-path
-xcrun --find simctl
-```
-
-Then the next gates become simulator/device `xcodebuild` builds and UI smoke tests.
+`ios/project.yml` is the source of truth. Generate `AutoWhisperIOS.xcodeproj` locally with XcodeGen; do not hand-edit generated project files.

@@ -640,3 +640,33 @@ Next:
 - Verified a fresh public release download: checksum OK, plist and CLI version `0.7.1`, Gatekeeper accepted, clean-HOME first run exited `0`, and user config was created.
 - Release-event CI run `25238033133` completed success for build, build-source, and build-deb. Existing PPA workflow remains noisy/failing separately.
 - Updated public landing repo `primemanifold/autowhisper-landing` commit `968274c` so homepage and roadmap CTAs point to `v0.7.1`; GitHub Pages run `25238071749` passed and hosted homepage/roadmap returned HTTP 200 with `v0.7.1` content.
+
+
+## Run 2026-05-02T01:35:17Z
+Phase: iOS app shell completion
+Hats used: Engineering, CEO
+Shipped:
+- [HAT: Engineering] Created `primeodin/ios-swiftui-app-shell` from `core` for an isolated iOS app-shell slice.
+- [HAT: Engineering] Added `ios/project.yml` as the XcodeGen source of truth and gitignored generated `ios/*.xcodeproj/` files.
+- [HAT: Engineering] Added a runnable SwiftUI iOS app shell under `ios/AutoWhisperApp/` with launch screen, microphone usage description, privacy manifest, AutoWhisperCore dependency, foreground record/stop placeholder loop, copy/share transcript actions, and explicit iOS platform-limit copy.
+- [HAT: Engineering] Updated `ios/README.md` and `engineering/ios-implementation-plan.md` to replace stale Xcode-blocked language with the new app-shell gate.
+- [HAT: Engineering] Added static regression tests in `tests/static/test_ios_app_shell.py` and watched them fail before implementation, then pass.
+Learned:
+- [HAT: Engineering] Xcode 26.4.1, iPhoneOS26.4.sdk, iPhoneSimulator26.4.sdk, simctl, and XcodeGen are usable locally for iOS app-shell validation.
+- [HAT: Engineering] Calling AVFoundation permission APIs on launch produced a system microphone prompt during screenshot QA; the shell now gates microphone permission behind an explicit `Request Microphone Permission` button.
+Verification:
+- RED: `python3 -m unittest tests.static.test_ios_app_shell -v` failed for missing `ios/project.yml`, iOS app metadata, SwiftUI shell, and updated README.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks` passed.
+- GREEN: `python3 -m unittest discover -s tests/static -v` passed — 31/31 tests.
+- GREEN: `xcodegen generate` passed from `ios/`.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived build` passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived build` passed.
+- GREEN: Simulator install + launch passed on iPhone simulator; screenshot captured at `/tmp/autowhisper-ios-evidence/ios-app-shell-final-erased.png` and verified the app shell is visible, unclipped, and does not auto-prompt for microphone permission.
+- GREEN: `git diff --check` passed.
+- Independent review returned PASS with no blockers; its only UX note about automatic microphone prompting was fixed and reverified after simulator erase.
+Blocked on:
+- No blocker for the iOS app-shell slice.
+- Real iOS transcription remains next phase: bind AVFoundation recording buffers to `whisper.cpp`, add real model resources/loading, then validate simulator/device runtime and signing/TestFlight separately.
+Next:
+- Commit and push this branch, open PR into `core`.
+- Next iOS slice should implement real AVFoundation recording and the first `whisper.cpp` inference bridge without claiming TestFlight/App Store readiness until signing/provisioning gates pass.
