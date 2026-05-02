@@ -781,3 +781,25 @@ Limits:
 - No new platform readiness status is proven by this planning slice.
 Next:
 - Review with Channa, then if approved launch Phase 1 read-only Claude scouts before implementation.
+
+## Run 2026-05-02T18:44:43Z
+Phase: cross-platform readiness Lane A + Lane B docs/tests on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Ran Phase 1 read-only Claude scouts for macOS, Linux, Windows, iOS/mobile, and product docs; saved reports under `engineering/claude-scout-reports/` with a synthesis recommending Lane A + Lane B first.
+- Committed the plan/scout pack as `f98839f` (`docs: plan cross-platform readiness batch`).
+- Added the readiness foundation: `engineering/platform-readiness-matrix.md`, `engineering/platform-validation-commands.md`, `docs/usage-guide.md`, `docs/media/README.md`, and `docs/media/manim/autowhisper-flow-plan.md`.
+- Updated README with concise local-first and per-platform status links/copy.
+- Added static claim-boundary tests in `tests/static/test_platform_readiness_docs.py` and `tests/static/test_docs_claims.py`.
+- Committed the implementation as `ac07830` (`docs: add platform readiness matrix and guide`).
+Verification:
+- GREEN: control-character scan passed after fixing hidden BEL bytes in Windows PowerShell examples.
+- GREEN: `python3 -m unittest tests.static.test_platform_readiness_docs tests.static.test_docs_claims -v`: 16/16 passed.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 52/52 passed.
+- GREEN: `git diff --check`: passed.
+- Independent review initially requested changes for the hidden control-character blocker; follow-up independent review returned PASS after the fix.
+Limits:
+- This slice is docs/tests-only and proves claim hygiene, not new runtime platform capability.
+- macOS public artifact language remains limited to v0.7.1; v0.7.2 remains candidate/PR until public artifact validation.
+- Windows remains build-proven/runtime-unverified; iOS still has no real local Whisper transcription or TestFlight/App Store readiness.
+Next:
+- Push the local commits to `origin/primeodin/ios-swiftui-app-shell` to update PR #12, then watch hosted checks.
