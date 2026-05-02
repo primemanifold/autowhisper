@@ -9,7 +9,7 @@ The current checked-in slice includes both:
 1. A Foundation-only Swift package that verifies the mobile product contract.
 2. A runnable SwiftUI iOS app shell generated from `ios/project.yml` with XcodeGen.
 
-This is intentionally still an app-shell milestone: it proves launch, microphone-permission copy, native AVFoundation foreground audio recording to a temporary 16 kHz mono CAF file, recorded-audio decode into normalized PCM for the future inference bridge, explicit bundled-model resource lookup with clear missing-model state, copy/share actions, and iOS-safe product constraints. It does not yet bind decoded audio into `whisper.cpp` inference.
+This is intentionally still an app-shell milestone: it proves launch, microphone-permission copy, native AVFoundation foreground audio recording to a temporary 16 kHz mono CAF file, recorded-audio decode into normalized PCM for the future inference bridge, explicit bundled-model resource lookup with clear missing-model state, a Quick Record widget/deep-link launcher, copy/share actions, and iOS-safe product constraints. It does not yet bind decoded audio into `whisper.cpp` inference.
 
 ## Verified now
 
@@ -46,6 +46,8 @@ The package check executable verifies:
 - The SwiftUI app shell uses `IOSAudioRecorder`/`AVAudioRecorder` for real foreground microphone capture before the transcript bridge exists.
 - The app decodes the recorded CAF into normalized PCM through `IOSAudioDecoder` and routes that through an explicit `IOSWhisperTranscribing` seam before real `whisper.cpp` inference is connected.
 - The placeholder transcriber checks `IOSWhisperModelLocator` for the recommended bundled GGML model and reports missing model resources without claiming transcription succeeded.
+- The Quick Record widget is a small WidgetKit launcher only: Widgets cannot record microphone audio directly, so `autowhisper://record` opens the foreground app before any microphone capture starts.
+- No Ghost Pepper code is vendored or copied; Ghost Pepper remains architecture inspiration only because no license file was found during inspection.
 
 The SwiftUI shell verifies:
 
@@ -53,6 +55,7 @@ The SwiftUI shell verifies:
 - The app declares `NSMicrophoneUsageDescription`.
 - The app includes an App Store privacy manifest with no tracking or collected-data declarations for this shell.
 - The home screen communicates iOS limits honestly: no global hotkeys and no arbitrary text injection.
+- A small WidgetKit Quick Record widget opens the foreground app through `autowhisper://record`; it does not attempt background or widget-process microphone recording.
 - Users can exercise the foreground Start Recording -> Stop & Decode Audio -> Copy Transcript / Share Transcript loop with a native AVFoundation recording file and a decoded PCM bridge summary. Real Whisper transcript output is still a future slice.
 
 ## Target first real transcription loop
@@ -77,6 +80,7 @@ These desktop capabilities are not available in this iOS product surface:
 - Injecting text into arbitrary active apps.
 - Linux/X11 clipboard or `xdotool`/`xclip` behavior.
 - PulseAudio mute-other-apps behavior.
+- Widget-process/background microphone capture. The Quick Record widget can only open the foreground app; the user still controls recording in AutoWhisper.
 
 A future iOS keyboard extension or Share extension may provide separate integration surfaces, but those need their own sandbox and App Store review design.
 

@@ -16,6 +16,9 @@ MODEL_CATALOG = IOS / "Sources" / "AutoWhisperCore" / "ModelCatalog.swift"
 INFO_PLIST = APP_DIR / "Info.plist"
 PRIVACY = APP_DIR / "PrivacyInfo.xcprivacy"
 README = IOS / "README.md"
+WIDGET_DIR = IOS / "AutoWhisperWidget"
+WIDGET_SWIFT = WIDGET_DIR / "AutoWhisperWidget.swift"
+WIDGET_INTENTS = WIDGET_DIR / "AutoWhisperWidgetIntents.swift"
 
 
 class IOSAppShellTests(unittest.TestCase):
@@ -206,6 +209,69 @@ class IOSAppShellTests(unittest.TestCase):
         self.assertIn("xcodebuild -project AutoWhisperIOS.xcodeproj", text)
         self.assertNotIn("not yet a runnable iOS app bundle", text)
         self.assertNotIn("Blocked until full Xcode/iOS SDK", text)
+    def test_ios_widget_and_deep_link_are_safe_quick_record_surfaces(self):
+        project_text = PROJECT_YML.read_text()
+        info = plistlib.loads(INFO_PLIST.read_bytes())
+        view_text = CONTENT_VIEW.read_text()
+
+        for snippet in [
+            "AutoWhisperWidget:",
+            "type: app-extension",
+            "platform: iOS",
+            "AutoWhisperWidget",
+            "PRODUCT_BUNDLE_IDENTIFIER: com.primemanifold.autowhisper.ios.widget",
+            "CODE_SIGNING_ALLOWED: NO",
+        ]:
+            self.assertIn(snippet, project_text)
+
+        schemes = [
+            scheme
+            for item in info.get("CFBundleURLTypes", [])
+            for scheme in item.get("CFBundleURLSchemes", [])
+        ]
+        self.assertIn("autowhisper", schemes)
+
+        for snippet in [
+            ".onOpenURL",
+            "handleDeepLink",
+            "url.scheme == \"autowhisper\"",
+            "url.host == \"record\"",
+            "requestMicrophonePermission()",
+        ]:
+            self.assertIn(snippet, view_text)
+
+        self.assertTrue(WIDGET_SWIFT.exists(), "Widget target should expose a small quick-record launcher")
+        self.assertTrue(WIDGET_INTENTS.exists(), "Widget target should include an AppIntent/deep-link seam for future Shortcuts")
+        widget_text = WIDGET_SWIFT.read_text()
+        intents_text = WIDGET_INTENTS.read_text()
+        combined_widget = widget_text + "\n" + intents_text
+        for snippet in [
+            "import WidgetKit",
+            "import SwiftUI",
+            "struct AutoWhisperWidget",
+            "StaticConfiguration",
+            "supportedFamilies([.systemSmall])",
+            "autowhisper://record",
+            "Open AutoWhisper to record",
+            "AppIntent",
+            "OpenRecorderIntent",
+        ]:
+            self.assertIn(snippet, combined_widget)
+
+        forbidden_widget_runtime = ["AVAudioRecorder", "AVAudioSession", "requestAccess(for: .audio)", "startRecording()"]
+        for snippet in forbidden_widget_runtime:
+            self.assertNotIn(snippet, combined_widget)
+
+    def test_ios_widget_voice_docs_are_honest_about_platform_limits(self):
+        text = README.read_text()
+        for snippet in [
+            "Quick Record widget",
+            "Widgets cannot record microphone audio directly",
+            "opens the foreground app",
+            "autowhisper://record",
+            "No Ghost Pepper code is vendored or copied",
+        ]:
+            self.assertIn(snippet, text)
 
 
 if __name__ == "__main__":

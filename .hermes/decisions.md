@@ -178,3 +178,13 @@ Consequences:
 - `IOSWhisperModelLocator` resolves the recommended model from `Bundle.main` under `Models/` or returns a typed `missingBundledModel` error.
 - The placeholder transcriber checks the locator and reports model readiness/missing-model state while still returning bridge-pending placeholder output.
 - Verification language must still avoid claiming model bundling, real inference, physical-device runtime, TestFlight, or App Store readiness.
+
+## 2026-05-02T16:00:38Z — iOS Quick Record widget is a foreground-app launcher
+Decision: Add a WidgetKit Quick Record launcher and deep-link seam for iOS, but keep all microphone recording in the foreground AutoWhisper app.
+Rationale: Channa wants the widget and small voice part of iOS. iOS widgets are not a safe place to run microphone capture, and Ghost Pepper has no detected license, so this must be a clean-room native iOS slice that learns from architecture patterns without copying code.
+Consequences:
+- `AutoWhisperWidget` is an embedded WidgetKit app extension with a small widget that opens `autowhisper://record`.
+- `AutoWhisperApp` registers the `autowhisper` URL scheme and handles `autowhisper://record` by requesting/updating microphone permission in the foreground app and starting the existing `IOSAudioRecorder` only when authorized and idle.
+- Widget code must not instantiate `AVAudioRecorder`, configure `AVAudioSession`, request microphone permission, or claim background/widget-process recording.
+- Ghost Pepper remains research inspiration only unless explicit licensing/permission is obtained; no Ghost Pepper code is vendored or copied.
+- Verification language must still avoid claiming real Whisper transcription, widget/background microphone recording, physical-device runtime, TestFlight, or App Store readiness.

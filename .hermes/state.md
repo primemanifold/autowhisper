@@ -737,3 +737,29 @@ Verification:
 - Independent read-only review returned PASS; no blockers or important issues.
 Limits:
 - Still no real bundled model binary, no `whisper.cpp` inference, no real transcript output, no physical-device runtime, no signed device install, no TestFlight, and no App Store readiness.
+
+## Run 2026-05-02T16:00:38Z
+Phase: iOS widget + small voice continuation on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Performed a clean-room Ghost Pepper gap analysis for iOS voice entry points. Ghost Pepper remains architecture inspiration only because GitHub license metadata is null and no local `LICENSE*`/`COPYING*` file was found.
+- Added `engineering/ios-widget-voice-plan.md` documenting the licensing boundary, WidgetKit platform constraints, implemented Quick Record slice, verification gates, and next slices.
+- Added an `AutoWhisperWidget` WidgetKit app-extension target to `ios/project.yml` and embedded it in the iOS app target.
+- Added a small `.systemSmall` Quick Record widget that opens `autowhisper://record` and does not touch microphone APIs in the widget process.
+- Registered the `autowhisper` URL scheme in `AutoWhisperApp/Info.plist`.
+- Wired `.onOpenURL` and `handleDeepLink(_:)` in `ContentView`/`AutoWhisperAppModel` so `autowhisper://record` opens the foreground app, requests/updates microphone permission if needed, and starts the existing AVFoundation foreground recorder only when authorized and idle.
+- Added an AppIntent seam for future Shortcuts/interactivity while preserving iOS 16-compatible non-interactive widget behavior.
+- Updated iOS README and static regressions to keep platform limits honest: widgets cannot record microphone audio directly, the widget opens the foreground app, and no Ghost Pepper code is vendored or copied.
+Verification:
+- RED: targeted static tests failed before implementation because the widget target, deep link, widget files, and docs did not exist.
+- GREEN: `python3 -m unittest tests.static.test_ios_app_shell -v`: 9/9 passed.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- GREEN: `cd ios && xcodegen generate`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-widget build`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-widget-device build`: passed.
+- GREEN: `git diff --check`: passed.
+- GREEN: Simulator install/launch/open-url smoke captured `/tmp/autowhisper-ios-evidence/ios-widget-deeplink-record.png`; vision verified the app is visible, copy is honest about real Whisper still being next, and no microphone permission prompt is visible. Non-blocking: `simctl openurl` shows the expected system “Open in AutoWhisper?” confirmation modal, so this is not yet full widget-tap runtime proof.
+- Independent read-only review returned PASS; no licensing/claim-boundary/platform-risk blockers.
+Limits:
+- Still no real Whisper transcription, no widget/background microphone capture, no Ghost Pepper code reuse, no physical-device runtime proof, no signed device install, no TestFlight, and no App Store readiness.
+Next:
+- Commit/push this slice if final precommit stays clean; next runtime proof should be a real widget-tap or accepted deep-link flow on simulator/physical device.

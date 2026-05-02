@@ -12,6 +12,7 @@ final class AutoWhisperAppModel: ObservableObject {
     @Published var recordingState: RecordingState = .idle
     @Published var transcriptText: String = ""
     @Published var errorMessage: String?
+    @Published var quickRecordMessage: String?
 
     private let audioRecorder = IOSAudioRecorder()
     private let transcriber: IOSWhisperTranscribing
@@ -36,6 +37,29 @@ final class AutoWhisperAppModel: ObservableObject {
     func requestMicrophonePermission() async {
         let granted = await AVCaptureDevice.requestAccess(for: .audio)
         permissionStatus = granted ? "Microphone permission granted" : "Microphone permission denied — enable it in Settings to record."
+    }
+
+    func handleDeepLink(_ url: URL) async {
+        guard url.scheme == "autowhisper", url.host == "record" else { return }
+        quickRecordMessage = "Quick Record opened from widget. Recording starts only while AutoWhisper is foregrounded."
+        if AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined {
+            await requestMicrophonePermission()
+        } else {
+            updateMicrophonePermissionStatus()
+        }
+
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else { return }
+        guard recordingState == .idle else { return }
+
+        errorMessage = nil
+        do {
+            try audioRecorder.startRecording()
+            recordingState = .recording
+            transcriptText = ""
+        } catch {
+            recordingState = .failed
+            errorMessage = "Quick Record failed: \(error.localizedDescription)"
+        }
     }
 
     func toggleRecording() async {
@@ -88,6 +112,9 @@ struct ContentView: View {
                 .padding(24)
             }
             .navigationTitle("AutoWhisper")
+            .onOpenURL { url in
+                Task { await model.handleDeepLink(url) }
+            }
         }
     }
 
