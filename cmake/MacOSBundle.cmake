@@ -37,7 +37,12 @@ set(AUTOWHISPER_INFO_PLIST_OUT "${AUTOWHISPER_BUNDLE_DIR}/Contents/Info.plist")
 set(AUTOWHISPER_ENTITLEMENTS   "${CMAKE_SOURCE_DIR}/platform/macos/entitlements.plist")
 set(AUTOWHISPER_SETTINGS_SWIFT "${CMAKE_SOURCE_DIR}/platform/macos/SettingsApp.swift")
 set(AUTOWHISPER_SETTINGS_HELPER "${CMAKE_BINARY_DIR}/AutoWhisperSettings")
+set(AUTOWHISPER_ICON_SCRIPT "${CMAKE_SOURCE_DIR}/scripts/generate_macos_icon.py")
+set(AUTOWHISPER_ICONSET "${CMAKE_BINARY_DIR}/AutoWhisper.iconset")
+set(AUTOWHISPER_ICON_FILE "${CMAKE_BINARY_DIR}/AutoWhisper.icns")
 find_program(AUTOWHISPER_SWIFTC swiftc REQUIRED)
+find_program(AUTOWHISPER_ICONUTIL iconutil REQUIRED)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(AUTOWHISPER_SWIFT_TARGET "${CMAKE_SYSTEM_PROCESSOR}-apple-macos${CMAKE_OSX_DEPLOYMENT_TARGET}")
 
 add_custom_command(
@@ -54,8 +59,17 @@ add_custom_command(
 )
 add_custom_target(autowhisper_settings_helper DEPENDS "${AUTOWHISPER_SETTINGS_HELPER}")
 
+add_custom_command(
+    OUTPUT "${AUTOWHISPER_ICON_FILE}"
+    COMMAND ${Python3_EXECUTABLE} "${AUTOWHISPER_ICON_SCRIPT}" "${AUTOWHISPER_ICONSET}"
+    COMMAND "${AUTOWHISPER_ICONUTIL}" -c icns -o "${AUTOWHISPER_ICON_FILE}" "${AUTOWHISPER_ICONSET}"
+    DEPENDS "${AUTOWHISPER_ICON_SCRIPT}"
+    VERBATIM
+)
+add_custom_target(autowhisper_macos_icon DEPENDS "${AUTOWHISPER_ICON_FILE}")
+
 add_custom_target(autowhisper_bundle ALL
-    DEPENDS autowhisper autowhisper_settings_helper
+    DEPENDS autowhisper autowhisper_settings_helper autowhisper_macos_icon
     COMMAND ${CMAKE_COMMAND} -E make_directory "${AUTOWHISPER_MACOS_DIR}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${AUTOWHISPER_RESOURCES_DIR}"
     COMMAND ${CMAKE_COMMAND} -E copy
@@ -64,6 +78,8 @@ add_custom_target(autowhisper_bundle ALL
             "${AUTOWHISPER_SETTINGS_HELPER}" "${AUTOWHISPER_MACOS_DIR}/AutoWhisperSettings"
     COMMAND ${CMAKE_COMMAND} -E copy
             "${CMAKE_SOURCE_DIR}/config.toml" "${AUTOWHISPER_RESOURCES_DIR}/config.toml"
+    COMMAND ${CMAKE_COMMAND} -E copy
+            "${AUTOWHISPER_ICON_FILE}" "${AUTOWHISPER_RESOURCES_DIR}/AutoWhisper.icns"
     COMMAND ${CMAKE_COMMAND}
             -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
             -DPROJECT_VERSION=${PROJECT_VERSION}

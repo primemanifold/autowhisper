@@ -16,6 +16,8 @@
     <string>APPL</string>
     <key>CFBundleExecutable</key>
     <string>autowhisper</string>
+    <key>CFBundleIconFile</key>
+    <string>AutoWhisper</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleSignature</key>
