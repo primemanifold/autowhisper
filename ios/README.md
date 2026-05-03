@@ -57,6 +57,7 @@ The SwiftUI shell verifies:
 - The home screen communicates iOS limits honestly: no global hotkeys and no arbitrary text injection.
 - A small WidgetKit Quick Record widget opens the foreground app through `autowhisper://record`; it does not attempt background or widget-process microphone recording.
 - Users can exercise the foreground Start Recording -> Stop & Decode Audio -> Copy Transcript / Share Transcript loop with a native AVFoundation recording file and a decoded PCM bridge summary. The first Start Recording tap requests microphone permission when needed, and denied/restricted permission states stay non-recording with actionable Settings copy. Real Whisper transcript output is still a future slice.
+- If an OS event interrupts recording (phone call, Siri, audio session interrupt, or backgrounding), the app detects the interruption via `AVAudioRecorderDelegate` and returns the UI to idle with a clear "Recording was interrupted" message. The microphone permission status is also refreshed whenever the app returns to the foreground, so stale copy from a Settings change cannot persist.
 
 ## Target first real transcription loop
 

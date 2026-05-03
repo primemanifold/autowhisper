@@ -20,6 +20,14 @@ final class AutoWhisperAppModel: ObservableObject {
 
     init(transcriber: IOSWhisperTranscribing = IOSPlaceholderWhisperTranscriber()) {
         self.transcriber = transcriber
+        audioRecorder.onInterrupted = { [weak self] in
+            guard let self else { return }
+            // OS stopped recording unexpectedly (phone call, Siri, background, etc.)
+            if self.recordingState == .recording {
+                self.recordingState = .idle
+                self.errorMessage = "Recording was interrupted by the system. Tap Start Recording to try again."
+            }
+        }
     }
 
     func updateMicrophonePermissionStatus() {
@@ -131,6 +139,7 @@ final class AutoWhisperAppModel: ObservableObject {
 
 struct ContentView: View {
     @StateObject private var model = AutoWhisperAppModel()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         NavigationStack {
@@ -147,6 +156,11 @@ struct ContentView: View {
             .navigationTitle("AutoWhisper")
             .onOpenURL { url in
                 Task { await model.handleDeepLink(url) }
+            }
+            .onChange(of: scenePhase) { phase in
+                if phase == .active {
+                    model.updateMicrophonePermissionStatus()
+                }
             }
         }
     }

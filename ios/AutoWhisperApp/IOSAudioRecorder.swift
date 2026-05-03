@@ -47,6 +47,10 @@ final class IOSAudioRecorder: NSObject, AVAudioRecorderDelegate {
     private var recordingStartedAt: Date?
     private(set) var recordingURL: URL?
 
+    /// Called on the main actor when the OS stops or interrupts an active
+    /// recording unexpectedly (phone call, Siri, audio session interruption, etc.).
+    var onInterrupted: (() -> Void)?
+
     init(configuration: IOSAudioRecorderConfiguration = IOSAudioRecorderConfiguration()) {
         self.configuration = configuration
         super.init()
@@ -110,6 +114,27 @@ final class IOSAudioRecorder: NSObject, AVAudioRecorderDelegate {
             sampleRate: configuration.sampleRate,
             numberOfChannels: configuration.numberOfChannels
         )
+    }
+
+    // MARK: - AVAudioRecorderDelegate
+
+    nonisolated func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
+        // Called when the recorder stops for any reason, including OS interruption.
+        // If !flag the OS stopped it (phone call, Siri, etc.) — notify the model.
+        guard !flag else { return }
+        Task { @MainActor in
+            self.recorder = nil
+            self.recordingStartedAt = nil
+            self.onInterrupted?()
+        }
+    }
+
+    nonisolated func audioRecorderEncodeErrorDidOccur(_ recorder: AVAudioRecorder, error: Error?) {
+        Task { @MainActor in
+            self.recorder = nil
+            self.recordingStartedAt = nil
+            self.onInterrupted?()
+        }
     }
 
     private static func makeRecordingURL() -> URL {

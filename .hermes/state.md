@@ -874,3 +874,13 @@ Verification:
 - Independent read-only review PASS; no blocking/high findings. Medium caveat: research is intentionally shallow and docs now require maintenance discipline.
 Next best action:
 - Ship this bootstrap to PR #12, then continue with the highest-leverage reversible engineering task: iOS interruption/background recorder reconciliation, unless Channa chooses benchmark harness first.
+
+## Run 2026-05-03T10:21:38Z
+Phase: iOS interruption/background recorder reconciliation.
+Changes:
+- IOSAudioRecorder: Added audioRecorderDidFinishRecording and audioRecorderEncodeErrorDidOccur AVAudioRecorderDelegate callbacks; on abnormal stop these clear internal state and call onInterrupted on the main actor.
+- ContentView/AutoWhisperAppModel: Wires onInterrupted in init with [weak self]; sets recordingState=.idle and errorMessage with interrupted copy when fired.
+- ContentView: Added @Environment(.scenePhase) and onChange(of:) observer to refresh microphone permission status on .active; uses single-value closure for iOS 16 compatibility.
+- ios/README.md: Documents interruption and permission-staleness behaviour.
+- tests/static/test_ios_app_shell.py: Added 4 TDD tests (all passed after implementation); full suite now 61 tests.
+Verification: 61 static tests OK, swift run AutoWhisperCoreChecks OK, xcodegen OK, simulator BUILD SUCCEEDED, device BUILD SUCCEEDED, git diff --check OK, manual review PASS.

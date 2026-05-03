@@ -322,5 +322,57 @@ class IOSAppShellTests(unittest.TestCase):
             self.assertIn(snippet, text)
 
 
+    # ── Interruption / background reconciliation (RED) ──────────────────────
+
+    def test_recorder_exposes_interruption_callback_interface(self):
+        """IOSAudioRecorder must expose a way for callers to observe when the OS
+        stops or interrupts recording, so ContentView can reconcile state."""
+        rec = RECORDER.read_text()
+        # Delegate callback that fires when AVAudioRecorder stops unexpectedly
+        self.assertIn("audioRecorderDidFinishRecording", rec)
+        # Interruption observation: either AVAudioSession notification or a
+        # typed onInterrupted callback that callers can set
+        has_notification = "AVAudioSession.interruptionNotification" in rec
+        has_callback = "onInterrupted" in rec
+        self.assertTrue(
+            has_notification or has_callback,
+            "IOSAudioRecorder must observe AVAudioSession interruptions or expose onInterrupted",
+        )
+
+    def test_app_model_reconciles_state_on_recorder_interruption(self):
+        """AutoWhisperAppModel must handle recorder interruption and set a
+        non-recording state so the UI never shows 'recording' after the OS stops it."""
+        view = CONTENT_VIEW.read_text()
+        # Model must connect the recorder's interruption signal
+        self.assertIn("onInterrupted", view)
+        # Must transition to a well-defined non-recording state
+        interrupted_handled = (
+            "recordingState = .failed" in view or
+            "recordingState = .idle" in view
+        )
+        self.assertTrue(interrupted_handled,
+            "Model must set recordingState to .idle or .failed when interrupted")
+        # Must surface a human-readable message so the user understands what happened
+        self.assertIn("interrupted", view.lower())
+
+    def test_app_model_refreshes_permission_on_scene_active(self):
+        """AutoWhisperAppModel must refresh microphone permission status when the
+        app returns to the foreground (scenePhase == .active), so that stale
+        permission copy cannot persist after a Settings change."""
+        view = CONTENT_VIEW.read_text()
+        self.assertIn("scenePhase", view)
+        self.assertIn(".active", view)
+        self.assertIn("updateMicrophonePermissionStatus", view)
+
+    def test_readme_documents_interruption_behaviour(self):
+        """ios/README.md must document that recording stops when the app is
+        interrupted or backgrounded, so users and QA know what to expect."""
+        text = README.read_text()
+        self.assertTrue(
+            "interrupt" in text.lower() or "background" in text.lower(),
+            "iOS README must mention interruption or background handling"
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
