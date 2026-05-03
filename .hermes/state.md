@@ -856,3 +856,21 @@ Hosted CI follow-up:
 - First hosted `ios-build` run failed on GitHub macOS/Xcode 16.4 because `AVAudioSession.CategoryOptions.allowBluetoothHFP` is unavailable there even though local Xcode 26.4 accepted it.
 - Replaced `.allowBluetoothHFP` with the older compatible `.allowBluetooth` option and added a static regression preventing reintroduction of `.allowBluetoothHFP` while keeping Bluetooth input support intent.
 - Re-ran local static tests, Swift package checks, XcodeGen, simulator build, generic iOS build, and `git diff --check`; all passed before push.
+
+## Run 2026-05-03T04:20:30Z
+Phase: Product operating system bootstrap.
+Changes:
+- Embedded global Hermes identity in `~/.hermes/SOUL.md` with the Company Operating Agent posture supplied by Channa. This file is intentionally outside the repo.
+- Added repo-level `AGENTS.md` for AutoWhisper with product, research, design-system, engineering, marketing, CEO/operator, autonomy, startup protocol, competitive baseline, gap ledger, prioritization, privacy/trust, and session output rules.
+- Began the Startup Protocol and initialized required operating docs under `docs/company`, `docs/research`, `docs/product`, `docs/design`, and `docs/engineering`.
+- Added `docs/company/FOUNDATION_AUDIT.md` with current architecture/product surface, missing/fragile/strong points, likely competitor opportunities, first five PR-sized improvements, and areas not to touch yet.
+- Seeded competitor baseline from public vendor pages retrieved 2026-05-03; docs explicitly label these as vendor claims and shallow first-pass research.
+Verification:
+- Required doc existence check passed.
+- Placeholder guard passed after replacing template bracket placeholders in `AGENTS.md`.
+- `python3 -m unittest discover -s tests/static -v` passed: 57 tests OK.
+- `git diff --check` passed.
+- `git diff --check origin/core...HEAD` passed.
+- Independent read-only review PASS; no blocking/high findings. Medium caveat: research is intentionally shallow and docs now require maintenance discipline.
+Next best action:
+- Ship this bootstrap to PR #12, then continue with the highest-leverage reversible engineering task: iOS interruption/background recorder reconciliation, unless Channa chooses benchmark harness first.
