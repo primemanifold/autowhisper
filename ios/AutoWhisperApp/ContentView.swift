@@ -16,6 +16,7 @@ final class AutoWhisperAppModel: ObservableObject {
 
     private let audioRecorder = IOSAudioRecorder()
     private let transcriber: IOSWhisperTranscribing
+    private var isRecordingTransitionInFlight = false
 
     init(transcriber: IOSWhisperTranscribing = IOSPlaceholderWhisperTranscriber()) {
         self.transcriber = transcriber
@@ -88,6 +89,9 @@ final class AutoWhisperAppModel: ObservableObject {
 
     func toggleRecording() async {
         guard recordingState != .preparingTranscript else { return }
+        guard !isRecordingTransitionInFlight else { return }
+        isRecordingTransitionInFlight = true
+        defer { isRecordingTransitionInFlight = false }
 
         errorMessage = nil
         do {
@@ -97,7 +101,11 @@ final class AutoWhisperAppModel: ObservableObject {
                 transcriptText = try await transcriber.transcribe(recording: recording)
                 recordingState = .idle
             } else {
-                guard await hasMicrophonePermissionForRecording() else { return }
+                recordingState = .preparingRecording
+                guard await hasMicrophonePermissionForRecording() else {
+                    recordingState = .idle
+                    return
+                }
                 try audioRecorder.startRecording()
                 recordingState = .recording
                 transcriptText = ""
@@ -173,6 +181,8 @@ struct ContentView: View {
         switch model.recordingState {
         case .recording:
             return "Stop & Decode Audio"
+        case .preparingRecording:
+            return "Preparing Recording…"
         case .preparingTranscript:
             return "Decoding Audio…"
         default:
@@ -189,7 +199,7 @@ struct ContentView: View {
                     Task { await model.toggleRecording() }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(model.recordingState == .preparingTranscript)
+                .disabled(model.recordingState == .preparingRecording || model.recordingState == .preparingTranscript)
                 if let errorMessage = model.errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(.red)

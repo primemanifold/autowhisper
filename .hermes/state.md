@@ -827,3 +827,27 @@ Limits:
 - Widget/deep-link behavior remains foreground-app only; no widget/background microphone capture is claimed.
 Next:
 - Commit/push this slice if final preflight stays clean, then watch hosted checks.
+
+## Run 2026-05-03T03:12:27Z
+Phase: PR #12 issue-fix batch — iOS race guard, hosted iOS build CI, validation docs hygiene.
+Changes:
+- Added `RecordingState.preparingRecording` and an `isRecordingTransitionInFlight` guard in `AutoWhisperAppModel.toggleRecording()` so rapid taps cannot re-enter the async microphone permission/start path before the first transition finishes.
+- Disabled the primary record button while preparing recording or decoding audio, and reset to idle when microphone permission is denied before recording starts.
+- Added a macOS-hosted GitHub Actions `ios-build` job that installs XcodeGen, runs `swift run --package-path ios AutoWhisperCoreChecks`, generates the Xcode project, verifies the generated project exists, and builds both iOS Simulator and generic iOS targets with signing disabled.
+- Fixed `engineering/platform-validation-commands.md` so macOS public ZIP validation assesses the extracted downloaded app rather than `/Applications/AutoWhisper.app`, and Windows validation references the existing `cmake/toolchains/mingw-w64-x86_64.cmake` file.
+- Removed trailing whitespace/extra EOF blank-line issues from the cross-platform planning/scout docs so PR-wide diff hygiene can pass after commit.
+- Added static regressions for the iOS transition guard, hosted iOS CI build coverage, macOS artifact validation path, and Windows toolchain path.
+Verification:
+- RED: targeted new static tests failed before implementation for missing transition serialization, hosted iOS CI job, corrected Windows toolchain path, and extracted macOS ZIP assessment.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 57/57 passed.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- GREEN: `cd ios && xcodegen generate && test -f AutoWhisperIOS.xcodeproj/project.pbxproj`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-race2 build`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-race2-device build`: passed.
+- GREEN: `git diff --check`: passed.
+- Independent read-only review passed for functional changes and documentation fixes; it called out the ignored generated Xcode project, so the CI step now validates project generation/existence rather than claiming drift detection.
+Limits:
+- Hosted macOS CI still needs to run after push; local Xcode builds are compile proof, not physical-device runtime proof.
+- iOS still has no real local Whisper transcription, no physical-device microphone E2E, no TestFlight, and no App Store readiness.
+Next:
+- Commit and push this batch to PR #12, then watch hosted CI including the new `ios-build` job.

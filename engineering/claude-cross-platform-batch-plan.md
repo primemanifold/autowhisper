@@ -2,8 +2,8 @@
 
 > **For Hermes:** This file is the prompt pack for a future Claude Code batch. Do not execute implementation automatically until Channa approves the selected lane. Start with read-only scouts, synthesize, then ask for go/no-go.
 
-**Repo:** `/Users/odin-mac-730/src/autowhisper-macos-app-gate`  
-**Base planning doc:** `engineering/cross-platform-readiness-prd.md`  
+**Repo:** `/Users/odin-mac-730/src/autowhisper-macos-app-gate`
+**Base planning doc:** `engineering/cross-platform-readiness-prd.md`
 **Quality bar:** Evidence-backed, release-grade, no platform overclaims.
 
 ## 1. Batch objective

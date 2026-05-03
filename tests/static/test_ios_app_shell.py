@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+CI_WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 IOS = ROOT / "ios"
 PROJECT_YML = IOS / "project.yml"
 APP_DIR = IOS / "AutoWhisperApp"
@@ -146,7 +147,7 @@ class IOSAppShellTests(unittest.TestCase):
             "private var recordingButtonTitle: String",
             "case .preparingTranscript:",
             "return \"Decoding Audio…\"",
-            ".disabled(model.recordingState == .preparingTranscript)",
+            ".disabled(model.recordingState == .preparingRecording || model.recordingState == .preparingTranscript)",
         ]:
             self.assertIn(snippet, view_text)
         self.assertNotIn("stopAndTranscribe(audio: AudioFixture(samples: []", view_text)
@@ -208,15 +209,44 @@ class IOSAppShellTests(unittest.TestCase):
         self.assertIn("func requestMicrophonePermission() async -> Bool", view_text)
         self.assertIn("func hasMicrophonePermissionForRecording() async -> Bool", view_text)
         self.assertIn("await requestMicrophonePermission()", view_text)
-        self.assertIn("guard await hasMicrophonePermissionForRecording() else { return }", view_text)
+        self.assertIn("guard await hasMicrophonePermissionForRecording() else {", view_text)
         toggle_body = view_text.split("func toggleRecording() async", 1)[1]
         self.assertLess(
-            toggle_body.index("guard await hasMicrophonePermissionForRecording() else { return }"),
+            toggle_body.index("guard await hasMicrophonePermissionForRecording() else {"),
             toggle_body.index("try audioRecorder.startRecording()"),
             "The primary Start Recording path must request/verify microphone permission before starting AVAudioRecorder",
         )
         self.assertIn("Microphone permission is required before recording", view_text)
         self.assertNotIn("Start Recording requests permission and transcribes locally", view_text)
+
+    def test_ios_primary_record_button_serializes_start_transitions(self):
+        view_text = CONTENT_VIEW.read_text()
+        core_text = (IOS / "Sources" / "AutoWhisperCore" / "Transcription.swift").read_text()
+        self.assertIn("case preparingRecording", core_text)
+        self.assertIn("case .preparingRecording:", view_text)
+        self.assertIn("guard !isRecordingTransitionInFlight else { return }", view_text)
+        self.assertIn("isRecordingTransitionInFlight = true", view_text)
+        self.assertIn("defer { isRecordingTransitionInFlight = false }", view_text)
+        toggle_body = view_text.split("func toggleRecording() async", 1)[1]
+        self.assertLess(
+            toggle_body.index("isRecordingTransitionInFlight = true"),
+            toggle_body.index("guard await hasMicrophonePermissionForRecording() else {"),
+            "Start Recording must mark an in-flight transition before awaiting microphone permission",
+        )
+        self.assertIn(".disabled(model.recordingState == .preparingRecording", view_text)
+
+    def test_ios_hosted_ci_builds_app_and_widget(self):
+        workflow_text = CI_WORKFLOW.read_text()
+        for snippet in [
+            "runs-on: macos-",
+            "swift run --package-path ios AutoWhisperCoreChecks",
+            "xcodegen generate",
+            "xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp",
+            "generic/platform=iOS Simulator",
+            "generic/platform=iOS",
+            "test -f AutoWhisperIOS.xcodeproj/project.pbxproj",
+        ]:
+            self.assertIn(snippet, workflow_text)
 
     def test_readme_reflects_runnable_app_shell_gate(self):
         text = README.read_text()

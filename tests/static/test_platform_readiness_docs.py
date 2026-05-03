@@ -60,6 +60,18 @@ class PlatformReadinessDocsTests(unittest.TestCase):
             line = match.group(0)
             allowed = ["build_proven", "unverified", "not yet", "coming soon", "deferred", "cross-build only", "runtime unproven"]
             self.assertTrue(any(token in line.lower() for token in allowed), line)
+    def test_windows_validation_uses_existing_toolchain_file(self):
+        text = self.read(COMMANDS)
+        self.assertIn("cmake/toolchains/mingw-w64-x86_64.cmake", text)
+        self.assertNotIn("cmake/mingw-toolchain.cmake", text)
+        toolchain = ROOT / "cmake" / "toolchains" / "mingw-w64-x86_64.cmake"
+        self.assertTrue(toolchain.exists(), "Documented Windows cross-build toolchain must exist")
+
+    def test_macos_public_artifact_validation_assesses_extracted_zip(self):
+        text = self.read(COMMANDS)
+        self.assertIn("unzip -q /tmp/AutoWhisper-macOS-v0.7.1.zip -d /tmp/AutoWhisper-v0.7.1", text)
+        self.assertIn("spctl --assess --type execute --verbose /tmp/AutoWhisper-v0.7.1/AutoWhisper.app", text)
+        self.assertNotIn("spctl --assess --type execute --verbose /Applications/AutoWhisper.app", text)
 
 
 if __name__ == "__main__":

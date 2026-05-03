@@ -2,10 +2,10 @@
 
 > **For Hermes:** This is a plan/spec only. Do not launch implementation until Channa approves the chosen lane. When implementation starts, use the `claude-code`, `subagent-driven-development`, `test-driven-development`, and `cross-platform-desktop-build-validation` skills.
 
-**Status:** Draft for discussion  
-**Owner:** Channa / Hermes Operator  
-**Primary repo:** `primemanifold/autowhisper`  
-**Local path:** `/Users/odin-mac-730/src/autowhisper-macos-app-gate`  
+**Status:** Draft for discussion
+**Owner:** Channa / Hermes Operator
+**Primary repo:** `primemanifold/autowhisper`
+**Local path:** `/Users/odin-mac-730/src/autowhisper-macos-app-gate`
 **Current planning branch:** `primeodin/ios-swiftui-app-shell`
 
 ## 1. Product goal

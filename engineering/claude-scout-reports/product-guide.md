@@ -289,8 +289,8 @@ xcrun simctl io booted screenshot docs/media/screenshots/ios-app-shell.png
 
 ### Narrative arc
 
-**Title:** "AutoWhisper: From Hotkey to Local Text in One Tap"  
-**Target duration:** 90–120 seconds  
+**Title:** "AutoWhisper: From Hotkey to Local Text in One Tap"
+**Target duration:** 90–120 seconds
 **Target audience:** new users deciding if AutoWhisper fits their workflow
 
 ### Scenes

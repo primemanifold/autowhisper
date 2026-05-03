@@ -64,7 +64,7 @@ xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp \
   -sdk iphonesimulator \
   CODE_SIGNING_ALLOWED=NO build
 ```
-**Proves:** XcodeGen, Swift 6 compilation, dependency resolution, widget target compiles.  
+**Proves:** XcodeGen, Swift 6 compilation, dependency resolution, widget target compiles.
 **Does not prove:** app launches, microphone permission request fires, AVFoundation session opens, `onOpenURL` is reached, widget tap opens the app, or any inference path executes.
 
 #### Generic device build
@@ -74,14 +74,14 @@ xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp \
   -sdk iphoneos \
   CODE_SIGNING_ALLOWED=NO build
 ```
-**Proves:** arm64 compilation succeeds, no iOS-specific SDK symbol errors.  
+**Proves:** arm64 compilation succeeds, no iOS-specific SDK symbol errors.
 **Does not prove:** the IPA can be installed (`CODE_SIGNING_ALLOWED=NO` prevents install), sandbox permissions work, microphone is granted on real hardware, or the widget can tap through on a real home screen.
 
 #### Swift package check
 ```bash
 swift run --package-path ios AutoWhisperCoreChecks
 ```
-**Proves:** `AutoWhisperCore` domain logic compiles and all package-level checks pass.  
+**Proves:** `AutoWhisperCore` domain logic compiles and all package-level checks pass.
 **Does not prove:** anything about the Xcode targets, AVFoundation runtime, or app lifecycle.
 
 ---

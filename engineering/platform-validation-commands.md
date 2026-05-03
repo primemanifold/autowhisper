@@ -20,9 +20,11 @@ Does not prove: the public v0.7.1 ZIP was downloaded, installed, opened, granted
 ### Public artifact validation
 
 ```bash
-curl -L -o /tmp/AutoWhisper-macOS-v0.7.1.zip   https://github.com/primemanifold/autowhisper/releases/download/v0.7.1/AutoWhisper-macOS-v0.7.1.zip
-unzip -l /tmp/AutoWhisper-macOS-v0.7.1.zip
-spctl --assess --type execute --verbose /Applications/AutoWhisper.app
+curl -L -o /tmp/AutoWhisper-macOS-v0.7.1.zip \
+  https://github.com/primemanifold/autowhisper/releases/download/v0.7.1/AutoWhisper-macOS-v0.7.1.zip
+rm -rf /tmp/AutoWhisper-v0.7.1
+unzip -q /tmp/AutoWhisper-macOS-v0.7.1.zip -d /tmp/AutoWhisper-v0.7.1
+spctl --assess --type execute --verbose /tmp/AutoWhisper-v0.7.1/AutoWhisper.app
 ```
 
 Proves: the v0.7.1 public release ZIP is reachable and can be inspected locally when run on macOS.
@@ -63,7 +65,7 @@ Does not prove: Wayland text injection; AutoWhisper is currently safest to valid
 ### Cross-build boundary
 
 ```bash
-cmake -S . -B build-windows -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-toolchain.cmake
+cmake -S . -B build-windows -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-w64-x86_64.cmake
 cmake --build build-windows --config Release
 ```
 

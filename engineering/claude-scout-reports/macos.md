@@ -167,10 +167,10 @@ def test_platform_matrix_does_not_claim_macos_e2e_ready():
 
 # T4 — audio capture must not be promoted to 'ready' without evidence note
 def test_platform_foundation_doc_does_not_claim_macos_audio_ready():
-    """desktop-platform-foundation.md must not change audio from 'partial' 
+    """desktop-platform-foundation.md must not change audio from 'partial'
     to 'ready' without an adjacent evidence comment."""
     doc = (ROOT / "engineering" / "desktop-platform-foundation.md").read_text()
-    # If the word 'ready' appears next to 'audio' in the macOS section, 
+    # If the word 'ready' appears next to 'audio' in the macOS section,
     # an evidence note must also be present
     macos_audio_matches = re.findall(
         r'(?i)(audio.{0,40}ready|ready.{0,40}audio)', doc)
@@ -180,7 +180,7 @@ def test_platform_foundation_doc_does_not_claim_macos_audio_ready():
 
 # T5 — DMG / installer must not be claimed until artifact exists
 def test_no_dmg_claim_without_artifact_evidence():
-    """README and release docs must not say 'DMG installer available' until 
+    """README and release docs must not say 'DMG installer available' until
     a DMG artifact has been built and validated."""
     for path in [README, ROOT / "CHANGELOG.md"]:
         if not path.exists():

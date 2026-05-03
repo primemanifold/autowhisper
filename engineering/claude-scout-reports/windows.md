@@ -82,7 +82,7 @@ file build-windows/autowhisper.exe
 # Expected: PE32+ executable (console) x86-64, for MS Windows
 ```
 
-What this proves: the source compiles to a Windows binary.  
+What this proves: the source compiles to a Windows binary.
 What this does **not** prove: the binary runs, microphone works, hotkeys fire, tray appears, or any user-facing feature functions.
 
 ### 4c. Wine smoke (optional — proves basic loader, not features)
