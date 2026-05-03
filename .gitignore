@@ -35,6 +35,9 @@ debian/.debhelper/
 *.swo
 *~
 
+# Generated Xcode projects (source of truth lives in project.yml)
+ios/*.xcodeproj/
+
 # Python
 __pycache__/
 *.py[cod]

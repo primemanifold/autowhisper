@@ -1,41 +1,73 @@
 # AutoWhisper iOS Foundation
 
-This directory is the start of the native iOS product line for AutoWhisper.
+This directory is the native iOS product line for AutoWhisper.
 
 ## Current milestone
 
-The current checked-in slice is intentionally a Foundation-only Swift package, not yet a runnable iOS app bundle. It defines and verifies the mobile product contract we need before adding SwiftUI, AVFoundation, signing, simulator, and device builds.
+The current checked-in slice includes both:
 
-Why this first:
+1. A Foundation-only Swift package that verifies the mobile product contract.
+2. A runnable SwiftUI iOS app shell generated from `ios/project.yml` with XcodeGen.
 
-- The current machine only has Command Line Tools selected, not full Xcode.
-- `iphoneos` / `iphonesimulator` SDKs and `simctl` are not available locally yet.
-- AutoWhisper's current desktop daemon model cannot be ported 1:1 to iOS because iOS does not allow global hotkeys, menu-bar daemons, or arbitrary-app text injection.
+This is intentionally still an app-shell milestone: it proves launch, microphone-permission copy, native AVFoundation foreground audio recording to a temporary 16 kHz mono CAF file, recorded-audio decode into normalized PCM for the future inference bridge, explicit bundled-model resource lookup with clear missing-model state, a Quick Record widget/deep-link launcher, copy/share actions, and iOS-safe product constraints. It does not yet bind decoded audio into `whisper.cpp` inference.
 
 ## Verified now
 
+From the repository root:
+
 ```bash
 swift run --package-path ios AutoWhisperCoreChecks
+python3 -m unittest tests.static.test_ios_app_shell -v
 ```
 
-The check executable verifies:
+From `ios/` after generating the Xcode project:
+
+```bash
+xcodegen generate
+xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp \
+  -destination 'generic/platform=iOS Simulator' \
+  -sdk iphonesimulator \
+  CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp \
+  -destination 'generic/platform=iOS' \
+  -sdk iphoneos \
+  CODE_SIGNING_ALLOWED=NO build
+```
+
+The package check executable verifies:
 
 - iOS defaults use 16 kHz mono audio for Whisper compatibility.
 - The first iOS catalog recommends `tiny.en`, not the large desktop default.
-- First-release models are represented as bundled resources.
+- First-release models are represented as bundled resources with concrete GGML filenames.
+- The app has an explicit bundled-model resource locator and clear missing-model placeholder state before real inference.
 - iOS output is copy/share, not desktop text injection.
 - iOS-specific unavailable capabilities are explicit.
 - A fake record -> transcribe -> copy/share workflow works end to end at the domain layer.
+- The SwiftUI app shell uses `IOSAudioRecorder`/`AVAudioRecorder` for real foreground microphone capture before the transcript bridge exists.
+- The app decodes the recorded CAF into normalized PCM through `IOSAudioDecoder` and routes that through an explicit `IOSWhisperTranscribing` seam before real `whisper.cpp` inference is connected.
+- The placeholder transcriber checks `IOSWhisperModelLocator` for the recommended bundled GGML model and reports missing model resources without claiming transcription succeeded.
+- The Quick Record widget is a small WidgetKit launcher only: Widgets cannot record microphone audio directly, so `autowhisper://record` opens the foreground app before any microphone capture starts.
+- No Ghost Pepper code is vendored or copied; Ghost Pepper remains architecture inspiration only because no license file was found during inspection.
 
-## Target first app loop
+The SwiftUI shell verifies:
 
-The first real app milestone is:
+- AutoWhisper launches as a native iOS app target.
+- The app declares `NSMicrophoneUsageDescription`.
+- The app includes an App Store privacy manifest with no tracking or collected-data declarations for this shell.
+- The home screen communicates iOS limits honestly: no global hotkeys and no arbitrary text injection.
+- A small WidgetKit Quick Record widget opens the foreground app through `autowhisper://record`; it does not attempt background or widget-process microphone recording.
+- Users can exercise the foreground Start Recording -> Stop & Decode Audio -> Copy Transcript / Share Transcript loop with a native AVFoundation recording file and a decoded PCM bridge summary. The first Start Recording tap requests microphone permission when needed, and denied/restricted permission states stay non-recording with actionable Settings copy. Real Whisper transcript output is still a future slice.
+- If an OS event interrupts recording (phone call, Siri, audio session interrupt, or backgrounding), the app detects the interruption via `AVAudioRecorderDelegate` and returns the UI to idle with a clear "Recording was interrupted" message. The microphone permission status is also refreshed whenever the app returns to the foreground, so stale copy from a Settings change cannot persist.
+
+## Target first real transcription loop
+
+The next real app milestone is:
 
 1. Launch AutoWhisper on iPhone.
 2. Request microphone permission.
 3. Tap to record.
 4. Tap to stop.
-5. Transcribe locally with `whisper.cpp`.
+5. Feed recorded 16 kHz mono audio to `whisper.cpp`.
 6. Display transcript in the app.
 7. Copy or share the transcript.
 
@@ -49,19 +81,10 @@ These desktop capabilities are not available in this iOS product surface:
 - Injecting text into arbitrary active apps.
 - Linux/X11 clipboard or `xdotool`/`xclip` behavior.
 - PulseAudio mute-other-apps behavior.
+- Widget-process/background microphone capture. The Quick Record widget can only open the foreground app; the user still controls recording in AutoWhisper.
 
 A future iOS keyboard extension or Share extension may provide separate integration surfaces, but those need their own sandbox and App Store review design.
 
-## Full Xcode gate
+## Xcode project policy
 
-Before adding and validating a runnable iOS app target, this machine needs full Xcode selected:
-
-```bash
-sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
-xcodebuild -version
-xcrun --sdk iphoneos --show-sdk-path
-xcrun --sdk iphonesimulator --show-sdk-path
-xcrun --find simctl
-```
-
-Then the next gates become simulator/device `xcodebuild` builds and UI smoke tests.
+`ios/project.yml` is the source of truth. Generate `AutoWhisperIOS.xcodeproj` locally with XcodeGen; do not hand-edit generated project files.

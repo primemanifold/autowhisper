@@ -640,3 +640,247 @@ Next:
 - Verified a fresh public release download: checksum OK, plist and CLI version `0.7.1`, Gatekeeper accepted, clean-HOME first run exited `0`, and user config was created.
 - Release-event CI run `25238033133` completed success for build, build-source, and build-deb. Existing PPA workflow remains noisy/failing separately.
 - Updated public landing repo `primemanifold/autowhisper-landing` commit `968274c` so homepage and roadmap CTAs point to `v0.7.1`; GitHub Pages run `25238071749` passed and hosted homepage/roadmap returned HTTP 200 with `v0.7.1` content.
+
+
+## Run 2026-05-02T01:35:17Z
+Phase: iOS app shell completion
+Hats used: Engineering, CEO
+Shipped:
+- [HAT: Engineering] Created `primeodin/ios-swiftui-app-shell` from `core` for an isolated iOS app-shell slice.
+- [HAT: Engineering] Added `ios/project.yml` as the XcodeGen source of truth and gitignored generated `ios/*.xcodeproj/` files.
+- [HAT: Engineering] Added a runnable SwiftUI iOS app shell under `ios/AutoWhisperApp/` with launch screen, microphone usage description, privacy manifest, AutoWhisperCore dependency, foreground record/stop placeholder loop, copy/share transcript actions, and explicit iOS platform-limit copy.
+- [HAT: Engineering] Updated `ios/README.md` and `engineering/ios-implementation-plan.md` to replace stale Xcode-blocked language with the new app-shell gate.
+- [HAT: Engineering] Added static regression tests in `tests/static/test_ios_app_shell.py` and watched them fail before implementation, then pass.
+Learned:
+- [HAT: Engineering] Xcode 26.4.1, iPhoneOS26.4.sdk, iPhoneSimulator26.4.sdk, simctl, and XcodeGen are usable locally for iOS app-shell validation.
+- [HAT: Engineering] Calling AVFoundation permission APIs on launch produced a system microphone prompt during screenshot QA; the shell now gates microphone permission behind an explicit `Request Microphone Permission` button.
+Verification:
+- RED: `python3 -m unittest tests.static.test_ios_app_shell -v` failed for missing `ios/project.yml`, iOS app metadata, SwiftUI shell, and updated README.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks` passed.
+- GREEN: `python3 -m unittest discover -s tests/static -v` passed — 31/31 tests.
+- GREEN: `xcodegen generate` passed from `ios/`.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived build` passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived build` passed.
+- GREEN: Simulator install + launch passed on iPhone simulator; screenshot captured at `/tmp/autowhisper-ios-evidence/ios-app-shell-final-erased.png` and verified the app shell is visible, unclipped, and does not auto-prompt for microphone permission.
+- GREEN: `git diff --check` passed.
+- Independent review returned PASS with no blockers; its only UX note about automatic microphone prompting was fixed and reverified after simulator erase.
+Blocked on:
+- No blocker for the iOS app-shell slice.
+- Real iOS transcription remains next phase: bind AVFoundation recording buffers to `whisper.cpp`, add real model resources/loading, then validate simulator/device runtime and signing/TestFlight separately.
+Next:
+- Commit and push this branch, open PR into `core`.
+- Next iOS slice should implement real AVFoundation recording and the first `whisper.cpp` inference bridge without claiming TestFlight/App Store readiness until signing/provisioning gates pass.
+
+
+## Run 2026-05-02T01:59:11Z
+Phase: iOS native-audio continuation on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Added `IOSAudioRecorder` using AVFoundation/AVAudioRecorder for explicit-permission foreground recording.
+- Recording target is 16 kHz mono 16-bit Linear PCM CAF in a temporary file, returning URL/duration metadata.
+- Wired SwiftUI Start Recording / Stop & Transcribe through native recorder while retaining placeholder transcript copy and explicit "Whisper bridge next" messaging.
+- Kept microphone permission behind explicit button; erased-simulator launch screenshot confirmed no automatic permission prompt.
+- Updated iOS README, implementation plan, and static regression tests.
+Verification:
+- `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- `python3 -m unittest discover -s tests/static -v`: 32/32 passed.
+- `cd ios && xcodegen generate`: passed.
+- `xcodebuild ... generic/platform=iOS Simulator ... CODE_SIGNING_ALLOWED=NO`: passed.
+- `xcodebuild ... generic/platform=iOS ... CODE_SIGNING_ALLOWED=NO`: passed.
+- `git diff --check`: passed.
+- Simulator erase/install/launch screenshot: `/tmp/autowhisper-ios-evidence/ios-av-recorder-shell.png`.
+- Independent review: PASS, no blockers; fixed non-blocking recorder-start failure cleanup by deactivating audio session if `record()` fails.
+Limits:
+- Still not real Whisper transcription, physical-device runtime, signed device install, TestFlight, or App Store readiness.
+
+## Run 2026-05-02T03:07:35Z
+Phase: iOS audio-decode bridge continuation on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Added `IOSAudioDecoder` to decode recorded CAF files into normalized float PCM samples for the future inference bridge, with a preview guard for overly long recordings.
+- Added async/sendable `IOSWhisperTranscribing` seam and `IOSPlaceholderWhisperTranscriber` so stop-recording output now passes through recorded-audio decode before returning honest bridge-pending UI output.
+- Updated SwiftUI copy from "Stop & Transcribe"/"transcribe locally" to decode/bridge language that explicitly says real Whisper transcription is still the next iOS slice.
+- Updated the iOS microphone permission prompt copy to decode/bridge language so the system permission sheet does not claim real local transcription yet.
+- Fixed the `.preparingTranscript` state race by guarding duplicate toggle actions, changing the button title to `Decoding Audio…`, and disabling the recorder button while decode/transcriber work is pending.
+- Added static regression checks for the decoder, transcriber seam, off-main decode path, no real-transcription overclaims while placeholder output remains active, and the `.preparingTranscript` button guard.
+- Updated iOS README, implementation plan, and decisions/state docs.
+Verification:
+- RED: `python3 -m unittest tests.static.test_ios_app_shell -v` failed for missing `IOSAudioDecoder`, async transcriber seam, and overclaim guard expectations before implementation.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 33/33 passed.
+- GREEN: `cd ios && xcodegen generate`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-bridge build`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-bridge build`: passed.
+- GREEN: `git diff --check`: passed.
+- GREEN: Simulator erase/install/launch screenshot: `/tmp/autowhisper-ios-evidence/ios-audio-decode-bridge-shell.png`; vision verified the app is visible, no automatic microphone permission prompt appears, and hero copy avoids claiming real Whisper is implemented.
+- Independent review initially requested changes for overclaiming copy, main-actor decode, microphone permission wording, and a `.preparingTranscript` duplicate-tap race; those issues were fixed and reverified.
+- Final independent read-only review returned PASS after the race fix.
+Limits:
+- Still not real Whisper transcription, physical-device runtime, signed device install, TestFlight, or App Store readiness.
+
+## Run 2026-05-02T10:39:11Z
+Phase: iOS model-resource locator continuation on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Added concrete GGML resource filenames to the iOS model catalog: `ggml-tiny.en.bin` and `ggml-base.en.bin`.
+- Added `IOSWhisperModelLocator` to resolve bundled model URLs from `Bundle.main` under `Models/` or return a typed `missingBundledModel` error.
+- Added `ModelResources.plist` plus `AutoWhisperApp/Models/README.md` and declared both resource locations in `ios/project.yml`; no large GGML binaries are committed in this slice.
+- Updated `IOSPlaceholderWhisperTranscriber` to check the recommended model locator and include model-ready or `Model not bundled yet` state in bridge-pending placeholder output without calling `whisper.cpp`.
+- Added static regression coverage for model filenames, resource declarations, model locator, no whisper API calls, and no real-inference overclaims.
+- Updated iOS README, implementation plan, and decisions/state docs.
+Verification:
+- RED: `python3 -m unittest tests.static.test_ios_app_shell -v` failed before implementation because `ModelCatalog.swift` lacked `ggmlFilename` and the model locator/resources did not exist.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 34/34 passed.
+- GREEN: `cd ios && xcodegen generate`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-modellocator build`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-modellocator build`: passed.
+- GREEN: `git diff --check`: passed.
+- GREEN: Simulator erase/install/launch screenshot: `/tmp/autowhisper-ios-evidence/ios-model-locator-shell.png`; vision verified the app is visible, no automatic microphone permission prompt appears, and copy avoids claiming real Whisper is implemented.
+- Independent read-only review returned PASS; no blockers or important issues.
+Limits:
+- Still no real bundled model binary, no `whisper.cpp` inference, no real transcript output, no physical-device runtime, no signed device install, no TestFlight, and no App Store readiness.
+
+## Run 2026-05-02T16:00:38Z
+Phase: iOS widget + small voice continuation on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Performed a clean-room Ghost Pepper gap analysis for iOS voice entry points. Ghost Pepper remains architecture inspiration only because GitHub license metadata is null and no local `LICENSE*`/`COPYING*` file was found.
+- Added `engineering/ios-widget-voice-plan.md` documenting the licensing boundary, WidgetKit platform constraints, implemented Quick Record slice, verification gates, and next slices.
+- Added an `AutoWhisperWidget` WidgetKit app-extension target to `ios/project.yml` and embedded it in the iOS app target.
+- Added a small `.systemSmall` Quick Record widget that opens `autowhisper://record` and does not touch microphone APIs in the widget process.
+- Registered the `autowhisper` URL scheme in `AutoWhisperApp/Info.plist`.
+- Wired `.onOpenURL` and `handleDeepLink(_:)` in `ContentView`/`AutoWhisperAppModel` so `autowhisper://record` opens the foreground app, requests/updates microphone permission if needed, and starts the existing AVFoundation foreground recorder only when authorized and idle.
+- Added an AppIntent seam for future Shortcuts/interactivity while preserving iOS 16-compatible non-interactive widget behavior.
+- Updated iOS README and static regressions to keep platform limits honest: widgets cannot record microphone audio directly, the widget opens the foreground app, and no Ghost Pepper code is vendored or copied.
+Verification:
+- RED: targeted static tests failed before implementation because the widget target, deep link, widget files, and docs did not exist.
+- GREEN: `python3 -m unittest tests.static.test_ios_app_shell -v`: 9/9 passed.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- GREEN: `cd ios && xcodegen generate`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-widget build`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-widget-device build`: passed.
+- GREEN: `git diff --check`: passed.
+- GREEN: Simulator install/launch/open-url smoke captured `/tmp/autowhisper-ios-evidence/ios-widget-deeplink-record.png`; vision verified the app is visible, copy is honest about real Whisper still being next, and no microphone permission prompt is visible. Non-blocking: `simctl openurl` shows the expected system “Open in AutoWhisper?” confirmation modal, so this is not yet full widget-tap runtime proof.
+- Independent read-only review returned PASS; no licensing/claim-boundary/platform-risk blockers.
+Limits:
+- Still no real Whisper transcription, no widget/background microphone capture, no Ghost Pepper code reuse, no physical-device runtime proof, no signed device install, no TestFlight, and no App Store readiness.
+Next:
+- Commit/push this slice if final precommit stays clean; next runtime proof should be a real widget-tap or accepted deep-link flow on simulator/physical device.
+
+## Run 2026-05-02T16:31:20Z
+Phase: plan-only cross-platform readiness PRD + Claude batch prompt pack on `primeodin/ios-swiftui-app-shell`.
+Changes:
+- Added `engineering/cross-platform-readiness-prd.md` as the discussion spec for a macOS/Linux/Windows/mobile readiness foundation.
+- Added `engineering/claude-cross-platform-batch-plan.md` with read-only scout prompts, model selection, implementation lanes, verification gates, and stop conditions.
+- Incorporated README usage-guide/media planning into the PRD/batch plan, including screenshot captions, `docs/usage-guide.md`, `docs/media/`, and a future Manim explainer video plan.
+- This was intentionally plan-only: no platform implementation, release link changes, public release creation, or Claude batch launch.
+Verification:
+- GREEN: custom Python doc smoke verified required sections/snippets in both new docs.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 36/36 passed.
+- GREEN: `git diff --check`: passed.
+Limits:
+- New docs are uncommitted draft files for discussion.
+- No read-only Claude scout batch has been launched yet.
+- No new platform readiness status is proven by this planning slice.
+Next:
+- Review with Channa, then if approved launch Phase 1 read-only Claude scouts before implementation.
+
+## Run 2026-05-02T18:44:43Z
+Phase: cross-platform readiness Lane A + Lane B docs/tests on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Ran Phase 1 read-only Claude scouts for macOS, Linux, Windows, iOS/mobile, and product docs; saved reports under `engineering/claude-scout-reports/` with a synthesis recommending Lane A + Lane B first.
+- Committed the plan/scout pack as `f98839f` (`docs: plan cross-platform readiness batch`).
+- Added the readiness foundation: `engineering/platform-readiness-matrix.md`, `engineering/platform-validation-commands.md`, `docs/usage-guide.md`, `docs/media/README.md`, and `docs/media/manim/autowhisper-flow-plan.md`.
+- Updated README with concise local-first and per-platform status links/copy.
+- Added static claim-boundary tests in `tests/static/test_platform_readiness_docs.py` and `tests/static/test_docs_claims.py`.
+- Committed the implementation as `ac07830` (`docs: add platform readiness matrix and guide`).
+Verification:
+- GREEN: control-character scan passed after fixing hidden BEL bytes in Windows PowerShell examples.
+- GREEN: `python3 -m unittest tests.static.test_platform_readiness_docs tests.static.test_docs_claims -v`: 16/16 passed.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 52/52 passed.
+- GREEN: `git diff --check`: passed.
+- Independent review initially requested changes for the hidden control-character blocker; follow-up independent review returned PASS after the fix.
+Limits:
+- This slice is docs/tests-only and proves claim hygiene, not new runtime platform capability.
+- macOS public artifact language remains limited to v0.7.1; v0.7.2 remains candidate/PR until public artifact validation.
+- Windows remains build-proven/runtime-unverified; iOS still has no real local Whisper transcription or TestFlight/App Store readiness.
+Next:
+- Push the local commits to `origin/primeodin/ios-swiftui-app-shell` to update PR #12, then watch hosted checks.
+
+## Run 2026-05-02T20:56:02Z
+Phase: iOS first-run microphone permission hardening on `primeodin/ios-swiftui-app-shell` / PR #12.
+Changes:
+- Used read-only scouts to choose the next small reversible iOS slice after the green PR #12 docs/widget foundation.
+- Updated `AutoWhisperAppModel.requestMicrophonePermission()` to return whether permission was granted while preserving existing button/deep-link callers.
+- Added `hasMicrophonePermissionForRecording()` so the primary Start Recording path requests/verifies microphone permission before `IOSAudioRecorder.startRecording()`.
+- Denied/restricted/unavailable microphone states now remain non-recording and surface actionable foreground-app copy instead of falling through to recorder failure.
+- Updated iOS README and static regression tests for the primary record-button permission gate.
+Verification:
+- RED: `python3 -m unittest tests.static.test_ios_app_shell.IOSAppShellTests.test_ios_primary_record_button_requests_microphone_permission_first -v` failed before implementation because the permission gate did not exist.
+- GREEN: `python3 -m unittest tests.static.test_ios_app_shell -v`: 10/10 passed.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- GREEN: `cd ios && xcodegen generate`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-permission build`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-permission-device build`: passed.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 53/53 passed.
+- GREEN: `git diff --check`: passed.
+- Independent read-only review returned PASS; no blockers or important issues.
+Limits:
+- This is first-run/onboarding hardening only; it does not prove physical-device microphone runtime, widget tap behavior, real Whisper transcription, model bundling, TestFlight, or App Store readiness.
+- Widget/deep-link behavior remains foreground-app only; no widget/background microphone capture is claimed.
+Next:
+- Commit/push this slice if final preflight stays clean, then watch hosted checks.
+
+## Run 2026-05-03T03:12:27Z
+Phase: PR #12 issue-fix batch — iOS race guard, hosted iOS build CI, validation docs hygiene.
+Changes:
+- Added `RecordingState.preparingRecording` and an `isRecordingTransitionInFlight` guard in `AutoWhisperAppModel.toggleRecording()` so rapid taps cannot re-enter the async microphone permission/start path before the first transition finishes.
+- Disabled the primary record button while preparing recording or decoding audio, and reset to idle when microphone permission is denied before recording starts.
+- Added a macOS-hosted GitHub Actions `ios-build` job that installs XcodeGen, runs `swift run --package-path ios AutoWhisperCoreChecks`, generates the Xcode project, verifies the generated project exists, and builds both iOS Simulator and generic iOS targets with signing disabled.
+- Fixed `engineering/platform-validation-commands.md` so macOS public ZIP validation assesses the extracted downloaded app rather than `/Applications/AutoWhisper.app`, and Windows validation references the existing `cmake/toolchains/mingw-w64-x86_64.cmake` file.
+- Removed trailing whitespace/extra EOF blank-line issues from the cross-platform planning/scout docs so PR-wide diff hygiene can pass after commit.
+- Added static regressions for the iOS transition guard, hosted iOS CI build coverage, macOS artifact validation path, and Windows toolchain path.
+Verification:
+- RED: targeted new static tests failed before implementation for missing transition serialization, hosted iOS CI job, corrected Windows toolchain path, and extracted macOS ZIP assessment.
+- GREEN: `python3 -m unittest discover -s tests/static -v`: 57/57 passed.
+- GREEN: `swift run --package-path ios AutoWhisperCoreChecks`: passed.
+- GREEN: `cd ios && xcodegen generate && test -f AutoWhisperIOS.xcodeproj/project.pbxproj`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-race2 build`: passed.
+- GREEN: `xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO -derivedDataPath /tmp/autowhisper-ios-derived-race2-device build`: passed.
+- GREEN: `git diff --check`: passed.
+- Independent read-only review passed for functional changes and documentation fixes; it called out the ignored generated Xcode project, so the CI step now validates project generation/existence rather than claiming drift detection.
+Limits:
+- Hosted macOS CI still needs to run after push; local Xcode builds are compile proof, not physical-device runtime proof.
+- iOS still has no real local Whisper transcription, no physical-device microphone E2E, no TestFlight, and no App Store readiness.
+Next:
+- Commit and push this batch to PR #12, then watch hosted CI including the new `ios-build` job.
+
+Hosted CI follow-up:
+- First hosted `ios-build` run failed on GitHub macOS/Xcode 16.4 because `AVAudioSession.CategoryOptions.allowBluetoothHFP` is unavailable there even though local Xcode 26.4 accepted it.
+- Replaced `.allowBluetoothHFP` with the older compatible `.allowBluetooth` option and added a static regression preventing reintroduction of `.allowBluetoothHFP` while keeping Bluetooth input support intent.
+- Re-ran local static tests, Swift package checks, XcodeGen, simulator build, generic iOS build, and `git diff --check`; all passed before push.
+
+## Run 2026-05-03T04:20:30Z
+Phase: Product operating system bootstrap.
+Changes:
+- Embedded global Hermes identity in `~/.hermes/SOUL.md` with the Company Operating Agent posture supplied by Channa. This file is intentionally outside the repo.
+- Added repo-level `AGENTS.md` for AutoWhisper with product, research, design-system, engineering, marketing, CEO/operator, autonomy, startup protocol, competitive baseline, gap ledger, prioritization, privacy/trust, and session output rules.
+- Began the Startup Protocol and initialized required operating docs under `docs/company`, `docs/research`, `docs/product`, `docs/design`, and `docs/engineering`.
+- Added `docs/company/FOUNDATION_AUDIT.md` with current architecture/product surface, missing/fragile/strong points, likely competitor opportunities, first five PR-sized improvements, and areas not to touch yet.
+- Seeded competitor baseline from public vendor pages retrieved 2026-05-03; docs explicitly label these as vendor claims and shallow first-pass research.
+Verification:
+- Required doc existence check passed.
+- Placeholder guard passed after replacing template bracket placeholders in `AGENTS.md`.
+- `python3 -m unittest discover -s tests/static -v` passed: 57 tests OK.
+- `git diff --check` passed.
+- `git diff --check origin/core...HEAD` passed.
+- Independent read-only review PASS; no blocking/high findings. Medium caveat: research is intentionally shallow and docs now require maintenance discipline.
+Next best action:
+- Ship this bootstrap to PR #12, then continue with the highest-leverage reversible engineering task: iOS interruption/background recorder reconciliation, unless Channa chooses benchmark harness first.
+
+## Run 2026-05-03T10:21:38Z
+Phase: iOS interruption/background recorder reconciliation.
+Changes:
+- IOSAudioRecorder: Added audioRecorderDidFinishRecording and audioRecorderEncodeErrorDidOccur AVAudioRecorderDelegate callbacks; on abnormal stop these clear internal state and call onInterrupted on the main actor.
+- ContentView/AutoWhisperAppModel: Wires onInterrupted in init with [weak self]; sets recordingState=.idle and errorMessage with interrupted copy when fired.
+- ContentView: Added @Environment(.scenePhase) and onChange(of:) observer to refresh microphone permission status on .active; uses single-value closure for iOS 16 compatibility.
+- ios/README.md: Documents interruption and permission-staleness behaviour.
+- tests/static/test_ios_app_shell.py: Added 4 TDD tests (all passed after implementation); full suite now 61 tests.
+Verification: 61 static tests OK, swift run AutoWhisperCoreChecks OK, xcodegen OK, simulator BUILD SUCCEEDED, device BUILD SUCCEEDED, git diff --check OK, manual review PASS.

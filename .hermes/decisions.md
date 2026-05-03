@@ -130,3 +130,61 @@ Treat this slice as a desktop-platform foundation gate: macOS is validated host-
 - Platform diagnostics explicitly expose ready/partial/placeholder/unsupported feature states.
 - `engineering/desktop-platform-foundation.md` documents Docker limits and avoids claiming macOS containers or Windows runtime execution.
 - Cross-compiled tests are not registered unless `CMAKE_CROSSCOMPILING_EMULATOR` is present.
+
+
+## ADR-0008 — Use XcodeGen source-of-truth for the runnable iOS app shell
+
+Date: 2026-05-02T01:35:17Z
+
+### Context
+
+Full Xcode and iOS SDKs are now available on the local Mac, unblocking work that ADR-0006 intentionally deferred. The first iOS milestone still must avoid desktop behavior overclaims: iOS cannot support global hotkeys, menu-bar daemons, or arbitrary text injection. The repo needs a runnable app shell that can be generated, built for simulator/device SDKs, installed, launched, and screenshot-verified without committing generated Xcode project churn.
+
+### Decision
+
+Use `ios/project.yml` as the source of truth for a generated `AutoWhisperIOS.xcodeproj`. Add a SwiftUI `AutoWhisperApp` target that depends on `AutoWhisperCore`, declares microphone usage copy and a privacy manifest, launches to a foreground record/transcribe/copy-share shell, and gates microphone permission behind an explicit user button. Keep generated `ios/*.xcodeproj/` files ignored.
+
+### Consequences
+
+- The iOS product line now has a runnable simulator app shell rather than only a Swift package foundation.
+- Local verification distinguishes simulator build, generic iPhoneOS build without signing, and simulator runtime smoke; it still does not claim physical-device install, TestFlight, App Store readiness, or real local Whisper inference.
+- Future iOS work should extend this shell with AVFoundation recording and a `whisper.cpp` bridge while preserving the explicit iOS platform-limit messaging.
+
+
+## 2026-05-02T01:59:11Z — iOS native audio before Whisper bridge
+Decision: Extend PR #12 with native AVFoundation foreground recording before attempting the `whisper.cpp` bridge.
+Rationale: Small reversible slice proves actual microphone-recording plumbing and app lifecycle without overclaiming local inference.
+Consequences:
+- `IOSAudioRecorder` owns `AVAudioSession`/`AVAudioRecorder` lifecycle for 16 kHz mono CAF capture.
+- SwiftUI still uses placeholder transcript text until recorded audio is decoded/fed to `whisper.cpp`.
+- Verification language must distinguish simulator/device builds from physical-device signing/runtime and from real transcription.
+
+## 2026-05-02T03:07:35Z — iOS audio decode seam before real Whisper inference
+Decision: Extend PR #12 with a bounded recorded-audio decode and transcriber-seam slice before binding `whisper.cpp`.
+Rationale: The app should not jump from AVFoundation recording straight to model integration without first proving the recorded CAF can be decoded into normalized PCM and routed through a reviewable inference seam.
+Consequences:
+- `IOSAudioDecoder` decodes recorded CAF audio into normalized float PCM and guards the preview path against overly long recordings.
+- `IOSWhisperTranscribing` is an async/sendable seam so decode/inference work can stay off the main actor.
+- The UI disables the recorder button while `.preparingTranscript` is in progress so users cannot start a second recording while decode/transcriber work from the previous recording is still pending.
+- SwiftUI copy and microphone permission prompt text now say decode/bridge summary and explicitly avoid saying real Whisper transcription is implemented.
+- Verification language must still avoid claiming physical-device runtime, TestFlight, App Store readiness, or real Whisper transcript output.
+
+## 2026-05-02T10:39:11Z — iOS model resource locator before real inference
+Decision: Extend PR #12 with an explicit bundled GGML model resource contract and locator before binding the `whisper.cpp` C API.
+Rationale: Real inference should not mix model filename mapping, bundle packaging, missing-model UX, C/Swift interop, and transcript output in one slice. The app can first prove it knows which model resource it expects and can report a missing bundled model honestly.
+Consequences:
+- `ModelDescriptor` now carries concrete GGML filenames such as `ggml-tiny.en.bin` and exposes a bundle resource name for app lookup.
+- `ios/project.yml` declares `ModelResources.plist` and `AutoWhisperApp/Models` as resources, with documentation placeholders but no large model binaries committed.
+- `IOSWhisperModelLocator` resolves the recommended model from `Bundle.main` under `Models/` or returns a typed `missingBundledModel` error.
+- The placeholder transcriber checks the locator and reports model readiness/missing-model state while still returning bridge-pending placeholder output.
+- Verification language must still avoid claiming model bundling, real inference, physical-device runtime, TestFlight, or App Store readiness.
+
+## 2026-05-02T16:00:38Z — iOS Quick Record widget is a foreground-app launcher
+Decision: Add a WidgetKit Quick Record launcher and deep-link seam for iOS, but keep all microphone recording in the foreground AutoWhisper app.
+Rationale: Channa wants the widget and small voice part of iOS. iOS widgets are not a safe place to run microphone capture, and Ghost Pepper has no detected license, so this must be a clean-room native iOS slice that learns from architecture patterns without copying code.
+Consequences:
+- `AutoWhisperWidget` is an embedded WidgetKit app extension with a small widget that opens `autowhisper://record`.
+- `AutoWhisperApp` registers the `autowhisper` URL scheme and handles `autowhisper://record` by requesting/updating microphone permission in the foreground app and starting the existing `IOSAudioRecorder` only when authorized and idle.
+- Widget code must not instantiate `AVAudioRecorder`, configure `AVAudioSession`, request microphone permission, or claim background/widget-process recording.
+- Ghost Pepper remains research inspiration only unless explicit licensing/permission is obtained; no Ghost Pepper code is vendored or copied.
+- Verification language must still avoid claiming real Whisper transcription, widget/background microphone recording, physical-device runtime, TestFlight, or App Store readiness.

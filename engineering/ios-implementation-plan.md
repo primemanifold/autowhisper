@@ -72,37 +72,55 @@ swift run --package-path ios AutoWhisperCoreChecks
 
 ## Phase I1: Xcode app shell
 
-Blocked until full Xcode/iOS SDK is installed and selected.
+Status: implemented as the first runnable SwiftUI app-shell slice.
 
 **Objective:** Add a runnable SwiftUI iOS app target.
 
 **Files:**
-- Create: `ios/AutoWhisperApp/AutoWhisperApp.swift`
-- Create: `ios/AutoWhisperApp/ContentView.swift`
-- Create: `ios/AutoWhisperApp/Info.plist`
-- Add app project/workspace once Xcode is available.
+- Created: `ios/project.yml` as the XcodeGen source of truth.
+- Created: `ios/AutoWhisperApp/AutoWhisperApp.swift`
+- Created: `ios/AutoWhisperApp/ContentView.swift`
+- Created: `ios/AutoWhisperApp/Info.plist`
+- Created: `ios/AutoWhisperApp/PrivacyInfo.xcprivacy`
+- Created: `ios/AutoWhisperApp/LaunchScreen.storyboard`
 
 **Required Info.plist key:**
 
 ```xml
 <key>NSMicrophoneUsageDescription</key>
-<string>AutoWhisper records your voice only when you tap record so it can transcribe locally on this device.</string>
+<string>AutoWhisper records your voice only when you tap record so it can decode audio locally for the transcription bridge.</string>
 ```
 
 **Verification:**
 
 ```bash
-xcodebuild -scheme AutoWhisper -destination 'platform=iOS Simulator,name=iPhone 16' build test
+swift run --package-path ios AutoWhisperCoreChecks
+python3 -m unittest tests.static.test_ios_app_shell -v
+cd ios && xcodegen generate
+xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp \
+  -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator \
+  CODE_SIGNING_ALLOWED=NO build
+xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp \
+  -destination 'generic/platform=iOS' -sdk iphoneos \
+  CODE_SIGNING_ALLOWED=NO build
 ```
 
+Runtime smoke evidence is simulator install + launch + screenshot.
+
 ## Phase I2: Native audio and whisper bridge
+
+Status: native AVFoundation recording and recorded-audio PCM decode are implemented; `whisper.cpp` inference bridge remains next.
 
 **Objective:** Bind the app shell to AVFoundation recording and `whisper.cpp` local inference.
 
 **Approach:**
-- Use AVFoundation for microphone permission and recording.
-- Record 16 kHz mono PCM where possible.
-- Use bundled `deps/whisper.cpp` C API as the first inference bridge.
+- Implemented: use AVFoundation for microphone permission-gated foreground recording.
+- Implemented: record 16 kHz mono Linear PCM CAF files through `IOSAudioRecorder`.
+- Implemented: decode recorded CAF files into normalized PCM samples through `IOSAudioDecoder`.
+- Implemented: route stop-recording output through an explicit async `IOSWhisperTranscribing` seam with honest placeholder output.
+- Implemented: declare concrete bundled GGML filenames (`ggml-tiny.en.bin`, `ggml-base.en.bin`) in the iOS model catalog.
+- Implemented: add `IOSWhisperModelLocator` and app-bundle resource contract files so the placeholder path can report a clear missing-model state before real inference.
+- Next: feed decoded samples into bundled `deps/whisper.cpp` C API as the first real inference bridge.
 - Keep model loading serialized through an actor or equivalent concurrency boundary.
 
 ## Phase I3: Distribution-grade iOS behavior

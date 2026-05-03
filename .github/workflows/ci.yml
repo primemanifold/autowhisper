@@ -45,6 +45,35 @@ jobs:
       - name: Run tests
         run: cd build && ctest --output-on-failure
 
+  ios-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Run iOS Swift package checks
+        run: swift run --package-path ios AutoWhisperCoreChecks
+
+      - name: Generate Xcode project
+        run: |
+          cd ios
+          xcodegen generate
+          test -f AutoWhisperIOS.xcodeproj/project.pbxproj
+
+      - name: Build iOS simulator app and widget
+        run: |
+          cd ios
+          xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS Simulator' -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO build
+
+      - name: Build generic iOS app and widget
+        run: |
+          cd ios
+          xcodebuild -project AutoWhisperIOS.xcodeproj -scheme AutoWhisperApp -destination 'generic/platform=iOS' -sdk iphoneos CODE_SIGNING_ALLOWED=NO build
+
   build-deb:
     runs-on: ubuntu-24.04
     if: github.event_name == 'release'

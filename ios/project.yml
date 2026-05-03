@@ -1,0 +1,61 @@
+name: AutoWhisperIOS
+options:
+  bundleIdPrefix: com.primemanifold
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+packages:
+  AutoWhisperIOSCore:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.0"
+targets:
+  AutoWhisperApp:
+    type: application
+    platform: iOS
+    sources:
+      - path: AutoWhisperApp
+    resources:
+      - path: AutoWhisperApp/PrivacyInfo.xcprivacy
+      - path: AutoWhisperApp/LaunchScreen.storyboard
+      - path: AutoWhisperApp/ModelResources.plist
+      - path: AutoWhisperApp/Models
+    dependencies:
+      - package: AutoWhisperIOSCore
+        product: AutoWhisperCore
+      - target: AutoWhisperWidget
+        embed: true
+    settings:
+      base:
+        PRODUCT_NAME: AutoWhisper
+        PRODUCT_BUNDLE_IDENTIFIER: com.primemanifold.autowhisper.ios
+        INFOPLIST_FILE: AutoWhisperApp/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGNING_ALLOWED: NO
+  AutoWhisperWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: AutoWhisperWidget
+    settings:
+      base:
+        PRODUCT_NAME: AutoWhisperWidget
+        PRODUCT_BUNDLE_IDENTIFIER: com.primemanifold.autowhisper.ios.widget
+        INFOPLIST_FILE: AutoWhisperWidget/Info.plist
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGNING_ALLOWED: NO
+schemes:
+  AutoWhisperApp:
+    build:
+      targets:
+        AutoWhisperApp: all
+    run:
+      config: Debug
+    test:
+      config: Debug

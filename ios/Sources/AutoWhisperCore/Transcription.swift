@@ -35,7 +35,9 @@ public enum TranscriptAction: Equatable, Sendable {
 
 public enum RecordingState: Equatable, Sendable {
     case idle
+    case preparingRecording
     case recording
+    case preparingTranscript
     case transcribing
     case transcribed
     case failed
