@@ -63,7 +63,7 @@ final class IOSAudioRecorder: NSObject, AVAudioRecorderDelegate {
         }
 
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker, .allowBluetoothHFP])
+        try session.setCategory(.playAndRecord, mode: .spokenAudio, options: [.defaultToSpeaker, .allowBluetooth])
         try session.setActive(true)
 
         let url = Self.makeRecordingURL()

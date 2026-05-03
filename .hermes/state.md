@@ -851,3 +851,8 @@ Limits:
 - iOS still has no real local Whisper transcription, no physical-device microphone E2E, no TestFlight, and no App Store readiness.
 Next:
 - Commit and push this batch to PR #12, then watch hosted CI including the new `ios-build` job.
+
+Hosted CI follow-up:
+- First hosted `ios-build` run failed on GitHub macOS/Xcode 16.4 because `AVAudioSession.CategoryOptions.allowBluetoothHFP` is unavailable there even though local Xcode 26.4 accepted it.
+- Replaced `.allowBluetoothHFP` with the older compatible `.allowBluetooth` option and added a static regression preventing reintroduction of `.allowBluetoothHFP` while keeping Bluetooth input support intent.
+- Re-ran local static tests, Swift package checks, XcodeGen, simulator build, generic iOS build, and `git diff --check`; all passed before push.

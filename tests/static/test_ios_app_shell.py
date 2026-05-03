@@ -104,6 +104,8 @@ class IOSAppShellTests(unittest.TestCase):
             "let recording = try audioRecorder.stopRecording()",
         ]:
             self.assertIn(snippet, view_text)
+        self.assertIn(".allowBluetooth", recorder_text)
+        self.assertNotIn(".allowBluetoothHFP", recorder_text)
         self.assertNotIn("AudioFixture.fixture(samples: [0, 0.1, 0.2, 0.1, 0])", view_text)
 
     def test_ios_shell_decodes_recorded_audio_for_whisper_bridge(self):
