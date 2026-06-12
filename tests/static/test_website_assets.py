@@ -50,6 +50,32 @@ class WebsiteAssetsTest(unittest.TestCase):
         self.assertRegex(html, r"<h1[\s\S]+</h1>")
         self.assertRegex(html, r"aria-label=\"[^\"]+\"")
 
+    def test_landing_page_screenshots_exist_and_are_labeled_honestly(self):
+        html = (SITE / "index.html").read_text(encoding="utf-8")
+        screenshots = SITE / "assets" / "screenshots"
+        for name in [
+            "settings-desktop.png",
+            "settings-output.png",
+            "settings-mobile.png",
+            "concept-ios.png",
+            "concept-android.png",
+            "concept-watchos.png",
+        ]:
+            self.assertTrue((screenshots / name).exists(), f"missing screenshot asset: {name}")
+            self.assertIn(f"assets/screenshots/{name}", html, f"landing page must reference {name}")
+        # Real captures and roadmap concepts must be distinguishable in copy.
+        self.assertIn("real product UI", html)
+        self.assertIn("design preview", html)
+        self.assertIn("not yet shipping", html)
+        # Every image needs alt text.
+        for img in re.findall(r"<img\b[^>]*>", html):
+            self.assertIn("alt=", img)
+
+    def test_readme_references_screenshots(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("site/assets/screenshots/settings-desktop.png", readme)
+        self.assertIn("design preview", readme)
+
     def test_github_pages_workflow_deploys_site_from_core(self):
         self.assertTrue(PAGES_WORKFLOW.exists(), "GitHub Pages deployment workflow is missing")
         workflow = PAGES_WORKFLOW.read_text(encoding="utf-8")

@@ -1,8 +1,27 @@
 # AutoWhisper
 
-GPU-accelerated voice-to-text for Ubuntu. Press a hotkey, speak, release — text appears at your cursor.
+Local voice-to-text for your desktop. Press a hotkey, speak, release — text appears at your cursor.
 
-Native C++ application powered by [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Runs entirely offline.
+Native C++ application powered by [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Runs entirely offline. Linux is production-ready, macOS ships as a notarized beta, and the Windows port is in active development.
+
+## Interface
+
+The settings UI is served locally by the app itself — no framework, no cloud. These are real captures:
+
+| Desktop | Output & transcript cleanup | Phone width |
+|---|---|---|
+| ![AutoWhisper settings, Dictation behavior pane](site/assets/screenshots/settings-desktop.png) | ![AutoWhisper settings, Output and Formatting panes](site/assets/screenshots/settings-output.png) | ![AutoWhisper settings at phone width](site/assets/screenshots/settings-mobile.png) |
+
+### Mobile (design previews)
+
+Native iOS, Android, and watchOS apps are on the roadmap (post-1.0; see
+`docs/plans/2026-06-12-production-readiness-plan.md`). These are design
+previews from `design/mobile/`, **not shipping apps** — same local-first
+rule: speech is processed on your devices.
+
+| iOS — design preview | Android — design preview | watchOS — design preview |
+|---|---|---|
+| ![iOS design preview](site/assets/screenshots/concept-ios.png) | ![Android design preview](site/assets/screenshots/concept-android.png) | ![watchOS design preview](site/assets/screenshots/concept-watchos.png) |
 
 ## Install
 

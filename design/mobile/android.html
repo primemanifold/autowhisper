@@ -1,0 +1,113 @@
+<!doctype html>
+<!-- AutoWhisper Android design preview (concept comp, not a shipping app).
+     Same honest loop as iOS — record, transcribe on-device, share/copy —
+     plus the planned voice-keyboard (IME) entry point, Android's natural
+     system-wide dictation surface. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoWhisper Android — design preview</title>
+<style>
+  :root {
+    --aw-paper-0: oklch(0.96 0.008 92); --aw-paper-1: oklch(0.985 0.005 92);
+    --aw-line: oklch(0.86 0.012 84);
+    --aw-ink-0: oklch(0.235 0.012 74); --aw-ink-1: oklch(0.32 0.012 74);
+    --aw-ink-2: oklch(0.46 0.012 74); --aw-ink-3: oklch(0.58 0.012 74);
+    --aw-signal: oklch(0.62 0.19 32); --aw-ok: oklch(0.55 0.13 142);
+    --aw-warn-soft: oklch(0.93 0.04 82);
+    --aw-font-sans: "Roboto", "Inter", system-ui, sans-serif;
+    --aw-font-mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: oklch(0.30 0.01 74); font-family: var(--aw-font-sans);
+         display: grid; place-items: center; min-height: 100vh; padding: 28px; }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 22px 20px; }
+  .device { width: 412px; height: 915px; background: var(--aw-paper-0);
+            border-radius: 34px; border: 9px solid oklch(0.16 0.008 74);
+            overflow: hidden; position: relative;
+            box-shadow: 0 24px 60px oklch(0.1 0.01 74 / .55); }
+  .cam { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+         width: 14px; height: 14px; border-radius: 50%; background: oklch(0.16 0.008 74); }
+  .statusbar { display: flex; justify-content: space-between; padding: 14px 26px 0;
+               font-size: 14px; font-weight: 500; color: var(--aw-ink-0); }
+  .screen { display: flex; flex-direction: column; height: calc(100% - 48px); padding: 16px 18px 0; }
+  .apphead { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .mark { width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid var(--aw-ink-0); position: relative; }
+  .mark::before, .mark::after { content: ""; position: absolute; top: 50%; width: 6px; height: 2.5px;
+          background: var(--aw-ink-0); transform: translateY(-50%); }
+  .mark::before { left: -9px; } .mark::after { right: -9px; }
+  .brand b { font-size: 18px; color: var(--aw-ink-0); }
+  .chip { font-family: var(--aw-font-mono); font-size: 11px; color: var(--aw-ink-2);
+          border: 1px solid var(--aw-line); border-radius: 999px; padding: 5px 10px;
+          background: var(--aw-paper-1); display: flex; gap: 6px; align-items: center; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--aw-ok); }
+  .transcript { flex: 1; margin-top: 16px; background: var(--aw-paper-1);
+                border: 1px solid var(--aw-line); border-radius: 22px; padding: 18px;
+                display: flex; flex-direction: column; gap: 12px; }
+  .t-label { font-family: var(--aw-font-mono); font-size: 11px; letter-spacing: .08em;
+             text-transform: uppercase; color: var(--aw-ink-3); }
+  .t-text { font-size: 19px; line-height: 1.55; color: var(--aw-ink-0); }
+  .t-actions { display: flex; gap: 10px; margin-top: auto; }
+  .btn { flex: 1; text-align: center; padding: 13px; border-radius: 999px; font-weight: 600;
+         font-size: 15px; border: 1px solid var(--aw-line); color: var(--aw-ink-1);
+         background: var(--aw-paper-0); }
+  .btn.primary { background: var(--aw-ink-0); color: var(--aw-paper-1); border-color: var(--aw-ink-0); }
+  .ime { margin-top: 14px; display: flex; align-items: center; justify-content: space-between;
+         gap: 12px; border: 1px dashed var(--aw-line); border-radius: 16px; padding: 14px 16px;
+         background: var(--aw-warn-soft); }
+  .ime b { font-size: 14px; color: var(--aw-ink-1); display: block; }
+  .ime small { font-size: 12px; color: var(--aw-ink-2); }
+  .ime .tag { font-family: var(--aw-font-mono); font-size: 10px; letter-spacing: .08em;
+              text-transform: uppercase; color: var(--aw-ink-2); border: 1px solid var(--aw-line);
+              padding: 4px 8px; border-radius: 999px; white-space: nowrap; background: var(--aw-paper-1); }
+  .talk { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 22px 0 26px; }
+  .ptt { width: 96px; height: 96px; border-radius: 30px; background: var(--aw-signal);
+         box-shadow: 0 0 0 12px oklch(0.62 0.19 32 / .14), 0 10px 28px oklch(0.62 0.19 32 / .35);
+         display: grid; place-items: center; }
+  .ptt svg { width: 40px; height: 40px; fill: white; }
+  .talk small { color: var(--aw-ink-2); font-size: 13px; }
+  .navbar { height: 22px; display: grid; place-items: center; }
+  .navbar i { width: 120px; height: 4px; border-radius: 999px; background: var(--aw-ink-3); }
+  .caption { color: oklch(0.88 0.008 92); font-family: var(--aw-font-mono); font-size: 12px;
+             letter-spacing: .08em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="device">
+    <div class="cam"></div>
+    <div class="statusbar"><span>9:41</span><span>▾▴ ▥ ▮</span></div>
+    <div class="screen">
+      <div class="apphead">
+        <div class="brand"><span class="mark"></span><b>AutoWhisper</b></div>
+        <div class="chip"><span class="dot"></span>tiny · on-device</div>
+      </div>
+      <div class="transcript">
+        <span class="t-label">Transcript · auto-detected (Deutsch)</span>
+        <p class="t-text">Der Releasetermin steht: Donnerstag früh. Bitte die
+          Changelog-Einträge bis Mittwochabend einreichen.</p>
+        <div class="t-actions">
+          <div class="btn">Copy</div>
+          <div class="btn primary">Share</div>
+        </div>
+      </div>
+      <div class="ime">
+        <div>
+          <b>AutoWhisper keyboard</b>
+          <small>Dictate into any app with the system voice keyboard.</small>
+        </div>
+        <span class="tag">Planned</span>
+      </div>
+      <div class="talk">
+        <div class="ptt"><svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11h-2z"/></svg></div>
+        <small>Hold to dictate · processed on this phone</small>
+      </div>
+      <div class="navbar"><i></i></div>
+    </div>
+  </div>
+  <span class="caption">Android · design preview</span>
+</div>
+</body>
+</html>
