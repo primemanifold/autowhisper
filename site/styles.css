@@ -7,7 +7,7 @@
   --aw-paper-1: light-dark(oklch(0.955 0 0), oklch(0.185 0 0));
   --aw-ink-0: light-dark(oklch(0.205 0 0), oklch(0.95 0 0));
   --aw-ink-2: light-dark(oklch(0.45 0 0), oklch(0.70 0 0));
-  --aw-ink-3: light-dark(oklch(0.60 0 0), oklch(0.56 0 0));
+  --aw-ink-3: light-dark(oklch(0.525 0 0), oklch(0.640 0 0));
   --aw-line: light-dark(oklch(0.90 0 0), oklch(0.26 0 0));
   --aw-shadow-1: 0 18px 60px light-dark(oklch(0 0 0 / 0.10), oklch(0 0 0 / 0.55));
   --aw-focus-ring: 0 0 0 3px light-dark(oklch(0.620 0.150 252 / 0.38), oklch(0.620 0.150 252 / 0.50));
@@ -38,9 +38,11 @@ main { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 .site-header {
   max-width: 1080px; margin: 0 auto; padding: 22px 24px;
   display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px 16px;
 }
 .brand { font-weight: 700; font-size: 18px; letter-spacing: -.02em; }
-.nav-links { display: flex; gap: 26px; font-size: 14px; color: var(--aw-ink-2); }
+.nav-links { display: flex; gap: 14px; font-size: 14px; color: var(--aw-ink-2); }
+.nav-links a { padding: 8px 6px; margin: -8px 0; }
 .nav-links a:hover { color: var(--aw-ink-0); }
 
 .hero { padding: 96px 0 64px; text-align: center; }
@@ -64,7 +66,7 @@ main { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
 }
 .button-primary { background: var(--aw-ink-0); color: var(--aw-paper-0); }
 .button-primary:hover { opacity: .85; }
-.button-quiet { color: var(--aw-ink-2); font-size: 16px; }
+.button-quiet { color: var(--aw-ink-2); font-size: 16px; padding: 8px 4px; margin: -8px 0; }
 .button-quiet:hover { color: var(--aw-ink-0); }
 .release-note { margin-top: 22px; font-size: 13px; color: var(--aw-ink-3); }
 
@@ -111,13 +113,14 @@ figcaption { margin-top: 12px; }
 
 .privacy { padding: 72px 0 96px; border-top: 1px solid var(--aw-line); text-align: center; }
 .privacy h2 { font-size: clamp(28px, 4.4vw, 38px); letter-spacing: -.028em; }
-.privacy p { max-width: 38em; margin: 16px auto 0; color: var(--aw-ink-2); }
+.privacy p { max-width: 38em; margin: 16px auto 0; color: var(--aw-ink-2); overflow-wrap: anywhere; }
 
 .site-footer {
   max-width: 1080px; margin: 0 auto; padding: 26px 24px 44px;
   display: flex; justify-content: space-between; font-size: 14px;
   color: var(--aw-ink-3); border-top: 1px solid var(--aw-line);
 }
+.site-footer a { padding: 8px 6px; margin: -8px -6px; }
 .site-footer a:hover { color: var(--aw-ink-0); }
 
 @media (max-width: 760px) {

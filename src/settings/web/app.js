@@ -359,7 +359,8 @@
       return sel;
     }
     if (keyDef.type === "bool") {
-      const wrap = document.createElement("div");
+      // A label wrapper makes the whole row (box + state text) one target.
+      const wrap = document.createElement("label");
       wrap.className = "aw-check";
       const cb = document.createElement("input");
       cb.type = "checkbox";

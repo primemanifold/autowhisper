@@ -15,16 +15,16 @@
   --aw-ink-0: light-dark(oklch(0.205 0 0), oklch(0.945 0 0));
   --aw-ink-1: light-dark(oklch(0.305 0 0), oklch(0.860 0 0));
   --aw-ink-2: light-dark(oklch(0.470 0 0), oklch(0.715 0 0));
-  --aw-ink-3: light-dark(oklch(0.600 0 0), oklch(0.580 0 0));
+  --aw-ink-3: light-dark(oklch(0.525 0 0), oklch(0.640 0 0));
   --aw-ink-4: light-dark(oklch(0.730 0 0), oklch(0.460 0 0));
   --aw-signal: light-dark(oklch(0.585 0.215 28), oklch(0.640 0.205 28));
   --aw-signal-soft: light-dark(oklch(0.950 0.022 28), oklch(0.270 0.045 28));
   --aw-signal-ink: light-dark(oklch(0.470 0.180 28), oklch(0.720 0.160 28));
-  --aw-ok: light-dark(oklch(0.540 0.130 152), oklch(0.700 0.115 152));
+  --aw-ok: light-dark(oklch(0.510 0.125 152), oklch(0.700 0.115 152));
   --aw-ok-soft: light-dark(oklch(0.955 0.018 152), oklch(0.255 0.025 152));
-  --aw-warn: light-dark(oklch(0.580 0.115 70), oklch(0.730 0.105 70));
+  --aw-warn: light-dark(oklch(0.520 0.105 70), oklch(0.730 0.105 70));
   --aw-warn-soft: light-dark(oklch(0.955 0.022 70), oklch(0.270 0.030 70));
-  --aw-err: light-dark(oklch(0.545 0.180 27), oklch(0.680 0.160 27));
+  --aw-err: light-dark(oklch(0.520 0.175 27), oklch(0.680 0.160 27));
   --aw-err-soft: light-dark(oklch(0.950 0.020 27), oklch(0.260 0.030 27));
   --aw-info: light-dark(oklch(0.500 0.140 252), oklch(0.700 0.110 252));
   --aw-info-soft: light-dark(oklch(0.945 0.020 252), oklch(0.255 0.028 252));
@@ -62,7 +62,7 @@
   --aw-ink-0: oklch(0.880 0.170 150);
   --aw-ink-1: oklch(0.800 0.150 150);
   --aw-ink-2: oklch(0.700 0.120 150);
-  --aw-ink-3: oklch(0.590 0.095 150);
+  --aw-ink-3: oklch(0.660 0.110 150);
   --aw-ink-4: oklch(0.470 0.070 150);
   --aw-signal: oklch(0.680 0.220 25);
   --aw-signal-soft: oklch(0.280 0.060 25);
@@ -262,6 +262,7 @@ p { margin: 0; }
 .aw-status {
   min-height: 42px;
   margin: 24px 32px 0;
+  overflow-wrap: anywhere;
   color: var(--aw-ink-2);
   font-family: var(--aw-font-mono);
   font-size: 12px;
@@ -322,12 +323,12 @@ p { margin: 0; }
 .aw-config-key {
   display: block;
   margin-top: 4px;
-  color: var(--aw-ink-4);
+  color: var(--aw-ink-3);
   font-family: var(--aw-font-mono);
   font-size: 10px;
   font-weight: 400;
 }
-.aw-desc { margin-top: 7px; color: var(--aw-ink-2); font-size: 13px; }
+.aw-desc { margin-top: 7px; color: var(--aw-ink-2); font-size: 13px; overflow-wrap: anywhere; }
 .aw-field.has-error { background: color-mix(in oklch, var(--aw-err-soft) 46%, transparent); }
 .aw-field.has-warning { background: color-mix(in oklch, var(--aw-warn-soft) 46%, transparent); }
 .aw-field.has-error input:not([type="checkbox"]),
@@ -336,6 +337,7 @@ p { margin: 0; }
 .aw-field.has-warning select { border-color: var(--aw-warn); }
 .aw-issue {
   margin-top: 7px;
+  overflow-wrap: anywhere;
   font-family: var(--aw-font-mono);
   font-size: 12px;
 }
@@ -352,8 +354,8 @@ p { margin: 0; }
   background: var(--aw-paper-0);
   color: var(--aw-ink-0);
 }
-.aw-check { display: flex; align-items: center; gap: 10px; min-height: 36px; }
-.aw-check input { width: 18px; height: 18px; accent-color: var(--aw-signal); }
+.aw-check { display: flex; align-items: center; gap: 10px; min-height: 36px; cursor: pointer; }
+.aw-check input { width: 18px; height: 18px; accent-color: var(--aw-ink-0); }
 .aw-note {
   margin: 12px 0;
   padding: 12px 14px;

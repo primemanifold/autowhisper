@@ -148,6 +148,18 @@ Researched per platform in `design/research/2026-06-12-motion-platform-research.
 
 ## Accessibility requirements
 
+2026-06-12 audit (Chromium + axe-core, all themes, 320–1440px, every
+pane, long-content stress): text contrast now meets WCAG AA on every
+surface — light `--aw-ink-3` darkened to L 0.525 (dark raised to 0.640),
+config keys moved from `--aw-ink-4` to `--aw-ink-3` (`ink-4` is now
+decorative-only, never text), and the light functional colors (`ok`,
+`warn`, `err`) darkened so 10–12px badge text passes on their `-soft`
+tints. Status/issue/description text uses `overflow-wrap: anywhere` so
+unbroken error tokens cannot widen the page. Checkbox rows are `<label>`
+wrappers (the whole row is one target) and checkboxes use ink, not
+signal red — red stays reserved for the record action. Landing nav and
+footer links carry invisible padding to reach 24px targets (WCAG 2.5.8).
+
 - All controls must be keyboard reachable.
 - Focus must remain visible via `--aw-focus-ring`.
 - Loading, save, and error messages use `role="status"` with `aria-live="polite"`.

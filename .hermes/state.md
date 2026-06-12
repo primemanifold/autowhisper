@@ -725,3 +725,20 @@ Next:
   token-approximate sRGB; replaces Tailwind-palette circles with
   SVG-text masks that tray renderers could rasterize wrong.
 - design/design-system.md documents the token architecture and themes.
+
+## Run 2026-06-12 (night, part 2) — UI/UX gotcha audit, 3 passes to zero
+
+- Built a Playwright + axe-core audit (contrast via canvas-resolved colors,
+  WCAG 2.5.8 targets with the inline-link exemption, horizontal overflow,
+  focus-ring paintability, long-token stress, reduced-motion) over
+  settings (3 themes x 6 widths x all panes), landing (2 schemes x 4
+  widths), and the mobile comps.
+- Pass 1: 141 findings -> fixes (ink-3 retuned for AA both schemes,
+  config-key off decorative ink-4, overflow-wrap on status/issue/desc,
+  label-wrapped checkbox rows, landing 24px link targets + header wrap +
+  URL wrapping, mock muted text). Pass 2: 4 (light ok/warn badges on soft
+  tints) -> light functional colors darkened. Pass 3: 0 findings.
+- Checkbox accent moved from signal red to ink: red is reserved for the
+  record action per the system's own color rule.
+- CI run #88 (the design refactor push) went green across the full matrix
+  on the first attempt.
