@@ -9,7 +9,6 @@
 #include <filesystem>
 #include <fstream>
 #include <thread>
-#include <unistd.h>
 
 #if defined(_WIN32)
 #include <process.h>

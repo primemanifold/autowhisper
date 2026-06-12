@@ -93,6 +93,12 @@ endif()
 if(WIN32)
     # settings/server.cpp compiles cpp-httplib into the core library.
     target_link_libraries(autowhisper_core PUBLIC ws2_32)
+    # windows.h defines min/max macros that break std::min/std::max, and
+    # MSVC warns on every getenv call without _CRT_SECURE_NO_WARNINGS.
+    target_compile_definitions(autowhisper_core PUBLIC
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
+    )
 endif()
 autowhisper_set_warnings(autowhisper_core)
 
