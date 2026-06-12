@@ -686,3 +686,19 @@ Next:
   pixel-identical output; artifacts + SHA256SUMS committed under dist/.
 - Boundary: macOS shell compiles via branch CI (no Apple toolchain in this
   container); runtime verification needs a Mac session.
+
+## Run 2026-06-12 (evening) — v0.8.0 release prep, README/AGENTS rewrite
+
+- Version bumped 0.7.1 -> 0.8.0 across CMakeLists + debian/changelog (ppa
+  workflow consistency rule) with a full CHANGELOG.md section.
+- README rewritten to the design system: one statement, honest platform
+  table, artifact-first install, first-run model story, companion section,
+  agent pointer. AGENTS.md added (build/test/verify commands, conventions,
+  release runbook, issue-filing guidance). Issue templates added
+  (bug/feature YAML forms).
+- Windows integrations from issue #14 (WH_KEYBOARD_LL hotkeys, SendInput/
+  clipboard output) and the click-to-dictate floating button are in;
+  capabilities + tests updated. dist/ rebuilt at 0.8.0 with SHA256SUMS.
+- Gates: 178/178 ctest, static suites, MinGW self-contained build, binary
+  --version = 0.8.0. Post-merge: tag v0.8.0 on core, publish release with
+  CI artifacts (mac signing/notarization on a Mac per docs/MACOS.md).
