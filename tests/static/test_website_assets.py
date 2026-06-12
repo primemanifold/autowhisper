@@ -53,8 +53,10 @@ class WebsiteAssetsTest(unittest.TestCase):
     def test_landing_page_screenshots_exist_and_are_labeled_honestly(self):
         html = (SITE / "index.html").read_text(encoding="utf-8")
         screenshots = SITE / "assets" / "screenshots"
+        # All marketing assets must exist (README uses the full set).
         for name in [
             "settings-desktop.png",
+            "settings-desktop-dark.png",
             "settings-output.png",
             "settings-mobile.png",
             "concept-ios.png",
@@ -62,11 +64,21 @@ class WebsiteAssetsTest(unittest.TestCase):
             "concept-watchos.png",
         ]:
             self.assertTrue((screenshots / name).exists(), f"missing screenshot asset: {name}")
+        # The landing page shows the hero capture (light + dark) and previews.
+        for name in [
+            "settings-desktop.png",
+            "settings-desktop-dark.png",
+            "concept-ios.png",
+            "concept-android.png",
+            "concept-watchos.png",
+        ]:
             self.assertIn(f"assets/screenshots/{name}", html, f"landing page must reference {name}")
         # Real captures and roadmap concepts must be distinguishable in copy.
-        self.assertIn("real product UI", html)
+        self.assertIn("Real product UI", html)
         self.assertIn("design preview", html)
         self.assertIn("not yet shipping", html)
+        # Dark mode is first-class: art-directed hero swap, no scripts.
+        self.assertIn("prefers-color-scheme: dark", html)
         # Every image needs alt text.
         for img in re.findall(r"<img\b[^>]*>", html):
             self.assertIn("alt=", img)

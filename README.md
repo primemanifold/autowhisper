@@ -6,11 +6,16 @@ Native C++ application powered by [whisper.cpp](https://github.com/ggerganov/whi
 
 ## Interface
 
-The settings UI is served locally by the app itself — no framework, no cloud. These are real captures:
+The settings UI is served locally by the app itself — no framework, no cloud. Real captures, light and dark:
 
-| Desktop | Output & transcript cleanup | Phone width |
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/assets/screenshots/settings-desktop-dark.png">
+  <img src="site/assets/screenshots/settings-desktop.png" alt="AutoWhisper settings — real product UI, Dictation behavior pane" width="100%">
+</picture>
+
+| Output & transcript cleanup | Phone width | Dark mode |
 |---|---|---|
-| ![AutoWhisper settings, Dictation behavior pane](site/assets/screenshots/settings-desktop.png) | ![AutoWhisper settings, Output and Formatting panes](site/assets/screenshots/settings-output.png) | ![AutoWhisper settings at phone width](site/assets/screenshots/settings-mobile.png) |
+| ![Output and Formatting panes](site/assets/screenshots/settings-output.png) | ![Settings at phone width](site/assets/screenshots/settings-mobile.png) | ![Dark mode settings](site/assets/screenshots/settings-desktop-dark.png) |
 
 ### Mobile (design previews)
 
@@ -21,7 +26,7 @@ rule: speech is processed on your devices.
 
 | iOS — design preview | Android — design preview | watchOS — design preview |
 |---|---|---|
-| ![iOS design preview](site/assets/screenshots/concept-ios.png) | ![Android design preview](site/assets/screenshots/concept-android.png) | ![watchOS design preview](site/assets/screenshots/concept-watchos.png) |
+| ![iOS design preview, light and dark](site/assets/screenshots/concept-ios.png) | ![Android design preview, light and dark](site/assets/screenshots/concept-android.png) | ![watchOS design preview](site/assets/screenshots/concept-watchos.png) |
 
 ## Install
 

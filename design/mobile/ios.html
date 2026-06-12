@@ -1,106 +1,74 @@
 <!doctype html>
 <!-- AutoWhisper iOS design preview (concept comp, not a shipping app).
-     Reflects the honest iOS loop from ADR-0006: foreground app, tap/hold to
-     record, on-device whisper.cpp transcription, share/copy out. -->
+     ADR-0006 loop: foreground app, hold to dictate, on-device whisper.cpp,
+     copy or share out. Rendered as bare app screens — light and dark —
+     with no fake device hardware. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AutoWhisper iOS — design preview</title>
 <style>
-  :root {
-    --aw-paper-0: oklch(0.96 0.008 92); --aw-paper-1: oklch(0.985 0.005 92);
-    --aw-paper-2: oklch(0.93 0.010 92); --aw-line: oklch(0.86 0.012 84);
-    --aw-ink-0: oklch(0.235 0.012 74); --aw-ink-1: oklch(0.32 0.012 74);
-    --aw-ink-2: oklch(0.46 0.012 74); --aw-ink-3: oklch(0.58 0.012 74);
-    --aw-signal: oklch(0.62 0.19 32); --aw-ok: oklch(0.55 0.13 142);
-    --aw-font-sans: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
-    --aw-font-mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
-  }
   * { box-sizing: border-box; margin: 0; }
-  body { background: oklch(0.30 0.01 74); font-family: var(--aw-font-sans);
-         display: grid; place-items: center; min-height: 100vh; padding: 28px; }
-  .stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 22px 20px; }
-  .device { width: 393px; height: 852px; background: var(--aw-paper-0);
-            border-radius: 54px; border: 10px solid oklch(0.16 0.008 74);
-            overflow: hidden; position: relative;
-            box-shadow: 0 24px 60px oklch(0.1 0.01 74 / .55); }
-  .island { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-            width: 122px; height: 34px; border-radius: 20px; background: oklch(0.16 0.008 74); }
-  .statusbar { display: flex; justify-content: space-between; padding: 18px 30px 0;
-               font-size: 15px; font-weight: 600; color: var(--aw-ink-0); }
-  .screen { display: flex; flex-direction: column; height: calc(100% - 56px); padding: 18px 20px 0; }
-  .apphead { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
-  .brand { display: flex; align-items: center; gap: 10px; }
-  .mark { width: 26px; height: 26px; border-radius: 50%; border: 2.5px solid var(--aw-ink-0);
-          position: relative; }
-  .mark::before, .mark::after { content: ""; position: absolute; top: 50%; width: 6px; height: 2.5px;
-          background: var(--aw-ink-0); transform: translateY(-50%); }
-  .mark::before { left: -9px; } .mark::after { right: -9px; }
-  .brand b { font-size: 17px; letter-spacing: -.01em; color: var(--aw-ink-0); }
-  .chip { font-family: var(--aw-font-mono); font-size: 10px; white-space: nowrap; color: var(--aw-ink-2);
-          border: 1px solid var(--aw-line); border-radius: 999px; padding: 5px 10px;
-          background: var(--aw-paper-1); display: flex; gap: 6px; align-items: center; }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--aw-ok); }
-  .transcript { flex: 1; margin-top: 16px; background: var(--aw-paper-1);
-                border: 1px solid var(--aw-line); border-radius: 18px; padding: 18px;
-                display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
-  .t-label { font-family: var(--aw-font-mono); font-size: 11px; letter-spacing: .08em;
-             text-transform: uppercase; color: var(--aw-ink-3); }
-  .t-text { font-size: 19px; line-height: 1.5; color: var(--aw-ink-0); }
-  .t-text .cursor { display: inline-block; width: 2px; height: 1.1em; background: var(--aw-signal);
-                    vertical-align: text-bottom; margin-left: 2px; animation: blink 1.1s steps(1) infinite; }
-  @keyframes blink { 50% { opacity: 0; } }
-  .t-actions { display: flex; gap: 10px; margin-top: auto; }
-  .btn { flex: 1; text-align: center; padding: 12px; border-radius: 12px; font-weight: 600;
-         font-size: 15px; border: 1px solid var(--aw-line); color: var(--aw-ink-1);
-         background: var(--aw-paper-0); }
-  .btn.primary { background: var(--aw-ink-0); color: var(--aw-paper-1); border-color: var(--aw-ink-0); }
-  .recent { margin-top: 14px; }
-  .recent .row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 4px;
-                 border-bottom: 1px solid var(--aw-line); font-size: 14px; color: var(--aw-ink-2); }
-  .recent .row span:last-child { font-family: var(--aw-font-mono); font-size: 11px; color: var(--aw-ink-3); white-space: nowrap; }
-  .talk { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 20px 0 30px; }
-  .ptt { width: 92px; height: 92px; border-radius: 50%; background: var(--aw-signal);
-         box-shadow: 0 0 0 12px oklch(0.62 0.19 32 / .14), 0 10px 28px oklch(0.62 0.19 32 / .35);
+  body { background: oklch(0.965 0 0);
+         font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+         display: grid; place-items: center; min-height: 100vh; padding: 40px; }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: 22px; padding: 8px 6px; }
+  .row { display: flex; gap: 28px; }
+  .screen { width: 300px; height: 620px; border-radius: 32px; overflow: hidden;
+            display: flex; flex-direction: column; padding: 26px 22px 30px;
+            box-shadow: 0 24px 70px oklch(0 0 0 / .16); }
+  .light { background: oklch(0.985 0 0); --ink: oklch(0.205 0 0); --ink-2: oklch(0.50 0 0);
+           --ink-3: oklch(0.65 0 0); --hair: oklch(0.91 0 0); }
+  .dark  { background: oklch(0.150 0 0); --ink: oklch(0.95 0 0); --ink-2: oklch(0.66 0 0);
+           --ink-3: oklch(0.50 0 0); --hair: oklch(0.27 0 0); }
+  .top { display: flex; justify-content: space-between; align-items: center; }
+  .app { font-size: 15px; font-weight: 650; letter-spacing: -.01em; color: var(--ink); }
+  .model { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .t { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+  .t p { font-size: 24px; line-height: 1.32; letter-spacing: -.015em; font-weight: 500;
+         color: var(--ink); }
+  .t p i { font-style: normal; color: var(--ink-3); }
+  .actions { display: flex; gap: 22px; font-size: 14px; font-weight: 550; color: var(--ink-2); }
+  .bottom { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 22px;
+            border-top: 1px solid var(--hair); }
+  .mic { width: 74px; height: 74px; border-radius: 50%; background: oklch(0.585 0.215 28);
          display: grid; place-items: center; }
-  .ptt svg { width: 38px; height: 38px; fill: white; }
-  .talk small { color: var(--aw-ink-2); font-size: 13px; }
-  .caption { color: oklch(0.88 0.008 92); font-family: var(--aw-font-mono); font-size: 12px;
-             letter-spacing: .08em; text-transform: uppercase; }
+  .dark .mic { background: oklch(0.640 0.205 28); }
+  .mic svg { width: 30px; height: 30px; fill: white; }
+  .hint { font-size: 12px; color: var(--ink-3); }
+  .caption { color: oklch(0.45 0 0); font-size: 12px; letter-spacing: .02em; }
 </style>
 </head>
 <body>
 <div class="stage">
-  <div class="device">
-    <div class="island"></div>
-    <div class="statusbar"><span>9:41</span><span style="letter-spacing:3px">●●●</span></div>
-    <div class="screen">
-      <div class="apphead">
-        <div class="brand"><span class="mark"></span><b>AutoWhisper</b></div>
-        <div class="chip"><span class="dot"></span>distil-small.en · local</div>
+  <div class="row">
+    <div class="screen light">
+      <div class="top"><span class="app">AutoWhisper</span><span class="model">on-device</span></div>
+      <div class="t">
+        <p>The launch checklist is ready for review — benchmarks are in from
+          last night's run.<i>|</i></p>
+        <div class="actions"><span>Copy</span><span>Share</span></div>
       </div>
-      <div class="transcript">
-        <span class="t-label">Transcript · English</span>
-        <p class="t-text">The launch checklist is ready for review. I added the
-          notarization step and the new benchmark numbers from last night's
-          run.<span class="cursor"></span></p>
-        <div class="t-actions">
-          <div class="btn">Copy</div>
-          <div class="btn primary">Share</div>
-        </div>
+      <div class="bottom">
+        <div class="mic"><svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11h-2z"/></svg></div>
+        <span class="hint">Hold to dictate</span>
       </div>
-      <div class="recent">
-        <div class="row"><span>Standup notes — model latency…</span><span>09:12</span></div>
-        <div class="row"><span>Reply to Maya re: release window…</span><span>08:47</span></div>
+    </div>
+    <div class="screen dark">
+      <div class="top"><span class="app">AutoWhisper</span><span class="model">on-device</span></div>
+      <div class="t">
+        <p>The launch checklist is ready for review — benchmarks are in from
+          last night's run.<i>|</i></p>
+        <div class="actions"><span>Copy</span><span>Share</span></div>
       </div>
-      <div class="talk">
-        <div class="ptt"><svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11h-2z"/></svg></div>
-        <small>Hold to dictate · processed on this iPhone</small>
+      <div class="bottom">
+        <div class="mic"><svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11h-2z"/></svg></div>
+        <span class="hint">Hold to dictate</span>
       </div>
     </div>
   </div>
-  <span class="caption">iOS · design preview</span>
+  <span class="caption">iOS — design preview, not yet shipping</span>
 </div>
 </body>
 </html>

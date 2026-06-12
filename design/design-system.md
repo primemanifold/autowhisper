@@ -34,6 +34,14 @@ A developer, writer, or operator uses AutoWhisper while focused in another deskt
 
 Production CSS tokens live in `src/settings/web/style.css` and use the `--aw-` prefix.
 
+2026-06-12 refactor: the palette moved from warm paper/terracotta to a pure
+neutral system (zero-chroma greys) with dark mode as a first-class theme
+built on elevation steps rather than borders. Color now carries meaning
+only: red is reserved for the record action, blue for focus, green/amber
+for status. Primary actions are ink-on-paper pills (black in light mode,
+white in dark). Decorative gradients, numbered navigation, and uppercase
+mono labels outside technical readouts were removed.
+
 Core roles:
 
 - `--aw-paper-0` through `--aw-paper-3`: canvas and surface stack

@@ -89,3 +89,29 @@ design contract for that work, not a shipping claim.
 - [ ] F4 auto-dismissing status
 - [ ] Dark-mode capture pass (tokens exist; verify real rendering)
 - [ ] Keyboard-only walkthrough + screen-reader spot check (axe/VoiceOver)
+
+## Round 2 — de-slop refactor (same day)
+
+Owner feedback: the first pass read as generic AI output. Specific tells,
+all removed:
+
+- **Warm beige + terracotta palette** → pure neutral greys, color reserved
+  for meaning (record red, focus blue, status green/amber). Light and dark
+  are both first-class; dark is elevation-based (grey steps, OLED-leaning
+  near-black), per 2026 dark-first practice.
+- **CSS-drawn device hardware** (bezels, crowns, dynamic islands, fake
+  status bars, wrist bands) → gone. Mobile comps are bare app screens,
+  light and dark side by side, floating with a single soft shadow —
+  press-asset style.
+- **Numbered eyebrows, uppercase mono labels everywhere, decorative
+  gradients, panel cards with "01/02/03"** → removed across the settings
+  UI and the landing page. Mono now appears only on technical readouts.
+- **Landing page** rebuilt: one giant statement ("Speak. It types."), one
+  CTA pair, the real product screenshot center stage (art-directed
+  light/dark swap via <picture>, still script-free), three terse fact
+  columns, minimal previews.
+- Buttons are ink pills (black on light, white on dark) matching the
+  settings UI.
+
+Static tests now also pin the dark-mode hero swap and the expanded asset
+set. All captures regenerated.

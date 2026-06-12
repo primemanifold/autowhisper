@@ -1,73 +1,42 @@
 <!doctype html>
 <!-- AutoWhisper watchOS design preview (concept comp, not a shipping app).
-     Companion surface: the watch captures audio and hands it to the paired
-     iPhone app for on-device transcription; the transcript echoes back. -->
+     Companion: the watch records, the paired iPhone transcribes on-device.
+     watchOS is dark by convention — one bare screen, no fake hardware. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AutoWhisper watchOS — design preview</title>
 <style>
-  :root {
-    --aw-ink-0: oklch(0.95 0.006 92); --aw-ink-2: oklch(0.74 0.010 92);
-    --aw-ink-3: oklch(0.61 0.012 92);
-    --aw-paper-1: oklch(0.225 0.012 74); --aw-line: oklch(0.39 0.014 74);
-    --aw-signal: oklch(0.62 0.19 32); --aw-ok: oklch(0.66 0.13 142);
-    --aw-font-sans: -apple-system, "SF Pro Text", "Inter", system-ui, sans-serif;
-    --aw-font-mono: ui-monospace, "SF Mono", monospace;
-  }
   * { box-sizing: border-box; margin: 0; }
-  body { background: oklch(0.30 0.01 74); font-family: var(--aw-font-sans);
-         display: grid; place-items: center; min-height: 100vh; padding: 28px; }
-  .stage { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 26px 20px; }
-  .wrist { position: relative; display: flex; flex-direction: column; align-items: center; }
-  .band { width: 96px; height: 56px; background: oklch(0.20 0.01 74); border-radius: 14px; }
-  .device { width: 198px; height: 242px; background: black; border-radius: 48px;
-            border: 7px solid oklch(0.14 0.008 74); overflow: hidden; position: relative;
-            box-shadow: 0 18px 44px oklch(0.1 0.01 74 / .6); margin: -8px 0; z-index: 1; }
-  .crown { position: absolute; right: -13px; top: 64px; width: 7px; height: 30px;
-           border-radius: 4px; background: oklch(0.25 0.01 74); }
-  .screen { height: 100%; padding: 14px 14px 12px; display: flex; flex-direction: column;
-            align-items: center; gap: 7px; position: relative; }
-  .time { position: absolute; top: 10px; right: 16px; font-size: 12px; font-weight: 600; color: var(--aw-ok); }
-  .title { margin-top: 16px; display: flex; align-items: center; gap: 6px; color: var(--aw-ink-0);
-           font-size: 13px; font-weight: 600; }
-  .mark { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--aw-ink-0); }
-  .ptt { width: 72px; height: 72px; flex-shrink: 0; border-radius: 50%; background: var(--aw-signal);
-         display: grid; place-items: center; margin-top: 2px;
-         box-shadow: 0 0 0 9px oklch(0.62 0.19 32 / .22); }
-  .ptt svg { width: 34px; height: 34px; fill: white; }
-  .hint { font-size: 10.5px; white-space: nowrap; color: var(--aw-ink-2); text-align: center; }
-  .last { width: 100%; margin-top: auto; background: var(--aw-paper-1); border: 1px solid var(--aw-line);
-          border-radius: 12px; padding: 8px 10px; }
-  .last small { font-family: var(--aw-font-mono); font-size: 8px; letter-spacing: .08em;
-                text-transform: uppercase; color: var(--aw-ink-3); display: block; }
-  .last p { font-size: 11px; color: var(--aw-ink-0); line-height: 1.35;
-            overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-  .caption { color: oklch(0.88 0.008 92); font-family: var(--aw-font-mono); font-size: 12px;
-             letter-spacing: .08em; text-transform: uppercase; }
+  body { background: oklch(0.965 0 0);
+         font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+         display: grid; place-items: center; min-height: 100vh; padding: 40px; }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: 20px; padding: 8px 6px; }
+  .screen { width: 198px; height: 242px; border-radius: 44px; background: black;
+            display: flex; flex-direction: column; align-items: center;
+            padding: 22px 18px 18px; gap: 12px;
+            box-shadow: 0 22px 60px oklch(0 0 0 / .22); }
+  .app { font-size: 13px; font-weight: 650; color: oklch(0.95 0 0); letter-spacing: -.01em; }
+  .mic { width: 78px; height: 78px; border-radius: 50%; flex-shrink: 0; margin-top: 6px;
+         background: oklch(0.640 0.205 28); display: grid; place-items: center; }
+  .mic svg { width: 32px; height: 32px; fill: white; }
+  .hint { font-size: 11px; color: oklch(0.60 0 0); }
+  .note { margin-top: auto; width: 100%; font-size: 11px; line-height: 1.35;
+          color: oklch(0.78 0 0); overflow: hidden; display: -webkit-box;
+          -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .caption { color: oklch(0.45 0 0); font-size: 12px; letter-spacing: .02em; }
 </style>
 </head>
 <body>
 <div class="stage">
-  <div class="wrist">
-    <div class="band"></div>
-    <div class="device">
-      <div class="crown"></div>
-      <div class="screen">
-        <span class="time">9:41</span>
-        <span class="title"><span class="mark"></span>AutoWhisper</span>
-        <div class="ptt"><svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11h-2z"/></svg></div>
-        <span class="hint">Hold · sends to iPhone</span>
-        <div class="last">
-          <small>Last note</small>
-          <p>Move the deploy to Thursday morning and tell the team in standup.</p>
-        </div>
-      </div>
-    </div>
-    <div class="band" style="border-radius: 14px;"></div>
+  <div class="screen">
+    <span class="app">AutoWhisper</span>
+    <div class="mic"><svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11h-2z"/></svg></div>
+    <span class="hint">Hold — types on iPhone</span>
+    <p class="note">Move the deploy to Thursday morning and tell the team in standup.</p>
   </div>
-  <span class="caption">watchOS · design preview</span>
+  <span class="caption">watchOS — design preview, not yet shipping</span>
 </div>
 </body>
 </html>
