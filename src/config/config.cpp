@@ -389,6 +389,23 @@ void Config::validate() const {
     }
 }
 
+namespace {
+
+// Widening float→double directly turns 0.3f into 0.30000001192092896 in the
+// written TOML. Use the shortest decimal that round-trips the float instead.
+double float_to_shortest_double(float v) {
+    char buf[64];
+    for (int precision = 1; precision <= 9; precision++) {
+        std::snprintf(buf, sizeof(buf), "%.*g", precision, static_cast<double>(v));
+        if (std::strtof(buf, nullptr) == v) {
+            return std::strtod(buf, nullptr);
+        }
+    }
+    return static_cast<double>(v);
+}
+
+}  // namespace
+
 void Config::save(const std::string& path) const {
     validate();
 
@@ -412,9 +429,9 @@ void Config::save(const std::string& path) const {
     if (audio.device) audio_tbl.insert("device", *audio.device);
     if (audio.output_device) audio_tbl.insert("output_device", *audio.output_device);
     audio_tbl.insert("vad_enabled", audio.vad_enabled);
-    audio_tbl.insert("vad_threshold", static_cast<double>(audio.vad_threshold));
-    audio_tbl.insert("silence_duration", static_cast<double>(audio.silence_duration));
-    audio_tbl.insert("max_duration", static_cast<double>(audio.max_duration));
+    audio_tbl.insert("vad_threshold", float_to_shortest_double(audio.vad_threshold));
+    audio_tbl.insert("silence_duration", float_to_shortest_double(audio.silence_duration));
+    audio_tbl.insert("max_duration", float_to_shortest_double(audio.max_duration));
     audio_tbl.insert("mute_other_apps", audio.mute_other_apps);
     tbl.insert("audio", std::move(audio_tbl));
 
@@ -435,7 +452,7 @@ void Config::save(const std::string& path) const {
         {"method", output.method},
         {"also_copy_to_clipboard", output.also_copy_to_clipboard},
         {"auto_paste", output.auto_paste},
-        {"paste_delay", static_cast<double>(output.paste_delay)},
+        {"paste_delay", float_to_shortest_double(output.paste_delay)},
         {"ending_action", output.ending_action},
         {"lowercase", output.lowercase},
     });
@@ -446,8 +463,8 @@ void Config::save(const std::string& path) const {
         {"frequency_start", static_cast<int64_t>(feedback.frequency_start)},
         {"frequency_stop", static_cast<int64_t>(feedback.frequency_stop)},
         {"frequency_error", static_cast<int64_t>(feedback.frequency_error)},
-        {"duration", static_cast<double>(feedback.duration)},
-        {"volume", static_cast<double>(feedback.volume)},
+        {"duration", float_to_shortest_double(feedback.duration)},
+        {"volume", float_to_shortest_double(feedback.volume)},
     });
 
     // [daemon]
@@ -478,7 +495,14 @@ void Config::save(const std::string& path) const {
     if (!ofs) {
         throw std::runtime_error("Cannot open config file for writing: " + path);
     }
+#if defined(__APPLE__)
+    // Without float charconv (see CMakeLists), full-precision doubles print as
+    // 17-digit noise. Six significant digits cover every human-entered value.
+    ofs << toml::toml_formatter{tbl, toml::toml_formatter::default_flags
+                                         | toml::format_flags::relaxed_float_precision};
+#else
     ofs << tbl;
+#endif
 }
 
 std::string find_config_file() {

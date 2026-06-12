@@ -78,6 +78,15 @@ target_compile_definitions(autowhisper_core PUBLIC
     AUTOWHISPER_VERSION_MINOR=${PROJECT_VERSION_MINOR}
     AUTOWHISPER_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
+if(NOT APPLE)
+    # toml++ disables float <charconv> on GCC/Clang based on a stale 2020-era
+    # probe; GCC >= 11 and MSVC support it fully. With it, floats serialize as
+    # their shortest round-trip decimal ("0.3", not "0.29999999999999999").
+    # Apple's libc++ gates floating-point to_chars behind macOS 13.3 while our
+    # deployment target is 12.0, so macOS uses relaxed precision in
+    # Config::save instead.
+    target_compile_definitions(autowhisper_core PUBLIC TOML_FLOAT_CHARCONV=1)
+endif()
 autowhisper_set_warnings(autowhisper_core)
 
 # === Application sources (need platform libs, whisper, miniaudio) ===
