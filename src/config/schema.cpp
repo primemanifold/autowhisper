@@ -91,6 +91,15 @@ const std::vector<KeyDef>& table() {
         {"output", "also_copy_to_clipboard", Type::Bool, V{}, std::nullopt, std::nullopt,
             "Copy to clipboard in addition to the primary method."},
 
+        // [formatting]
+        {"formatting", "remove_fillers", Type::Bool, V{}, std::nullopt, std::nullopt,
+            "Remove hesitation words (um, uh, ...) from transcripts. English only."},
+        {"formatting", "spoken_commands", Type::Bool, V{}, std::nullopt, std::nullopt,
+            "Turn standalone 'new line' / 'new paragraph' into real line breaks."},
+        {"formatting", "dictionary", Type::StringArray, V{}, std::nullopt, std::nullopt,
+            "Personal dictionary, entries of the form 'spoken => written', "
+            "e.g. 'auto whisper => AutoWhisper'."},
+
         // [feedback]
         {"feedback", "enabled", Type::Bool, V{}, std::nullopt, std::nullopt,
             "Play tones on record start/stop/error."},

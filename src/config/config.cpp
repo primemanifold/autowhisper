@@ -234,6 +234,16 @@ ConfigLoadResult Config::load_with_diagnostics(const std::string& path) {
         }
     }
 
+    // [formatting]
+    if (auto formatting = tbl["formatting"].as_table()) {
+        config.formatting.remove_fillers =
+            get_or(*formatting, "remove_fillers", config.formatting.remove_fillers);
+        config.formatting.spoken_commands =
+            get_or(*formatting, "spoken_commands", config.formatting.spoken_commands);
+        config.formatting.dictionary =
+            get_string_array(*formatting, "dictionary", config.formatting.dictionary);
+    }
+
     // [feedback]
     if (auto feedback = tbl["feedback"].as_table()) {
         config.feedback.enabled = get_or(*feedback, "enabled", config.feedback.enabled);
@@ -347,6 +357,17 @@ std::vector<ValidationIssue> Config::validate_all() const {
         add_error(issues, "output.ending_action", "invalid_enum", "Invalid ending_action: " + output.ending_action);
     }
 
+    for (const auto& entry : formatting.dictionary) {
+        const auto sep = entry.find("=>");
+        const bool has_lhs = sep != std::string::npos &&
+                             entry.find_first_not_of(" \t") < sep;
+        if (!has_lhs) {
+            issues.push_back(make_issue(ValidationSeverity::Warning,
+                "formatting.dictionary", "malformed_entry",
+                "Dictionary entry is not 'spoken => written' and will be ignored: " + entry));
+        }
+    }
+
     if (!std::isfinite(feedback.volume) || feedback.volume < 0.0f || feedback.volume > 1.0f) {
         add_error(issues, "feedback.volume", "out_of_range", "Invalid volume: must be between 0.0 and 1.0");
     }
@@ -455,6 +476,15 @@ void Config::save(const std::string& path) const {
         {"paste_delay", float_to_shortest_double(output.paste_delay)},
         {"ending_action", output.ending_action},
         {"lowercase", output.lowercase},
+    });
+
+    // [formatting]
+    toml::array dictionary_arr;
+    for (const auto& d : formatting.dictionary) dictionary_arr.push_back(d);
+    tbl.insert("formatting", toml::table{
+        {"remove_fillers", formatting.remove_fillers},
+        {"spoken_commands", formatting.spoken_commands},
+        {"dictionary", std::move(dictionary_arr)},
     });
 
     // [feedback]

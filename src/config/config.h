@@ -44,6 +44,13 @@ struct OutputConfig {
     bool also_copy_to_clipboard = true;
 };
 
+struct FormattingConfig {
+    bool remove_fillers = true;
+    bool spoken_commands = true;
+    // Personal dictionary entries, "spoken => written".
+    std::vector<std::string> dictionary;
+};
+
 struct FeedbackConfig {
     bool enabled = true;
     int frequency_start = 800;
@@ -88,6 +95,7 @@ struct Config {
     AudioConfig audio;
     HotkeyConfig hotkeys;
     OutputConfig output;
+    FormattingConfig formatting;
     FeedbackConfig feedback;
     DaemonConfig daemon;
     TrayConfig tray;

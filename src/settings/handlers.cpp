@@ -65,6 +65,12 @@ nlohmann::json config_to_json(const Config& c) {
         {"also_copy_to_clipboard", c.output.also_copy_to_clipboard},
     };
 
+    j["formatting"] = {
+        {"remove_fillers", c.formatting.remove_fillers},
+        {"spoken_commands", c.formatting.spoken_commands},
+        {"dictionary", c.formatting.dictionary},
+    };
+
     j["feedback"] = {
         {"enabled", c.feedback.enabled},
         {"frequency_start", c.feedback.frequency_start},
@@ -138,6 +144,10 @@ Config json_to_config(const nlohmann::json& j) {
     get("output", "ending_action", c.output.ending_action);
     get("output", "lowercase", c.output.lowercase);
     get("output", "also_copy_to_clipboard", c.output.also_copy_to_clipboard);
+
+    get("formatting", "remove_fillers", c.formatting.remove_fillers);
+    get("formatting", "spoken_commands", c.formatting.spoken_commands);
+    get("formatting", "dictionary", c.formatting.dictionary);
 
     get("feedback", "enabled", c.feedback.enabled);
     get("feedback", "frequency_start", c.feedback.frequency_start);

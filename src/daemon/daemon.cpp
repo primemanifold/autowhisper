@@ -76,6 +76,9 @@ void AutoWhisperDaemon::initialize() {
     whisper_ = std::make_unique<WhisperInference>(config_.model);
     whisper_->load();
 
+    pipeline_ = std::make_unique<TranscriptPipeline>(config_.formatting,
+                                                     config_.model.language);
+
     spdlog::info("Initializing output subsystem");
     output_ = std::make_unique<OutputManager>(config_.output);
     output_->initialize();
@@ -204,6 +207,7 @@ void AutoWhisperDaemon::handle_stop() {
     try {
         spdlog::info("Transcribing {:.2f}s of audio", duration);
         std::string text = whisper_->transcribe(audio);
+        text = pipeline_->process(text);
 
         if (!text.empty()) {
             std::string preview = text.size() > 50 ? text.substr(0, 50) + "..." : text;

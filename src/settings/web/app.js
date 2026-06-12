@@ -45,8 +45,8 @@
       id: "output",
       number: "04",
       title: "Output & insertion",
-      lede: "Control how text reaches the current app and what fallback behavior is allowed.",
-      sections: ["output"],
+      lede: "Control how text reaches the current app, how transcripts are cleaned up, and what fallback behavior is allowed.",
+      sections: ["output", "formatting"],
     },
     {
       id: "privacy",

@@ -6,6 +6,7 @@
 #include "hotkey/hotkey.h"
 #include "inference/inference.h"
 #include "output/output.h"
+#include "pipeline/transcript_pipeline.h"
 #include "pulseaudio/pulseaudio.h"
 #include "tray/tray.h"
 
@@ -51,6 +52,7 @@ private:
     // Components
     std::unique_ptr<AudioManager> audio_;
     std::unique_ptr<WhisperInference> whisper_;
+    std::unique_ptr<TranscriptPipeline> pipeline_;
     std::unique_ptr<OutputManager> output_;
     std::unique_ptr<FeedbackManager> feedback_;
     std::unique_ptr<PulseAudioManager> pulseaudio_;
