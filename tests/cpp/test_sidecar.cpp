@@ -114,13 +114,23 @@ TEST_CASE("sidecar_path_for falls back to writable temp dir with user suffix whe
 }
 
 TEST_CASE("parse_sidecar round-trip with format_sidecar", "[sidecar]") {
-    SidecarContents c{12345, 38543, "/home/u/.config/autowhisper/config.toml"};
+    SidecarContents c{12345, 38543, "/home/u/.config/autowhisper/config.toml", "deadbeef"};
     auto s = format_sidecar(c);
     auto parsed = parse_sidecar(s);
     REQUIRE(parsed.has_value());
     CHECK(parsed->pid == 12345);
     CHECK(parsed->port == 38543);
     CHECK(parsed->canonical_path == c.canonical_path);
+    CHECK(parsed->token == "deadbeef");
+}
+
+TEST_CASE("parse_sidecar accepts pre-token three-line sidecars", "[sidecar]") {
+    auto parsed = parse_sidecar("123\n38543\n/home/u/config.toml\n");
+    REQUIRE(parsed.has_value());
+    CHECK(parsed->pid == 123);
+    CHECK(parsed->port == 38543);
+    CHECK(parsed->canonical_path == "/home/u/config.toml");
+    CHECK(parsed->token.empty());
 }
 
 TEST_CASE("parse_sidecar rejects empty, malformed, or out-of-range input", "[sidecar]") {

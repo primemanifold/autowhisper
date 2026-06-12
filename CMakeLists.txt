@@ -53,6 +53,7 @@ set(CORE_LIB_SOURCES
     src/platform/capabilities.cpp
     src/output/output_common.cpp
     src/settings/handlers.cpp
+    src/settings/server.cpp
     src/settings/sidecar.cpp
     src/tray/tray_common.cpp
     src/util/logging.cpp
@@ -68,6 +69,7 @@ target_link_libraries(autowhisper_core PUBLIC
     tomlplusplus::tomlplusplus
     spdlog::spdlog
     nlohmann_json
+    cpp_httplib
     Threads::Threads
 )
 target_compile_definitions(autowhisper_core PUBLIC

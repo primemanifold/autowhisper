@@ -4,6 +4,7 @@
 #include "settings/assets.h"
 #include "platform/capabilities.h"
 #include "settings/handlers.h"
+#include "settings/server.h"
 #include "settings/sidecar.h"
 
 #include <httplib.h>
@@ -41,65 +42,10 @@ int cmd_config_ui(const std::string&, bool) {
 
 namespace {
 
-void register_api_routes(httplib::Server& srv, const std::string& config_path) {
-    srv.Get("/api/schema", [](const httplib::Request&, httplib::Response& res) {
-        res.set_content(schema::to_json().dump(), "application/json");
-    });
-    srv.Get("/api/defaults", [](const httplib::Request&, httplib::Response& res) {
-        res.set_content(settings::defaults_json().dump(), "application/json");
-    });
-    srv.Get("/api/platform", [](const httplib::Request&, httplib::Response& res) {
-        res.set_content(platform_capabilities_json(current_platform_capabilities()).dump(), "application/json");
-    });
-    srv.Get("/api/config", [config_path](const httplib::Request&, httplib::Response& res) {
-        try {
-            res.set_content(settings::get_config_json(config_path).dump(),
-                            "application/json");
-        } catch (const std::exception& e) {
-            res.status = 500;
-            res.set_content(nlohmann::json{{"error", e.what()}}.dump(),
-                            "application/json");
-        }
-    });
-    srv.Put("/api/config", [config_path](const httplib::Request& req, httplib::Response& res) {
-        nlohmann::json body;
-        try {
-            body = nlohmann::json::parse(req.body);
-        } catch (const std::exception& e) {
-            res.status = 400;
-            const auto message = std::string(e.what());
-            res.set_content(nlohmann::json{
-                                {"errors", {message}},
-                                {"issues", {settings::issue_to_json(ValidationIssue{
-                                                ValidationSeverity::Error,
-                                                "",
-                                                "json_parse_error",
-                                                message})}}}
-                                .dump(),
-                            "application/json");
-            return;
-        }
-        auto v = settings::validate_json(body);
-        if (!v.ok()) {
-            nlohmann::json issues = nlohmann::json::array();
-            for (const auto& issue : v.issues) {
-                issues.push_back(settings::issue_to_json(issue));
-            }
-            res.status = 400;
-            res.set_content(nlohmann::json{{"errors", v.errors}, {"issues", issues}}.dump(),
-                            "application/json");
-            return;
-        }
-        try {
-            settings::save_config_json(config_path, body);
-        } catch (const std::exception& e) {
-            res.status = 500;
-            res.set_content(nlohmann::json{{"error", e.what()}}.dump(),
-                            "application/json");
-            return;
-        }
-        res.status = 204;
-    });
+std::string settings_url(int port, const std::string& token) {
+    std::string url = "http://127.0.0.1:" + std::to_string(port) + "/";
+    if (!token.empty()) url += "?token=" + token;
+    return url;
 }
 
 std::string read_all(int fd) {
@@ -213,10 +159,10 @@ int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
             auto parsed = settings::parse_sidecar(read_all(fd));
             if (parsed.has_value()) {
                 if (parsed->canonical_path == canonical) {
-                    std::cout << "Settings UI already running at http://127.0.0.1:"
-                              << parsed->port << "\n";
+                    const std::string url = settings_url(parsed->port, parsed->token);
+                    std::cout << "Settings UI already running at " << url << "\n";
                     if (open_browser) {
-                        launch_browser("http://127.0.0.1:" + std::to_string(parsed->port));
+                        launch_browser(url);
                     }
                     ::close(fd);
                     return 0;
@@ -237,8 +183,10 @@ int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
         return 1;
     }
 
+    const std::string token = settings::generate_session_token();
+
     httplib::Server srv;
-    register_api_routes(srv, canonical);
+    settings::attach_api_routes(srv, canonical, token);
     srv.Get("/", [](const httplib::Request&, httplib::Response& res) {
         res.set_content(std::string(settings::assets::kIndexHtml), "text/html");
     });
@@ -271,17 +219,17 @@ int cmd_config_ui(const std::string& config_path_opt, bool open_browser) {
         if (g_server) g_server->stop();
     });
 
-    settings::SidecarContents contents{::getpid(), port, canonical};
+    settings::SidecarContents contents{::getpid(), port, canonical, token};
     write_full(fd, settings::format_sidecar(contents));
 
     ::setsid();
 
-    std::cout << "AutoWhisper Settings: http://127.0.0.1:" << port << "\n";
+    std::cout << "AutoWhisper Settings: " << settings_url(port, token) << "\n";
     std::cout << "Config file: " << canonical << "\n";
     std::cout << "Press Ctrl+C to close\n";
 
     if (open_browser) {
-        launch_browser("http://127.0.0.1:" + std::to_string(port));
+        launch_browser(settings_url(port, token));
     }
 
     srv.listen_after_bind();

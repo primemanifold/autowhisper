@@ -19,6 +19,9 @@ struct SidecarContents {
     int pid = 0;
     int port = 0;
     std::string canonical_path;
+    // Session token for the settings server API. Optional fourth line for
+    // backward compatibility with pre-token sidecars.
+    std::string token;
 };
 
 std::optional<SidecarContents> parse_sidecar(std::string_view raw);
