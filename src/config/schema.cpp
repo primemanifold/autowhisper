@@ -17,9 +17,11 @@ const std::vector<KeyDef>& table() {
         {"model", "size", Type::Enum,
             V{"tiny", "tiny.en", "base", "base.en", "small", "small.en",
               "medium", "medium.en", "large", "large-v1", "large-v2", "large-v3",
+              "large-v3-turbo",
               "distil-large-v2", "distil-large-v3", "distil-medium.en", "distil-small.en"},
             std::nullopt, std::nullopt,
-            "Whisper model variant. Smaller = faster, larger = more accurate."},
+            "Whisper model variant. Smaller = faster, larger = more accurate. "
+            "Models without '.en'/'distil' suffixes are multilingual."},
         {"model", "device", Type::Enum,
             V{"cuda", "cpu", "auto"},
             std::nullopt, std::nullopt,
@@ -32,7 +34,8 @@ const std::vector<KeyDef>& table() {
         {"model", "beam_size", Type::Int, V{}, 1.0, 10.0,
             "Beam search width. 1 = greedy."},
         {"model", "language", Type::String, V{}, std::nullopt, std::nullopt,
-            "ISO 639-1 language code (e.g. 'en')."},
+            "ISO 639-1 language code (e.g. 'en'), or 'auto' to detect the spoken "
+            "language (requires a multilingual model)."},
         {"model", "num_threads", Type::Int, V{}, 1.0, 256.0,
             "CPU threads for inference."},
 

@@ -1,6 +1,7 @@
 #include "config/config.h"
 
 #include "config/schema.h"
+#include "models/models.h"
 
 #include <spdlog/spdlog.h>
 #include <toml++/toml.hpp>
@@ -276,6 +277,19 @@ std::vector<ValidationIssue> Config::validate_all() const {
     }
     if (!is_allowed_enum("model", "compute_type", model.compute_type)) {
         add_error(issues, "model.compute_type", "invalid_enum", "Invalid compute_type: " + model.compute_type);
+    }
+
+    if (model.language == "auto" && model_is_english_only(model.size)) {
+        issues.push_back(make_issue(ValidationSeverity::Warning, "model.language",
+            "language_model_mismatch",
+            "language='auto' requires a multilingual model, but '" + model.size +
+            "' is English-only. Use e.g. 'large-v3-turbo', 'small', or 'base'."));
+    } else if (model.language != "en" && model.language != "auto" && !model.language.empty() &&
+               model_is_english_only(model.size)) {
+        issues.push_back(make_issue(ValidationSeverity::Warning, "model.language",
+            "language_model_mismatch",
+            "language='" + model.language + "' requires a multilingual model, but '" +
+            model.size + "' is English-only."));
     }
 
     if (model.beam_size <= 0 || model.beam_size > 10) {

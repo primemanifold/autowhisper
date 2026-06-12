@@ -56,6 +56,7 @@ set(CORE_LIB_SOURCES
     src/settings/sidecar.cpp
     src/tray/tray_common.cpp
     src/util/logging.cpp
+    src/util/sha256.cpp
     src/util/subprocess.cpp
 )
 
@@ -231,6 +232,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_schema.cpp
         tests/cpp/test_settings_handlers.cpp
         tests/cpp/test_settings_http.cpp
+        tests/cpp/test_sha256.cpp
         tests/cpp/test_sidecar.cpp
         tests/cpp/test_subprocess.cpp
         tests/cpp/test_tray_display.cpp

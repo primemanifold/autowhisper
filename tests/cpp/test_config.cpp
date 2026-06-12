@@ -284,6 +284,43 @@ TEST_CASE("Config::validate_all returns empty for valid defaults", "[config][val
     CHECK(cfg.validate_all().empty());
 }
 
+TEST_CASE("Config::validate_all warns on language/model mismatch", "[config][validate]") {
+    auto cfg = Config::default_config();
+
+    SECTION("auto language with English-only model warns") {
+        cfg.model.size = "distil-small.en";
+        cfg.model.language = "auto";
+        auto issues = cfg.validate_all();
+        REQUIRE(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+            return issue.severity == ValidationSeverity::Warning &&
+                   issue.path == "model.language" &&
+                   issue.code == "language_model_mismatch";
+        }));
+    }
+
+    SECTION("non-English language with English-only model warns") {
+        cfg.model.size = "tiny.en";
+        cfg.model.language = "de";
+        auto issues = cfg.validate_all();
+        REQUIRE(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+            return issue.severity == ValidationSeverity::Warning &&
+                   issue.code == "language_model_mismatch";
+        }));
+    }
+
+    SECTION("auto language with multilingual model is clean") {
+        cfg.model.size = "large-v3-turbo";
+        cfg.model.language = "auto";
+        CHECK(cfg.validate_all().empty());
+    }
+
+    SECTION("English language with English-only model is clean") {
+        cfg.model.size = "distil-small.en";
+        cfg.model.language = "en";
+        CHECK(cfg.validate_all().empty());
+    }
+}
+
 TEST_CASE("Config::validate rejects invalid numeric ranges", "[config][validate]") {
     auto cfg = Config::default_config();
 
