@@ -640,3 +640,33 @@ Next:
 - Verified a fresh public release download: checksum OK, plist and CLI version `0.7.1`, Gatekeeper accepted, clean-HOME first run exited `0`, and user config was created.
 - Release-event CI run `25238033133` completed success for build, build-source, and build-deb. Existing PPA workflow remains noisy/failing separately.
 - Updated public landing repo `primemanifold/autowhisper-landing` commit `968274c` so homepage and roadmap CTAs point to `v0.7.1`; GitHub Pages run `25238071749` passed and hosted homepage/roadmap returned HTTP 200 with `v0.7.1` content.
+
+## Run 2026-06-12 — Production plan ratified; M1 "Truth & foundations" executed
+
+Phase: M1 (production-readiness plan `docs/plans/2026-06-12-production-readiness-plan.md`, ratified as ADR-0008 with decisions D1–D7)
+
+Changed:
+- Production plan + Wispr Flow parity scorecard committed; `.hermes/roadmap.md` points at it.
+- Multilingual model catalog (tiny/base/small/medium/large-v3-turbo) with `language="auto"`; pinned SHA-256 (HF LFS oids) for every entry; downloads and cache hits verified, corrupt cache self-heals. Fixed broken distil-medium.en URL and wrong size claims. Inference resolves paths through the catalog.
+- Config validation warns on language/model mismatch (`language_model_mismatch`).
+- Settings server hardened: per-session bearer token (64-hex, OS entropy) on /api/*, loopback Host allowlist (DNS-rebinding defense), shared `settings::attach_api_routes` used by prod + tests, token in sidecar (backward compatible).
+- Float round-trip fix: configs write `0.3` not `0.30000001192092896` (toml++ float charconv enabled off-Apple; relaxed precision on Apple).
+- X11 listener rewritten to canonical sync XRecordEnableContext + retried XRecordDisableContext nudge; bounded 5s stop with detach-and-leak last resort; chaining X IO error handler so a dead listener connection kills only that thread, not the daemon. Resume-deadlock doc closed.
+- CI matrix: linux (with xvfb), macos-14, windows-cross (MinGW PE32+), windows-msvc (experimental, continue-on-error); triggers on claude/** branches.
+- Benchmark harness `autowhisper_bench` (latency/RTF/WER, JSON output) + WER scorer with unit tests + nightly bench workflow; README claims replaced with measured numbers.
+
+Verification:
+- GREEN: 145/145 ctest on Linux (was 110), incl. new Xvfb+XTest integration tests for the hotkey listener; 0/30 flake reruns after the sync-enable rewrite.
+- GREEN: 27/27 static tests.
+- GREEN: real end-to-end: 75MB tiny.en download with SHA-256 verify, corrupt-cache self-heal re-download, bench run (jfk.wav: 0.79s/11s audio, RTF 0.072, WER 0, 4 threads on 2.8GHz Xeon vCPU).
+- GREEN: MinGW Windows cross-build of autowhisper.exe + autowhisper_tests.exe with all new code.
+- PENDING: GitHub Actions matrix on claude/magical-davinci-3cbk27 (macos/windows runners).
+
+Boundaries:
+- macOS launchd autostart wiring, .icns, Sparkle/DMG/Homebrew remain open M1/W3 items: they need a macOS host for honest verification (this container is Linux).
+- windows-msvc CI job is experimental; MSVC-isms (e.g. ::getpid in test fixtures) are M2 scope.
+- Benchmark numbers published are CPU smoke-fixture numbers; corpus-grade WER and GPU numbers need the M1 bench run on real hardware.
+
+Next:
+- Watch CI matrix to green; fix macos job if AppleClang complains.
+- M1 leftovers on a macOS host; then M2 (Windows port) and M4 (intelligence layer) per plan.
