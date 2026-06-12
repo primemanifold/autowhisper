@@ -11,6 +11,23 @@
 #include <thread>
 #include <unistd.h>
 
+#if defined(_WIN32)
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
+namespace {
+int test_process_id() {
+#if defined(_WIN32)
+    return _getpid();
+#else
+    return ::getpid();
+#endif
+}
+}  // namespace
+
+
 namespace fs = std::filesystem;
 using namespace autowhisper;
 
@@ -22,7 +39,7 @@ struct TempLogPath {
     explicit TempLogPath(const std::string& suffix) {
         path = fs::temp_directory_path() /
                ("autowhisper_logtest_" +
-                std::to_string(::getpid()) + "_" +
+                std::to_string(test_process_id()) + "_" +
                 std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id())) +
                 "_" + suffix);
     }

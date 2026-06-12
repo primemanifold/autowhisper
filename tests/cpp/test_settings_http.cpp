@@ -15,6 +15,23 @@
 #include <set>
 #include <thread>
 
+#if defined(_WIN32)
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
+namespace {
+int test_process_id() {
+#if defined(_WIN32)
+    return _getpid();
+#else
+    return ::getpid();
+#endif
+}
+}  // namespace
+
+
 namespace fs = std::filesystem;
 using namespace autowhisper;
 
@@ -59,7 +76,7 @@ struct TempDir {
         if (ec || !fs::is_directory(base)) {
             base = fs::path("/tmp");
         }
-        path = base / ("aw_http_" + std::to_string(::getpid()) + "_" +
+        path = base / ("aw_http_" + std::to_string(test_process_id()) + "_" +
             std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id())));
         fs::create_directories(path);
     }

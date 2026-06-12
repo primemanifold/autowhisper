@@ -13,6 +13,9 @@
 #ifndef W_OK
 #define W_OK 2
 #endif
+#ifndef S_ISDIR
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#endif
 #define access _access
 #define getpid _getpid
 #else
