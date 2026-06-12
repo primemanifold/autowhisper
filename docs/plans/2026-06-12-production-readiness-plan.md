@@ -316,14 +316,19 @@ agents; parallelize where workstreams are independent).
 
 ### M1 — v0.8 "Truth & foundations" (S+M)
 Exit criteria:
-- [ ] X11 hotkey resume deadlock fixed with regression test (W2).
-- [ ] Multilingual models in catalog + `language = "auto"` detect (G2).
-- [ ] Benchmark harness (`bench/`) producing WER + latency; README table replaced
-      with measured numbers (G2).
-- [ ] CI matrix: macOS and Windows build+test jobs green alongside Linux (W7).
-- [ ] macOS: launchd autostart wired, `.icns`, settings float-precision fix
-      (`TODOS.md` items).
-- [ ] Settings server bearer-token hardening + model SHA-256 verification (W6).
+- [x] X11 hotkey resume deadlock fixed with regression test (W2) — listener
+      rewritten to canonical sync XRecord pattern; Xvfb+XTest integration tests.
+- [x] Multilingual models in catalog + `language = "auto"` detect (G2) — plus
+      SHA-256-pinned downloads and a language/model mismatch warning.
+- [x] Benchmark harness (`bench/`) producing WER + latency; README table replaced
+      with measured numbers (G2) — nightly bench workflow added.
+- [~] CI matrix: macOS and Windows build+test jobs green alongside Linux (W7) —
+      jobs added (linux+xvfb, macos-14, windows-cross MinGW, windows-msvc
+      experimental); first MSVC findings already fixed (S_ISDIR, getpid).
+- [ ] macOS: launchd autostart wired, `.icns` (`TODOS.md` items) — needs a
+      macOS host for honest runtime verification; float-precision fix done.
+- [x] Settings server bearer-token hardening + model SHA-256 verification (W6) —
+      plus loopback-Host DNS-rebinding defense.
 
 ### M2 — v0.9 "Windows is real" (L)
 Exit criteria:
