@@ -46,6 +46,19 @@ jobs:
       - name: Run tests
         run: cd build && ctest --output-on-failure
 
+      - name: Package binary
+        run: |
+          strip build/autowhisper
+          mkdir -p out && cp build/autowhisper out/
+          cp docs/INSTALL-UNSIGNED.md out/README-FIRST.md
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autowhisper-linux-x86_64
+          path: out/
+          retention-days: 30
+
   macos:
     runs-on: macos-14
     steps:
@@ -64,6 +77,21 @@ jobs:
 
       - name: Run tests
         run: cd build && ctest --output-on-failure
+
+      - name: Package binary (unsigned)
+        run: |
+          mkdir -p out && cp build/autowhisper out/
+          if [ -d build/AutoWhisper.app ]; then
+            ditto -c -k --keepParent build/AutoWhisper.app out/AutoWhisper-app-unsigned.zip
+          fi
+          cp docs/INSTALL-UNSIGNED.md out/README-FIRST.md
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autowhisper-macos-universal-unsigned
+          path: out/
+          retention-days: 30
 
   # Compile-drift guard for the Windows port: cross-builds PE32+ binaries with
   # the same MinGW toolchain as the docker smoke. Runtime tests run on real
@@ -94,11 +122,24 @@ jobs:
           file build-win/autowhisper.exe | grep "PE32+"
           file build-win/autowhisper_tests.exe | grep "PE32+"
 
-  # Experimental until the Windows port milestone (M2): MSVC build + native
-  # test run on real Windows. Failures do not block merges yet.
+      - name: Package binary
+        run: |
+          x86_64-w64-mingw32-strip build-win/autowhisper.exe
+          mkdir -p out && cp build-win/autowhisper.exe out/
+          cp docs/INSTALL-UNSIGNED.md out/README-FIRST.md
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autowhisper-windows-x86_64
+          path: out/
+          retention-days: 30
+
+  # MSVC build is required (it produces the native Windows artifact). The
+  # native test run stays visible but non-blocking until the M2 Windows
+  # port makes it green.
   windows-msvc:
     runs-on: windows-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -110,8 +151,23 @@ jobs:
       - name: Build
         run: cmake --build build --config Release -j 4
 
-      - name: Run tests
+      - name: Run tests (non-blocking until M2)
+        continue-on-error: true
         run: cd build && ctest -C Release --output-on-failure
+
+      - name: Package binary
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item build/Release/autowhisper.exe out/
+          Copy-Item docs/INSTALL-UNSIGNED.md out/README-FIRST.md
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: autowhisper-windows-x86_64-msvc
+          path: out/
+          retention-days: 30
 
   build-deb:
     runs-on: ubuntu-24.04

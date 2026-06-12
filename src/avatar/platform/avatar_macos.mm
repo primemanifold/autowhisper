@@ -31,7 +31,7 @@ struct AvatarManager::Impl {
         CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
         CGContextRef ctx = CGBitmapContextCreate(
             buf.data(), size, size, 8, size_t(size) * 4, space,
-            kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Little);
+            CGBitmapInfo(kCGImageAlphaPremultipliedFirst) | CGBitmapInfo(kCGBitmapByteOrder32Little));
         CGImageRef image = ctx ? CGBitmapContextCreateImage(ctx) : nullptr;
         if (image) {
             panel.contentView.layer.contents = (__bridge id)image;
@@ -60,7 +60,7 @@ struct AvatarManager::Impl {
         panel.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
                                    NSWindowCollectionBehaviorStationary;
         panel.contentView.wantsLayer = YES;
-        panel.contentView.layer.contentsGravity = kCAGravityResize;
+        panel.contentView.layer.contentsGravity = @"resize";  // avoids needing the QuartzCore kCAGravityResize symbol
 
         buf.assign(size_t(size) * size, 0);
         frame();

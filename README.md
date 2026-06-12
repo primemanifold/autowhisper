@@ -43,6 +43,12 @@ Enable with `[avatar] enabled = true`; forms: `echo`, `hermes`,
 
 ## Install
 
+**Just want a file that runs?** Grab a binary from the latest green
+[Actions run](https://github.com/primemanifold/autowhisper/actions) (or
+`dist/` on the current feature branch) and follow
+[docs/INSTALL-UNSIGNED.md](docs/INSTALL-UNSIGNED.md) — it covers the
+unsigned-binary prompts on Windows/macOS and the first model download.
+
 ```bash
 sudo add-apt-repository ppa:primemanifold/autowhisper
 sudo apt update

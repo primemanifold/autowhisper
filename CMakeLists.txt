@@ -19,6 +19,10 @@ if(APPLE)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
+if(MSVC)
+    # Self-contained exe: no VC++ redistributable required on user machines.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -104,6 +108,7 @@ if(WIN32)
     target_compile_definitions(autowhisper_core PUBLIC
         NOMINMAX
         _CRT_SECURE_NO_WARNINGS
+        _USE_MATH_DEFINES
     )
 endif()
 autowhisper_set_warnings(autowhisper_core)
@@ -221,6 +226,7 @@ elseif(APPLE)
     find_library(COREMEDIA_FRAMEWORK CoreMedia)
     find_library(METAL_FRAMEWORK    Metal)
     find_library(IOKIT_FRAMEWORK    IOKit)
+    find_library(QUARTZCORE_FRAMEWORK QuartzCore)
     target_link_libraries(autowhisper PRIVATE
         ${COCOA_FRAMEWORK}
         ${APPKIT_FRAMEWORK}
@@ -232,6 +238,7 @@ elseif(APPLE)
         ${COREMEDIA_FRAMEWORK}
         ${METAL_FRAMEWORK}
         ${IOKIT_FRAMEWORK}
+        ${QUARTZCORE_FRAMEWORK}
     )
 elseif(WIN32)
     target_link_libraries(autowhisper PRIVATE ws2_32 ole32 uuid shell32 user32)

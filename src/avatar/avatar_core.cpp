@@ -6,6 +6,9 @@
 
 namespace autowhisper {
 
+// MSVC hides the POSIX math constants behind a feature macro; carry our own.
+namespace { constexpr double kTau = 6.283185307179586; }
+
 // ---- The pantheon ----------------------------------------------------------
 // Echo: repeats your words — the default scribe-spirit. Hermes: the herald,
 // quick, message-blue. Mnemosyne: memory, unhurried amber.
@@ -157,7 +160,7 @@ void avatar_rasterize(uint32_t* buf, int size, const AvatarCharacter& ch,
     // scribe holds still).
     float bob = (state == AvatarState::Writing)
                     ? 0.f
-                    : float(std::sin(tt * 2.0 * M_PI / 3.2)) * S * .022f;
+                    : float(std::sin(tt * kTau / 3.2)) * S * .022f;
     // Writing shifts the orb up to make room for the written line.
     float cy = S * (state == AvatarState::Writing ? .40f : .46f) + bob;
     const float R = S * .175f;       // core ring radius
@@ -166,7 +169,7 @@ void avatar_rasterize(uint32_t* buf, int size, const AvatarCharacter& ch,
     // --- aura ---
     switch (state) {
         case AvatarState::Idle: {
-            float br = .10f + .04f * float(std::sin(tt * 2.0 * M_PI / 3.2));
+            float br = .10f + .04f * float(std::sin(tt * kTau / 3.2));
             glow(buf, size, cx, cy, S * .34f, kInk, br);
             break;
         }
@@ -184,7 +187,7 @@ void avatar_rasterize(uint32_t* buf, int size, const AvatarCharacter& ch,
             break;
         }
         case AvatarState::Thinking: {
-            float br = .22f + .08f * float(std::sin(tt * 2.0 * M_PI / 1.6));
+            float br = .22f + .08f * float(std::sin(tt * kTau / 1.6));
             glow(buf, size, cx, cy, S * .32f, accent, br);
             break;
         }
@@ -193,7 +196,7 @@ void avatar_rasterize(uint32_t* buf, int size, const AvatarCharacter& ch,
             break;
         case AvatarState::Ambient: {
             // shimmer between ink and accent while something else plays
-            float m = .5f + .5f * float(std::sin(tt * 2.0 * M_PI / 5.0));
+            float m = .5f + .5f * float(std::sin(tt * kTau / 5.0));
             Col mix{kInk.r + (accent.r - kInk.r) * m * .6f,
                     kInk.g + (accent.g - kInk.g) * m * .6f,
                     kInk.b + (accent.b - kInk.b) * m * .6f};
@@ -223,7 +226,7 @@ void avatar_rasterize(uint32_t* buf, int size, const AvatarCharacter& ch,
         // inner mote rises with voice level
         disc(buf, size, cx, cy, R * (.30f + .25f * level), accent, .85f);
     } else if (state == AvatarState::Thinking) {
-        double ang = tt * 2.0 * M_PI / 1.1;
+        double ang = tt * kTau / 1.1;
         float ox = cx + std::cos(float(ang)) * (R * 1.55f);
         float oy = cy + std::sin(float(ang)) * (R * 1.55f);
         disc(buf, size, ox, oy, S * .030f, accent, .9f);
@@ -246,7 +249,7 @@ void avatar_rasterize(uint32_t* buf, int size, const AvatarCharacter& ch,
         }
     } else if (state == AvatarState::Ambient) {
         // two soft notes drifting beside the orb
-        float dy = float(std::sin(tt * 2.0 * M_PI / 2.6)) * S * .02f;
+        float dy = float(std::sin(tt * kTau / 2.6)) * S * .02f;
         disc(buf, size, cx - R * 2.1f, cy + dy, S * .018f, kInk, .35f);
         disc(buf, size, cx + R * 2.1f, cy - dy, S * .018f, kInk, .35f);
     }
