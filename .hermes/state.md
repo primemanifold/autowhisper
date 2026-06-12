@@ -702,3 +702,26 @@ Next:
 - Gates: 178/178 ctest, static suites, MinGW self-contained build, binary
   --version = 0.8.0. Post-merge: tag v0.8.0 on core, publish release with
   CI artifacts (mac signing/notarization on a Mac per docs/MACOS.md).
+
+## Run 2026-06-12 (night) — design system pass 2: one token source, appearance themes, dev mode
+
+- Settings UI tokens collapsed to a single block via `light-dark()` —
+  light and dark resolve from one source of truth through `color-scheme`,
+  so the schemes can no longer drift. Radius/shadow promoted to themable
+  tokens (`--aw-radius-pill`, `--aw-shadow-1`).
+- New appearance switcher in the sidebar (Auto / Light / Dark / Dev),
+  persisted in localStorage (`aw-theme`), applied pre-paint by an inline
+  head script (no theme flash). "Dev" is a phosphor-terminal theme — CRT
+  green palette, mono type, square corners, hard offset shadows, static
+  scanlines — implemented purely as a token-override layer on
+  `html[data-theme="dev"]`; zero component or layout changes.
+- Numbered-navigation remnants removed (hidden nav spans, kicker numbers),
+  finishing the earlier refactor's stated intent.
+- Landing site css renamed onto the `--aw-` vocabulary (same light-dark()
+  pattern); mobile comps now use `--aw-ink/line/signal` tokens with the
+  halo derived from `--aw-signal` via color-mix.
+- Tray icons redrawn as geometric state glyphs (grey ring idle, red disc
+  recording, amber open arc processing, red ring + bang error) in
+  token-approximate sRGB; replaces Tailwind-palette circles with
+  SVG-text masks that tray renderers could rasterize wrong.
+- design/design-system.md documents the token architecture and themes.

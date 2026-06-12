@@ -42,6 +42,15 @@ for status. Primary actions are ink-on-paper pills (black in light mode,
 white in dark). Decorative gradients, numbered navigation, and uppercase
 mono labels outside technical readouts were removed.
 
+Second pass, same day: light and dark collapsed into a single token block
+via `light-dark()` (one source of truth per token; `color-scheme` decides),
+and the landing site (`site/styles.css`) and mobile comps
+(`design/mobile/*.html`) now speak the same `--aw-` vocabulary. Tray icons
+(`icons/*.svg`) were redrawn as geometric state glyphs — grey ring at rest,
+solid red disc while recording, amber open arc while processing, red ring
+with a bang on error — using sRGB approximations of the tokens, because
+tray renderers cannot be assumed to support `oklch()`.
+
 Core roles:
 
 - `--aw-paper-0` through `--aw-paper-3`: canvas and surface stack
@@ -51,6 +60,30 @@ Core roles:
 - `--aw-ok`, `--aw-warn`, `--aw-err`, `--aw-info`: functional states
 - `--aw-focus-ring`: keyboard focus affordance
 - `--aw-font-sans`, `--aw-font-mono`: UI and technical readouts
+- `--aw-radius-1/2/3`, `--aw-radius-pill`: corner system (themable)
+- `--aw-shadow-1`: the single elevation shadow (themable)
+
+## Appearance themes
+
+The settings UI ships four appearances, switched from the sidebar and
+persisted in `localStorage` (`aw-theme`), applied as
+`html[data-theme="light|dark|dev"]` (absent = follow the OS):
+
+1. **Auto** — `color-scheme: light dark`; the OS preference decides.
+2. **Light / Dark** — force one scheme; same tokens, resolved by
+   `color-scheme`, so the two can never drift.
+3. **Dev** — the opt-in phosphor-terminal theme: green-on-black CRT
+   palette (low-chroma green papers, phosphor-green ink ramp), mono type
+   everywhere, square corners (`--aw-radius-* : 0`), hard offset shadows,
+   static scanlines, and a faint glow on the page title. It is a pure
+   token-override layer: no component, layout, or hierarchy changes, and
+   color still carries meaning only (red records/errs, amber warns).
+   Focus moves to amber so it stays visible on the green field.
+
+`index.html` applies the stored choice in an inline head script before
+first paint to avoid a theme flash. `light-dark()` and `data-theme`
+require a 2024-baseline browser; the settings page opens in the user's
+default browser, which the local sidecar already assumes is current.
 
 ## Information architecture
 
@@ -81,6 +114,7 @@ Implemented in the first slice:
 - text, number, and select controls
 - advisory note
 - responsive mobile layout
+- appearance switcher (Auto / Light / Dark / Dev)
 
 Still needed:
 

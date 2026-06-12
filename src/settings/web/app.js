@@ -5,9 +5,40 @@
   const resetBtn = document.getElementById("reset-btn");
   const dirtyPill = document.getElementById("dirty-pill");
   const sectionTitle = document.getElementById("active-section-title");
-  const sectionKicker = document.getElementById("active-section-kicker");
   const sectionLede = document.getElementById("active-section-lede");
   const nav = document.getElementById("settings-nav");
+  const themeSwitch = document.getElementById("theme-switch");
+
+  // Appearance: "system" follows the OS, "light"/"dark" force a scheme,
+  // "dev" is the phosphor-terminal theme. index.html applies the stored
+  // choice before first paint; this block keeps the switcher in sync.
+  const THEME_KEY = "aw-theme";
+  function applyTheme(choice) {
+    if (choice === "system") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = choice;
+    themeSwitch?.querySelectorAll("[data-theme-choice]").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.themeChoice === choice));
+    });
+  }
+  function storedTheme() {
+    try {
+      const value = localStorage.getItem(THEME_KEY);
+      return ["light", "dark", "dev"].includes(value) ? value : "system";
+    } catch (_) {
+      return "system";
+    }
+  }
+  applyTheme(storedTheme());
+  themeSwitch?.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-theme-choice]");
+    if (!button) return;
+    const choice = button.dataset.themeChoice;
+    applyTheme(choice);
+    try {
+      if (choice === "system") localStorage.removeItem(THEME_KEY);
+      else localStorage.setItem(THEME_KEY, choice);
+    } catch (_) {}
+  });
 
   // Session token issued by the local settings server. It arrives once via
   // the launch URL; keep it in sessionStorage so same-tab reloads work, and
@@ -22,35 +53,30 @@
   const IA_SECTIONS = [
     {
       id: "dictation",
-      number: "01",
       title: "Dictation behavior",
       lede: "Choose how AutoWhisper listens, cancels, and gets out of your way.",
       sections: ["hotkeys"],
     },
     {
       id: "model",
-      number: "02",
       title: "Model & performance",
       lede: "Pick the local Whisper model, hardware target, precision, language, and CPU thread budget.",
       sections: ["model"],
     },
     {
       id: "audio",
-      number: "03",
       title: "Audio input",
       lede: "Set the microphone path and capture behavior before the model ever sees audio.",
       sections: ["audio"],
     },
     {
       id: "output",
-      number: "04",
       title: "Output & insertion",
       lede: "Control how text reaches the current app, how transcripts are cleaned up, and what fallback behavior is allowed.",
       sections: ["output", "formatting"],
     },
     {
       id: "privacy",
-      number: "05",
       title: "Privacy",
       lede: "AutoWhisper runs locally. This panel should become the place where that is proven, not merely promised.",
       sections: [],
@@ -58,21 +84,18 @@
     },
     {
       id: "feedback",
-      number: "06",
       title: "Feedback & tray",
       lede: "Tones, tray visibility, and the floating companion that listens and writes with you.",
       sections: ["feedback", "tray", "avatar"],
     },
     {
       id: "diagnostics",
-      number: "07",
       title: "Diagnostics",
       lede: "Keep logs and daemon settings legible so failures lead to action instead of guesswork.",
       sections: ["daemon"],
     },
     {
       id: "advanced",
-      number: "08",
       title: "Advanced",
       lede: "All schema-backed settings in their raw sections for operators who want the full config surface.",
       sections: "all",
@@ -396,7 +419,6 @@
       if (window.location.hash !== nextHash) history.replaceState(null, "", nextHash);
     }
     sectionTitle.textContent = pane.title;
-    sectionKicker.textContent = `${pane.number} · Settings`;
     sectionLede.textContent = pane.lede;
   }
 

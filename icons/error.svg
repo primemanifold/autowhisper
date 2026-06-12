@@ -1,9 +1,7 @@
+<!-- Tray: error. Red ring with an exclamation bang, distinct from the
+     solid recording disc at a glance (aw-err token, sRGB approximation). -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <defs>
-    <mask id="m">
-      <circle cx="64" cy="64" r="56" fill="white"/>
-      <text x="64" y="84" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="black" text-anchor="middle">A</text>
-    </mask>
-  </defs>
-  <circle cx="64" cy="64" r="56" fill="#ef4444" mask="url(#m)"/>
+  <circle cx="64" cy="64" r="46" fill="none" stroke="#ba3c2d" stroke-width="13"/>
+  <rect x="58" y="36" width="12" height="38" rx="6" fill="#ba3c2d"/>
+  <circle cx="64" cy="90" r="8" fill="#ba3c2d"/>
 </svg>

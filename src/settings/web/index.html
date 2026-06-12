@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AutoWhisper Settings</title>
   <link rel="stylesheet" href="/style.css">
+  <script>
+    // Apply the stored appearance before first paint to avoid a theme flash.
+    try {
+      var awTheme = localStorage.getItem("aw-theme");
+      if (awTheme && awTheme !== "system") document.documentElement.dataset.theme = awTheme;
+    } catch (_) {}
+  </script>
 </head>
 <body>
   <div class="aw-shell">
@@ -18,15 +25,25 @@
       </div>
 
       <nav id="settings-nav" class="aw-nav">
-        <button type="button" class="aw-nav-item is-active" data-target="dictation"><span>01</span>Dictation behavior</button>
-        <button type="button" class="aw-nav-item" data-target="model" aria-label="Model & performance"><span>02</span>Model &amp; performance</button>
-        <button type="button" class="aw-nav-item" data-target="audio"><span>03</span>Audio input</button>
-        <button type="button" class="aw-nav-item" data-target="output" aria-label="Output & insertion"><span>04</span>Output &amp; insertion</button>
-        <button type="button" class="aw-nav-item" data-target="privacy"><span>05</span>Privacy</button>
-        <button type="button" class="aw-nav-item" data-target="feedback" aria-label="Feedback & tray"><span>06</span>Feedback &amp; tray</button>
-        <button type="button" class="aw-nav-item" data-target="diagnostics"><span>07</span>Diagnostics</button>
-        <button type="button" class="aw-nav-item" data-target="advanced"><span>08</span>Advanced</button>
+        <button type="button" class="aw-nav-item is-active" data-target="dictation">Dictation behavior</button>
+        <button type="button" class="aw-nav-item" data-target="model" aria-label="Model & performance">Model &amp; performance</button>
+        <button type="button" class="aw-nav-item" data-target="audio">Audio input</button>
+        <button type="button" class="aw-nav-item" data-target="output" aria-label="Output & insertion">Output &amp; insertion</button>
+        <button type="button" class="aw-nav-item" data-target="privacy">Privacy</button>
+        <button type="button" class="aw-nav-item" data-target="feedback" aria-label="Feedback & tray">Feedback &amp; tray</button>
+        <button type="button" class="aw-nav-item" data-target="diagnostics">Diagnostics</button>
+        <button type="button" class="aw-nav-item" data-target="advanced">Advanced</button>
       </nav>
+
+      <div id="theme-switch" class="aw-theme" role="group" aria-label="Appearance">
+        <div class="aw-eyebrow">Appearance</div>
+        <div class="aw-theme-options">
+          <button type="button" class="aw-theme-option" data-theme-choice="system" aria-pressed="true">Auto</button>
+          <button type="button" class="aw-theme-option" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="aw-theme-option" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          <button type="button" class="aw-theme-option" data-theme-choice="dev" aria-pressed="false">Dev</button>
+        </div>
+      </div>
 
       <div class="aw-sidebar-status" aria-label="Runtime summary">
         <span class="aw-dot aw-dot-ok" aria-hidden="true"></span>
@@ -37,7 +54,7 @@
     <main class="aw-main">
       <header class="aw-topbar">
         <div>
-          <p class="aw-eyebrow" id="active-section-kicker">01 · Settings</p>
+          <p class="aw-eyebrow" id="active-section-kicker">Settings</p>
           <h1 id="active-section-title">Dictation behavior</h1>
           <p id="active-section-lede">Choose how AutoWhisper listens, cancels, and gets out of your way.</p>
         </div>

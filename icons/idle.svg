@@ -1,9 +1,7 @@
+<!-- Tray: idle. Quiet grey ring (calm at rest, per design/design-system.md).
+     Colors are sRGB approximations of the aw tokens, because tray renderers
+     cannot be assumed to support oklch(). The ink-3 grey reads on light and
+     dark panels alike. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <defs>
-    <mask id="m">
-      <circle cx="64" cy="64" r="56" fill="white"/>
-      <text x="64" y="84" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="black" text-anchor="middle">A</text>
-    </mask>
-  </defs>
-  <circle cx="64" cy="64" r="56" fill="#4ade80" mask="url(#m)"/>
+  <circle cx="64" cy="64" r="46" fill="none" stroke="#878787" stroke-width="13"/>
 </svg>

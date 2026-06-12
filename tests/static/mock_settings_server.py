@@ -41,6 +41,17 @@ CONFIG = {
     "daemon": {"log_level": "info"},
     "tray": {"enabled": True},
 }
+PLATFORM = {
+    "platform": "linux",
+    "build_target": "linux",
+    "summary": "Mock platform readiness for settings UI development.",
+    "features": [
+        {"id": "hotkeys", "name": "Global hotkeys", "state": "ready", "detail": "X11 push-to-talk verified."},
+        {"id": "output", "name": "Text insertion", "state": "ready", "detail": "XTest injection with clipboard fallback."},
+        {"id": "tray", "name": "Tray icon", "state": "partial", "detail": "AppIndicator when available."},
+        {"id": "wayland", "name": "Wayland", "state": "unsupported", "detail": "X11 only for now."},
+    ],
+}
 
 class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
@@ -51,6 +62,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(SCHEMA)
         if self.path in ("/api/config", "/api/defaults"):
             return self.send_json(CONFIG)
+        if self.path == "/api/platform":
+            return self.send_json(PLATFORM)
         return super().do_GET()
 
     def do_PUT(self):
