@@ -127,4 +127,9 @@ std::string resolve_config_path();
 // copy the bundled/default config when available, otherwise write defaults.
 std::string ensure_user_config_file();
 
+// The shortest double whose decimal form round-trips the float exactly.
+// Used wherever config floats are serialized (TOML, settings JSON) so
+// 0.05f surfaces as 0.05, never 0.05000000074505806.
+double shortest_double(float v);
+
 } // namespace autowhisper

@@ -43,9 +43,9 @@ nlohmann::json config_to_json(const Config& c) {
         {"device", c.audio.device.value_or("")},
         {"output_device", c.audio.output_device.value_or("")},
         {"vad_enabled", c.audio.vad_enabled},
-        {"vad_threshold", c.audio.vad_threshold},
-        {"silence_duration", c.audio.silence_duration},
-        {"max_duration", c.audio.max_duration},
+        {"vad_threshold", shortest_double(c.audio.vad_threshold)},
+        {"silence_duration", shortest_double(c.audio.silence_duration)},
+        {"max_duration", shortest_double(c.audio.max_duration)},
         {"mute_other_apps", c.audio.mute_other_apps},
     };
 
@@ -59,7 +59,7 @@ nlohmann::json config_to_json(const Config& c) {
     j["output"] = {
         {"method", c.output.method},
         {"auto_paste", c.output.auto_paste},
-        {"paste_delay", c.output.paste_delay},
+        {"paste_delay", shortest_double(c.output.paste_delay)},
         {"ending_action", c.output.ending_action},
         {"lowercase", c.output.lowercase},
         {"also_copy_to_clipboard", c.output.also_copy_to_clipboard},
@@ -76,8 +76,8 @@ nlohmann::json config_to_json(const Config& c) {
         {"frequency_start", c.feedback.frequency_start},
         {"frequency_stop", c.feedback.frequency_stop},
         {"frequency_error", c.feedback.frequency_error},
-        {"duration", c.feedback.duration},
-        {"volume", c.feedback.volume},
+        {"duration", shortest_double(c.feedback.duration)},
+        {"volume", shortest_double(c.feedback.volume)},
     };
 
     j["daemon"] = {

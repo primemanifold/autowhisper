@@ -26,4 +26,11 @@ function(autowhisper_embed_web_assets OUT_DIR)
 
     file(WRITE "${OUT_DIR}/assets.h"
          "#pragma once\n#include \"index_html.h\"\n#include \"style_css.h\"\n#include \"app_js.h\"\n")
+
+    # The embed above runs at configure time only. Re-run cmake when any web
+    # asset changes so a plain `cmake --build` never ships a stale UI.
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/settings/web/index.html
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/settings/web/style.css
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/settings/web/app.js)
 endfunction()
