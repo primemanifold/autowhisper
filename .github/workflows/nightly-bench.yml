@@ -1,0 +1,61 @@
+name: Nightly bench
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  bench-cpu:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            cmake \
+            g++ \
+            pkg-config \
+            libx11-dev \
+            libxtst-dev \
+            libxext-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            libpulse-dev
+
+      - name: Configure
+        run: >
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          -DAUTOWHISPER_ENABLE_TESTS=OFF -DAUTOWHISPER_ENABLE_BENCH=ON
+
+      - name: Build
+        run: cmake --build build -j$(nproc) --target autowhisper_bench autowhisper
+
+      - name: Download models
+        run: |
+          ./build/autowhisper model download tiny.en
+          ./build/autowhisper model download distil-small.en
+
+      - name: Bench tiny.en
+        run: >
+          ./build/autowhisper_bench --manifest bench/manifest.tsv
+          --model tiny.en --device cpu --threads 4 --json bench-tiny.en.json
+
+      - name: Bench distil-small.en
+        run: >
+          ./build/autowhisper_bench --manifest bench/manifest.tsv
+          --model distil-small.en --device cpu --threads 4
+          --json bench-distil-small.en.json
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results-${{ github.run_id }}
+          path: bench-*.json
+          retention-days: 90

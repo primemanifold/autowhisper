@@ -25,9 +25,10 @@ Press `Shift+Super`, speak, release. Text appears at your cursor.
 
 ```bash
 autowhisper doctor              # diagnose system
-autowhisper config              # open settings GUI
+autowhisper config ui           # open settings UI in the browser
+autowhisper config edit         # edit config.toml in $EDITOR
 autowhisper model list          # show available models
-autowhisper model download <name>  # download a model
+autowhisper model download <name>  # download a model (SHA-256 verified)
 autowhisper run                 # run in foreground
 ```
 
@@ -108,11 +109,31 @@ ending_action = "none"    # none, newline, or return_key
 
 ## Models
 
-| Model | Speed | Accuracy |
-|-------|-------|----------|
-| tiny.en | 78ms | Good |
-| distil-small.en | 198ms | Very Good |
-| distil-large-v3 | 448ms | Best |
+| Model | Size | Languages | Accuracy |
+|-------|------|-----------|----------|
+| tiny.en / tiny | ~78MB | English / 100+ | Good |
+| base.en / base | ~148MB | English / 100+ | Better |
+| distil-small.en | ~336MB | English | Very good (recommended) |
+| small.en / small | ~488MB | English / 100+ | Very good |
+| distil-large-v3 | ~1.5GB | English | Best English |
+| large-v3-turbo | ~1.6GB | 100+ | Best multilingual speed/accuracy |
+| large-v3 | ~3.1GB | 100+ | Maximum |
+
+Speed depends on your hardware. Measure it yourself with the benchmark
+harness (`bench/README.md`); for reference, `tiny.en` transcribes 11s of
+audio in ~0.8s with 4 threads on a 2.8GHz Xeon vCPU (RTF 0.07), with zero
+word errors on the smoke fixture.
+
+### Languages
+
+Models without an `.en`/`distil` suffix support 100+ languages. Set the
+language explicitly or let Whisper detect it:
+
+```toml
+[model]
+size = "large-v3-turbo"
+language = "auto"   # or an ISO 639-1 code like "de", "es", "zh"
+```
 
 ## Troubleshooting
 

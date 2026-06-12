@@ -33,6 +33,7 @@ endif()
 # Options
 option(AUTOWHISPER_ENABLE_CUDA "Enable CUDA support via whisper.cpp" OFF)
 option(AUTOWHISPER_ENABLE_TESTS "Build tests" ON)
+option(AUTOWHISPER_ENABLE_BENCH "Build the benchmark harness" OFF)
 
 # Include our CMake modules
 include(cmake/CompilerWarnings.cmake)
@@ -55,6 +56,7 @@ set(CORE_LIB_SOURCES
     src/settings/handlers.cpp
     src/settings/server.cpp
     src/settings/sidecar.cpp
+    src/bench/wer.cpp
     src/tray/tray_common.cpp
     src/util/logging.cpp
     src/util/sha256.cpp
@@ -221,6 +223,28 @@ endif()
 # Apply compiler warnings
 autowhisper_set_warnings(autowhisper)
 
+# Benchmark harness (latency/RTF/WER source of truth; see bench/README.md)
+if(AUTOWHISPER_ENABLE_BENCH)
+    add_executable(autowhisper_bench
+        tools/bench/bench_main.cpp
+        src/inference/inference.cpp
+    )
+    target_link_libraries(autowhisper_bench PRIVATE
+        autowhisper_core
+        whisper
+        miniaudio
+    )
+    if(APPLE)
+        target_link_libraries(autowhisper_bench PRIVATE
+            ${FOUNDATION_FRAMEWORK}
+            ${AVFOUNDATION_FRAMEWORK}
+            ${COREMEDIA_FRAMEWORK}
+            ${METAL_FRAMEWORK}
+        )
+    endif()
+    autowhisper_set_warnings(autowhisper_bench)
+endif()
+
 # Install
 install(TARGETS autowhisper RUNTIME DESTINATION bin)
 install(DIRECTORY icons/ DESTINATION share/autowhisper/icons)
@@ -251,6 +275,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_sidecar.cpp
         tests/cpp/test_subprocess.cpp
         tests/cpp/test_tray_display.cpp
+        tests/cpp/test_wer.cpp
     )
     if(LINUX)
         list(APPEND TEST_SOURCES

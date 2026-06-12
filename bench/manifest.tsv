@@ -1,0 +1,2 @@
+# <wav path (relative to this file)>\t<reference transcript>
+../deps/whisper.cpp/samples/jfk.wav	And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.
