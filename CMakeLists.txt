@@ -87,6 +87,10 @@ if(NOT APPLE)
     # Config::save instead.
     target_compile_definitions(autowhisper_core PUBLIC TOML_FLOAT_CHARCONV=1)
 endif()
+if(WIN32)
+    # settings/server.cpp compiles cpp-httplib into the core library.
+    target_link_libraries(autowhisper_core PUBLIC ws2_32)
+endif()
 autowhisper_set_warnings(autowhisper_core)
 
 # === Application sources (need platform libs, whisper, miniaudio) ===

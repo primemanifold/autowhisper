@@ -2,14 +2,14 @@ name: CI
 
 on:
   push:
-    branches: [core]
+    branches: [core, "claude/**"]
   pull_request:
     branches: [core]
   release:
     types: [published]
 
 jobs:
-  build:
+  linux:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -31,7 +31,8 @@ jobs:
             libgtk-3-dev \
             libayatana-appindicator3-dev \
             libpulse-dev \
-            libssl-dev
+            libssl-dev \
+            xvfb
 
       - name: Configure
         run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DAUTOWHISPER_ENABLE_TESTS=ON
@@ -44,6 +45,73 @@ jobs:
 
       - name: Run tests
         run: cd build && ctest --output-on-failure
+
+  macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DAUTOWHISPER_ENABLE_TESTS=ON
+
+      - name: Build
+        run: cmake --build build -j$(sysctl -n hw.ncpu)
+
+      - name: Run static asset tests
+        run: python3 -m unittest discover tests/static -v
+
+      - name: Run tests
+        run: cd build && ctest --output-on-failure
+
+  # Compile-drift guard for the Windows port: cross-builds PE32+ binaries with
+  # the same MinGW toolchain as the docker smoke. Runtime tests run on real
+  # Windows in the windows-msvc job.
+  windows-cross:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install MinGW toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++-mingw-w64-x86-64-posix
+
+      - name: Configure
+        run: >
+          cmake -B build-win -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/mingw-w64-x86_64.cmake
+          -DAUTOWHISPER_ENABLE_TESTS=ON
+
+      - name: Build
+        run: cmake --build build-win -j$(nproc)
+
+      - name: Verify PE artifacts
+        run: |
+          file build-win/autowhisper.exe | grep "PE32+"
+          file build-win/autowhisper_tests.exe | grep "PE32+"
+
+  # Experimental until the Windows port milestone (M2): MSVC build + native
+  # test run on real Windows. Failures do not block merges yet.
+  windows-msvc:
+    runs-on: windows-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DAUTOWHISPER_ENABLE_TESTS=ON
+
+      - name: Build
+        run: cmake --build build --config Release -j 4
+
+      - name: Run tests
+        run: cd build && ctest -C Release --output-on-failure
 
   build-deb:
     runs-on: ubuntu-24.04
