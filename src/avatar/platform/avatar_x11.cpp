@@ -8,6 +8,7 @@
 
 #include <atomic>
 #include <cstring>
+#include <functional>
 #include <thread>
 
 namespace autowhisper {
@@ -21,6 +22,7 @@ namespace autowhisper {
 struct AvatarManager::Impl {
     AvatarManager* mgr = nullptr;
     AvatarTicker* ticker = nullptr;
+    std::function<void()>* toggle = nullptr;
     std::thread thread;
     std::atomic<bool> quit{false};
     int size = 96;
@@ -71,7 +73,8 @@ struct AvatarManager::Impl {
                                    unsigned(size), unsigned(size), 32, 0);
 
         bool dragging = false;
-        int grab_dx = 0, grab_dy = 0;
+        bool moved = false;
+        int grab_dx = 0, grab_dy = 0, press_rx = 0, press_ry = 0;
         const AvatarCharacter& ch = *find_character(mgr->config_.character);
 
         while (!quit.load(std::memory_order_relaxed)) {
@@ -80,11 +83,20 @@ struct AvatarManager::Impl {
                 XNextEvent(dpy, &ev);
                 if (ev.type == ButtonPress && ev.xbutton.button == Button1) {
                     dragging = true;
+                    moved = false;
                     grab_dx = ev.xbutton.x;
                     grab_dy = ev.xbutton.y;
-                } else if (ev.type == ButtonRelease) {
+                    press_rx = ev.xbutton.x_root;
+                    press_ry = ev.xbutton.y_root;
+                } else if (ev.type == ButtonRelease && ev.xbutton.button == Button1) {
+                    // A press that never moved is a click → toggle dictation,
+                    // the Wispr-Flow floating-button gesture.
+                    if (!moved && toggle && *toggle) (*toggle)();
                     dragging = false;
                 } else if (ev.type == MotionNotify && dragging) {
+                    int dx = ev.xmotion.x_root - press_rx;
+                    int dy = ev.xmotion.y_root - press_ry;
+                    if (dx * dx + dy * dy > 25) moved = true;
                     XMoveWindow(dpy, win, ev.xmotion.x_root - grab_dx,
                                 ev.xmotion.y_root - grab_dy);
                 }
@@ -137,6 +149,7 @@ void AvatarManager::start() {
     if (!config_.enabled || running_.exchange(true)) return;
     ticker_ = std::make_unique<AvatarTicker>(AvatarStateMachine{}, level_, ambient_);
     impl_->ticker = ticker_.get();
+    impl_->toggle = toggle_ ? &toggle_ : nullptr;
     impl_->quit.store(false);
     impl_->thread = std::thread([this] { impl_->run(); });
     spdlog::info("avatar: {} joins ({})", find_character(config_.character)->name,

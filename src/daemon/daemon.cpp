@@ -103,6 +103,14 @@ void AutoWhisperDaemon::initialize() {
             config_.avatar,
             [this]() { return audio_ ? audio_->peak() : 0.f; },
             []() { return other_audio_playing(); });
+        // Clicking the floating companion toggles dictation, the same as the
+        // hotkey: START when idle, STOP while recording. Queued like any
+        // hotkey event so it runs on the daemon thread.
+        avatar_->on_toggle([this]() {
+            on_hotkey_event(state_.load() == DaemonState::RECORDING
+                                ? HotkeyEvent::STOP
+                                : HotkeyEvent::START);
+        });
         avatar_->start();
         avatar_->set_state(AvatarState::Idle);
     }

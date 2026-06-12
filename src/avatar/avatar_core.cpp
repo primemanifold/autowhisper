@@ -143,7 +143,78 @@ void capsule(uint32_t* buf, int size, float ax, float ay, float bx, float by,
 constexpr Col kInk{0.96f, 0.96f, 0.95f};   // luminous core stroke
 constexpr Col kRim{0.07f, 0.07f, 0.08f};   // dark rim so it reads on light desktops
 
+// A 5x7 uppercase/space bitmap font, just enough for the state labels below
+// the orb (no font dependency, identical on every platform). Each glyph is
+// 7 rows of a 5-bit mask, top row first.
+struct Glyph { char c; uint8_t rows[7]; };
+constexpr Glyph kFont[] = {
+    {' ', {0,0,0,0,0,0,0}},
+    {'A', {0x0E,0x11,0x11,0x1F,0x11,0x11,0x11}},
+    {'B', {0x1E,0x11,0x11,0x1E,0x11,0x11,0x1E}},
+    {'C', {0x0E,0x11,0x10,0x10,0x10,0x11,0x0E}},
+    {'D', {0x1E,0x11,0x11,0x11,0x11,0x11,0x1E}},
+    {'E', {0x1F,0x10,0x10,0x1E,0x10,0x10,0x1F}},
+    {'G', {0x0E,0x11,0x10,0x17,0x11,0x11,0x0F}},
+    {'H', {0x11,0x11,0x11,0x1F,0x11,0x11,0x11}},
+    {'I', {0x0E,0x04,0x04,0x04,0x04,0x04,0x0E}},
+    {'K', {0x11,0x12,0x14,0x18,0x14,0x12,0x11}},
+    {'L', {0x10,0x10,0x10,0x10,0x10,0x10,0x1F}},
+    {'M', {0x11,0x1B,0x15,0x15,0x11,0x11,0x11}},
+    {'N', {0x11,0x19,0x15,0x13,0x11,0x11,0x11}},
+    {'O', {0x0E,0x11,0x11,0x11,0x11,0x11,0x0E}},
+    {'R', {0x1E,0x11,0x11,0x1E,0x14,0x12,0x11}},
+    {'S', {0x0F,0x10,0x10,0x0E,0x01,0x01,0x1E}},
+    {'T', {0x1F,0x04,0x04,0x04,0x04,0x04,0x04}},
+    {'V', {0x11,0x11,0x11,0x11,0x11,0x0A,0x04}},
+    {'W', {0x11,0x11,0x11,0x15,0x15,0x1B,0x11}},
+    {'Y', {0x11,0x11,0x0A,0x04,0x04,0x04,0x04}},
+};
+
+const Glyph* find_glyph(char c) {
+    if (c >= 'a' && c <= 'z') c = char(c - 'a' + 'A');
+    for (const auto& g : kFont) if (g.c == c) return &g;
+    return &kFont[0];  // space
+}
+
+void draw_label(uint32_t* buf, int size, const char* text, float cx, float cy,
+                float px, Col c, float a) {
+    int len = 0;
+    for (const char* p = text; *p; ++p) len++;
+    if (len == 0) return;
+    const float gw = 5 * px, gap = px * 1.6f, advance = gw + gap;
+    float total = len * advance - gap;
+    float x = cx - total * .5f;
+    for (const char* p = text; *p; ++p) {
+        const Glyph* g = find_glyph(*p);
+        for (int row = 0; row < 7; row++) {
+            for (int col = 0; col < 5; col++) {
+                if (g->rows[row] & (1 << (4 - col))) {
+                    // Square pixels read crisper than discs at caption size.
+                    int gx = int(x + col * px), gy = int(cy + row * px);
+                    int gpx = std::max(1, int(px + 0.5f));
+                    for (int yy = 0; yy < gpx; yy++)
+                        for (int xx = 0; xx < gpx; xx++)
+                            blend(buf, size, gx + xx, gy + yy, c, a);
+                }
+            }
+        }
+        x += advance;
+    }
+}
+
 } // namespace
+
+const char* avatar_state_label(AvatarState s) {
+    switch (s) {
+        case AvatarState::Summoned:  return "READY";
+        case AvatarState::Listening: return "LISTENING";
+        case AvatarState::Thinking:  return "THINKING";
+        case AvatarState::Writing:   return "WRITING";
+        case AvatarState::Ambient:   return "IDLE";
+        case AvatarState::Error:     return "ERROR";
+        default:                     return "";
+    }
+}
 
 void avatar_rasterize(uint32_t* buf, int size, const AvatarCharacter& ch,
                       AvatarState state, double t, double phase, float level) {
@@ -252,6 +323,22 @@ void avatar_rasterize(uint32_t* buf, int size, const AvatarCharacter& ch,
         float dy = float(std::sin(tt * kTau / 2.6)) * S * .02f;
         disc(buf, size, cx - R * 2.1f, cy + dy, S * .018f, kInk, .35f);
         disc(buf, size, cx + R * 2.1f, cy - dy, S * .018f, kInk, .35f);
+    }
+
+    // --- state label (the floating-button caption, Wispr-Flow style) ---
+    // Active states get a short word in the bottom strip; idle stays silent
+    // so a resting companion is just the mark.
+    const char* label = avatar_state_label(state);
+    if (label[0] != '\0') {
+        float lx = S * .013f;                     // ~5px glyph pixel at 96px
+        float ly = S * (state == AvatarState::Writing ? .90f : .88f);
+        // soft plate so the caption reads on any wallpaper
+        int chars = 0; for (const char* p = label; *p; ++p) chars++;
+        float platew = chars * lx * 6 + S * .06f;
+        for (int y = int(ly - lx * 1.4f); y < int(ly + lx * 8.4f); y++)
+            for (int x = int(cx - platew * .5f); x < int(cx + platew * .5f); x++)
+                blend(buf, size, x, y, kRim, .28f);
+        draw_label(buf, size, label, cx, ly, lx, kInk, .92f);
     }
 }
 

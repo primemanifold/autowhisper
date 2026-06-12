@@ -34,10 +34,12 @@ Motion is status-only — a breathing record affordance and a live caret
 
 ### The companion
 
-An opt-in floating spirit — **Echo**, who repeats your words — glows when
-summoned, follows your voice while listening, and visibly writes as text
-lands ([live capture](site/assets/screenshots/avatar-linux.gif), real
-Linux build; same pixels verified on the Windows binary under Wine).
+An opt-in floating spirit — **Echo**, who repeats your words. It doubles as
+a Wispr-Flow-style floating button: **click it to start/stop dictation**, it
+glows and tracks your voice while listening, captions its own state
+(LISTENING / THINKING / WRITING), and visibly writes as text lands
+([live capture](site/assets/screenshots/avatar-floating-button.gif), real
+Linux build; the same renderer ships in the Windows and macOS binaries).
 Enable with `[avatar] enabled = true`; forms: `echo`, `hermes`,
 `mnemosyne`. Design: `design/avatar-companion.md`.
 

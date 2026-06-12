@@ -68,6 +68,10 @@ private:
 void avatar_rasterize(uint32_t* buf, int size, const AvatarCharacter& ch,
                       AvatarState state, double t, double phase, float level);
 
+// Short uppercase caption shown beneath the orb (the floating-button state
+// label). Empty string for Idle/Hidden.
+const char* avatar_state_label(AvatarState s);
+
 // Thread-safe tick engine shared by every platform shell: owns the state
 // machine, polls the providers, and answers "what do I draw right now".
 // Shells call request() from the daemon thread and tick() from their UI
@@ -103,6 +107,9 @@ class AvatarManager {
 public:
     using LevelProvider = std::function<float()>;
     using AmbientProvider = std::function<bool()>;
+    // Fired when the user clicks the companion (the Wispr-Flow-style
+    // floating button): the daemon toggles dictation. Runs on the UI thread.
+    using ToggleHandler = std::function<void()>;
 
     AvatarManager(const AvatarConfig& config, LevelProvider level,
                   AmbientProvider ambient);
@@ -114,11 +121,14 @@ public:
     void start();
     void stop();
     void set_state(AvatarState s);
+    // Set before start(): a click on the orb invokes this.
+    void on_toggle(ToggleHandler handler) { toggle_ = std::move(handler); }
 
 private:
     AvatarConfig config_;
     LevelProvider level_;
     AmbientProvider ambient_;
+    ToggleHandler toggle_;
     std::unique_ptr<AvatarTicker> ticker_;
     std::atomic<bool> running_{false};
 

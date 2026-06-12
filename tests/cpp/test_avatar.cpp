@@ -138,3 +138,28 @@ TEST_CASE("renderer respects arbitrary sizes", "[avatar]") {
         CHECK(painted(buf) > uint64_t(size) * size / 4);
     }
 }
+
+TEST_CASE("state labels caption active states only", "[avatar]") {
+    CHECK(std::string(avatar_state_label(AvatarState::Listening)) == "LISTENING");
+    CHECK(std::string(avatar_state_label(AvatarState::Thinking)) == "THINKING");
+    CHECK(std::string(avatar_state_label(AvatarState::Writing)) == "WRITING");
+    CHECK(std::string(avatar_state_label(AvatarState::Error)) == "ERROR");
+    // Idle and Hidden stay silent — a resting companion is just the mark.
+    CHECK(std::string(avatar_state_label(AvatarState::Idle)).empty());
+    CHECK(std::string(avatar_state_label(AvatarState::Hidden)).empty());
+}
+
+TEST_CASE("the label adds paint in the bottom strip", "[avatar]") {
+    // Listening (captioned) must paint more in the bottom rows than Idle
+    // (uncaptioned) at the same instant — proves the label renders.
+    const int size = 96;
+    auto count_bottom = [](AvatarState s) {
+        std::vector<uint32_t> buf(size_t(96) * 96, 0);
+        avatar_rasterize(buf.data(), 96, *find_character("echo"), s, 0.0, 0.0, 0.f);
+        uint64_t sum = 0;
+        for (int y = 80; y < 96; y++)
+            for (int x = 0; x < 96; x++) sum += buf[y * 96 + x] >> 24;
+        return sum;
+    };
+    CHECK(count_bottom(AvatarState::Listening) > count_bottom(AvatarState::Idle));
+}

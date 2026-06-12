@@ -39,6 +39,26 @@ so the companion, the menu bar, and the brand are one mark.
 Reduced-motion users: the companion is opt-in, and every state also reads
 as a still (the watch always-on principle from the motion research).
 
+## The floating button (Wispr-Flow-style)
+
+The companion is also the product's primary control surface, like Wispr
+Flow's floating button:
+
+- **Click to dictate.** A bare click on the orb toggles recording (START
+  when idle, STOP while listening) — the shells discriminate click from
+  drag by movement threshold, so you can still reposition it. Wired to the
+  same daemon path as the hotkey.
+- **State caption.** Active states show a short uppercase word beneath the
+  orb (READY / LISTENING / THINKING / WRITING / ERROR) on a soft plate, so
+  the button reads its own status at a glance. Idle stays silent — just the
+  mark. The caption uses a built-in 5x7 bitmap font (no font dependency,
+  pixel-identical on every OS).
+- **Live voice halo.** While listening, the ring and glow track the real
+  microphone level.
+
+This makes the companion a complete, mouse-only way to dictate for users
+who don't want a global hotkey — the experience Wispr Flow popularized.
+
 ## Architecture — one renderer, three thin shells
 
 All animation **math and pixels** live in shared, unit-tested code
@@ -51,7 +71,8 @@ Platform shells are dumb blitters (~150 lines each):
   its own thread (no GTK coupling); composites onto a dark plate when no
   compositor is present.
 - **Windows** `avatar_win32.cpp` — topmost layered tool window via
-  `UpdateLayeredWindow`, own message pump; whole orb drags (`HTCAPTION`).
+  `UpdateLayeredWindow`, own message pump; click toggles dictation, drag
+  past a threshold repositions.
 - **macOS** `avatar_macos.mm` — non-activating floating `NSPanel`, layer
   contents from a `CGImage`, timer on the main run loop the daemon owns;
   `movableByWindowBackground` for dragging.
@@ -67,8 +88,9 @@ runtime smoke used on each platform, no model or microphone needed.
 | Windows x86_64 | MinGW PE32+, **self-contained** (Wine smoke caught missing MinGW runtime DLLs → static link + `GGML_OPENMP=OFF`) | full demo under Wine, recorded, pixel-identical to Linux |
 | macOS | written to the proven `.mm` patterns; compiled by the macos-14 branch CI | needs a real Mac session (tracked) |
 
-13 unit tests pin the registry, the latch rules, and renderer invariants
-(determinism, premultiplication, level-reactivity, size independence).
+Unit tests pin the registry, the latch rules, renderer invariants
+(determinism, premultiplication, level-reactivity, size independence), and
+the state-label captions.
 
 ## Future ("talks to you, understands you")
 

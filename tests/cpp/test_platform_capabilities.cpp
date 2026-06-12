@@ -45,12 +45,19 @@ TEST_CASE("platform capabilities are honest about placeholder desktop ports", "[
     REQUIRE(output != nullptr);
     REQUIRE(tray != nullptr);
 
-#if defined(__APPLE__) || defined(_WIN32)
+#if defined(__APPLE__)
     REQUIRE(hotkey->state == PlatformFeatureState::Placeholder);
     REQUIRE(output->state == PlatformFeatureState::Placeholder);
     REQUIRE(tray->state == PlatformFeatureState::Placeholder);
     REQUIRE_FALSE(hotkey->operator_note.empty());
     REQUIRE_FALSE(output->operator_note.empty());
+    REQUIRE_FALSE(tray->operator_note.empty());
+#elif defined(_WIN32)
+    // Win32 hotkey + text insertion are implemented (issue #14); the system
+    // tray remains a later slice.
+    REQUIRE(hotkey->state == PlatformFeatureState::Ready);
+    REQUIRE(output->state == PlatformFeatureState::Ready);
+    REQUIRE(tray->state == PlatformFeatureState::Placeholder);
     REQUIRE_FALSE(tray->operator_note.empty());
 #elif defined(__linux__)
     REQUIRE(hotkey->state == PlatformFeatureState::Ready);

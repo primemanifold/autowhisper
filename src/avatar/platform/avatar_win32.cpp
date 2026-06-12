@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <cstring>
+#include <functional>
 #include <thread>
 #include <vector>
 
@@ -22,10 +23,13 @@ constexpr UINT_PTR kTimerId = 1;
 struct WindowState {
     AvatarTicker* ticker = nullptr;
     const AvatarCharacter* character = nullptr;
+    std::function<void()>* toggle = nullptr;
     int size = 96;
     HDC mem_dc = nullptr;
     HBITMAP dib = nullptr;
     uint32_t* pixels = nullptr;
+    POINT press_pt{0, 0};
+    bool pressed = false;
 
     void paint(HWND hwnd) {
         auto snap = ticker->tick();
@@ -51,9 +55,35 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
         case WM_TIMER:
             if (st) st->paint(hwnd);
             return 0;
-        case WM_NCHITTEST:
-            // The whole orb is a drag handle.
-            return HTCAPTION;
+        case WM_LBUTTONDOWN:
+            if (st) {
+                st->pressed = true;
+                GetCursorPos(&st->press_pt);
+                SetCapture(hwnd);
+            }
+            return 0;
+        case WM_MOUSEMOVE:
+            // Past a small threshold it's a drag, not a click: move the
+            // window and cancel the pending click.
+            if (st && st->pressed && (wp & MK_LBUTTON)) {
+                POINT now; GetCursorPos(&now);
+                int dx = now.x - st->press_pt.x, dy = now.y - st->press_pt.y;
+                if (dx * dx + dy * dy > 25) {
+                    st->pressed = false;
+                    ReleaseCapture();
+                    ReleaseCapture();
+                    SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+                }
+            }
+            return 0;
+        case WM_LBUTTONUP:
+            // A press that never became a drag is a click → toggle dictation.
+            if (st && st->pressed) {
+                st->pressed = false;
+                ReleaseCapture();
+                if (st->toggle && *st->toggle) (*st->toggle)();
+            }
+            return 0;
         case WM_DESTROY:
             KillTimer(hwnd, kTimerId);
             PostQuitMessage(0);
@@ -67,6 +97,7 @@ LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 struct AvatarManager::Impl {
     AvatarManager* mgr = nullptr;
     AvatarTicker* ticker = nullptr;
+    std::function<void()>* toggle = nullptr;
     std::thread thread;
     std::atomic<HWND> hwnd{nullptr};
     int size = 96;
@@ -94,6 +125,7 @@ struct AvatarManager::Impl {
         WindowState st;
         st.ticker = ticker;
         st.character = find_character(mgr->config_.character);
+        st.toggle = toggle;
         st.size = size;
 
         BITMAPINFO bmi{};
@@ -148,6 +180,7 @@ void AvatarManager::start() {
     if (!config_.enabled || running_.exchange(true)) return;
     ticker_ = std::make_unique<AvatarTicker>(AvatarStateMachine{}, level_, ambient_);
     impl_->ticker = ticker_.get();
+    impl_->toggle = toggle_ ? &toggle_ : nullptr;
     impl_->thread = std::thread([this] { impl_->run(); });
     spdlog::info("avatar: {} joins ({})", find_character(config_.character)->name,
                  find_character(config_.character)->epithet);

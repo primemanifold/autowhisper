@@ -5,7 +5,31 @@
 #import <AppKit/AppKit.h>
 #import <QuartzCore/QuartzCore.h>
 
+#include <functional>
 #include <vector>
+
+// A click target laid over the companion: a bare click toggles dictation,
+// a drag moves the window (movableByWindowBackground handles the drag).
+@interface AWAvatarClickView : NSView
+@property(nonatomic, assign) std::function<void()>* toggle;
+@property(nonatomic, assign) NSPoint downPoint;
+@property(nonatomic, assign) BOOL moved;
+@end
+
+@implementation AWAvatarClickView
+- (void)mouseDown:(NSEvent*)e { self.downPoint = e.locationInWindow; self.moved = NO; }
+- (void)mouseDragged:(NSEvent*)e {
+    NSPoint p = e.locationInWindow;
+    CGFloat dx = p.x - self.downPoint.x, dy = p.y - self.downPoint.y;
+    if (dx * dx + dy * dy > 25) {
+        self.moved = YES;
+        [self.window performWindowDragWithEvent:e];
+    }
+}
+- (void)mouseUp:(NSEvent*)e {
+    if (!self.moved && self.toggle && *self.toggle) (*self.toggle)();
+}
+@end
 
 namespace autowhisper {
 
@@ -17,6 +41,7 @@ namespace autowhisper {
 struct AvatarManager::Impl {
     AvatarManager* mgr = nullptr;
     AvatarTicker* ticker = nullptr;
+    std::function<void()>* toggle = nullptr;
     NSPanel* panel = nil;
     NSTimer* timer = nil;
     int size = 96;
@@ -59,6 +84,10 @@ struct AvatarManager::Impl {
         panel.movableByWindowBackground = YES;  // drag the orb anywhere
         panel.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces |
                                    NSWindowCollectionBehaviorStationary;
+        AWAvatarClickView* view = [[AWAvatarClickView alloc] initWithFrame:panel.contentView.bounds];
+        view.toggle = toggle;
+        view.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        panel.contentView = view;
         panel.contentView.wantsLayer = YES;
         panel.contentView.layer.contentsGravity = @"resize";  // avoids needing the QuartzCore kCAGravityResize symbol
 
@@ -96,6 +125,7 @@ void AvatarManager::start() {
     if (!config_.enabled || running_.exchange(true)) return;
     ticker_ = std::make_unique<AvatarTicker>(AvatarStateMachine{}, level_, ambient_);
     impl_->ticker = ticker_.get();
+    impl_->toggle = toggle_ ? &toggle_ : nullptr;
     Impl* impl = impl_.get();
     dispatch_async(dispatch_get_main_queue(), ^{
       impl->open();
