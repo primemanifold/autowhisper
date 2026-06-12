@@ -248,6 +248,12 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_subprocess.cpp
         tests/cpp/test_tray_display.cpp
     )
+    if(LINUX)
+        list(APPEND TEST_SOURCES
+            tests/cpp/test_hotkey_x11.cpp
+            src/hotkey/platform/hotkey_x11.cpp
+        )
+    endif()
     if(APPLE)
         list(APPEND TEST_SOURCES
             tests/cpp/test_keycombo_platform.cpp
@@ -267,6 +273,13 @@ if(AUTOWHISPER_ENABLE_TESTS)
         cpp_httplib
         Catch2::Catch2WithMain
     )
+    if(LINUX)
+        target_link_libraries(autowhisper_tests PRIVATE
+            ${X11_LIBRARIES}
+            ${X11_Xtst_LIB}
+        )
+        target_include_directories(autowhisper_tests PRIVATE ${X11_INCLUDE_DIR})
+    endif()
     if(WIN32)
         target_link_libraries(autowhisper_tests PRIVATE ws2_32)
     endif()
