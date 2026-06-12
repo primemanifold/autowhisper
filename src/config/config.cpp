@@ -267,6 +267,13 @@ ConfigLoadResult Config::load_with_diagnostics(const std::string& path) {
         config.tray.enabled = get_or(*tray, "enabled", config.tray.enabled);
     }
 
+    // [avatar]
+    if (auto avatar = tbl["avatar"].as_table()) {
+        config.avatar.enabled = get_or(*avatar, "enabled", config.avatar.enabled);
+        config.avatar.character = get_or(*avatar, "character", config.avatar.character);
+        config.avatar.size = get_or(*avatar, "size", config.avatar.size);
+    }
+
     auto validation_issues = config.validate_all();
     issues.insert(issues.end(), validation_issues.begin(), validation_issues.end());
     return ConfigLoadResult{config, std::move(issues)};
@@ -389,6 +396,15 @@ std::vector<ValidationIssue> Config::validate_all() const {
         add_error(issues, "daemon.work_dir", "empty_value", "Invalid daemon.work_dir: cannot be empty");
     }
 
+    if (!is_allowed_enum("avatar", "character", avatar.character)) {
+        add_error(issues, "avatar.character", "invalid_enum",
+                  "Invalid avatar.character: " + avatar.character);
+    }
+    if (avatar.size < 64 || avatar.size > 192) {
+        add_error(issues, "avatar.size", "out_of_range",
+                  "Invalid avatar.size: must be between 64 and 192");
+    }
+
     return issues;
 }
 
@@ -508,6 +524,13 @@ void Config::save(const std::string& path) const {
     // [tray]
     tbl.insert("tray", toml::table{
         {"enabled", tray.enabled},
+    });
+
+    // [avatar]
+    tbl.insert("avatar", toml::table{
+        {"enabled", avatar.enabled},
+        {"character", avatar.character},
+        {"size", static_cast<int64_t>(avatar.size)},
     });
 
     // Write to file

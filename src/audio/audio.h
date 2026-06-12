@@ -34,6 +34,9 @@ public:
     void start_recording();
     std::vector<float> stop_recording();
     bool is_recording() const;
+    // Peak amplitude (0..1) of the most recent capture chunk; drives the
+    // avatar's listening halo. Cheap atomic, safe from any thread.
+    float peak() const { return peak_.load(std::memory_order_relaxed); }
     float get_duration() const;
     std::vector<float> trim_silence(const std::vector<float>& audio, float threshold = 0.01f) const;
 
@@ -46,6 +49,7 @@ private:
     AudioConfig config_;
     std::vector<std::vector<float>> buffer_;
     std::atomic<bool> recording_{false};
+    std::atomic<float> peak_{0.f};
     mutable std::mutex lock_;
     std::string input_device_name_ = "Unknown";
     std::string output_device_name_ = "Unknown";

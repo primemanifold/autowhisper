@@ -1,5 +1,7 @@
 #include "daemon/daemon.h"
 
+#include "util/subprocess.h"
+
 #include <spdlog/spdlog.h>
 
 #include <chrono>
@@ -95,6 +97,16 @@ void AutoWhisperDaemon::initialize() {
     hotkey_ = std::make_unique<HotkeyManager>(config_.hotkeys,
         [this](HotkeyEvent e) { on_hotkey_event(e); });
 
+    if (config_.avatar.enabled) {
+        spdlog::info("Initializing companion avatar");
+        avatar_ = std::make_unique<AvatarManager>(
+            config_.avatar,
+            [this]() { return audio_ ? audio_->peak() : 0.f; },
+            []() { return other_audio_playing(); });
+        avatar_->start();
+        avatar_->set_state(AvatarState::Idle);
+    }
+
     spdlog::info("Initializing tray icon");
     tray_ = std::make_unique<TrayManager>(
         config_.tray.enabled,
@@ -166,6 +178,7 @@ void AutoWhisperDaemon::handle_start() {
     spdlog::info("Starting recording");
     state_.store(DaemonState::RECORDING);
     tray_->set_state(TrayState::RECORDING);
+    if (avatar_) avatar_->set_state(AvatarState::Summoned);
     feedback_->play_start();
     pulseaudio_->mute_other_apps(true);
     audio_->start_recording();
@@ -180,6 +193,7 @@ void AutoWhisperDaemon::handle_stop() {
     spdlog::info("Stopping recording");
     state_.store(DaemonState::PROCESSING);
     tray_->set_state(TrayState::PROCESSING);
+    if (avatar_) avatar_->set_state(AvatarState::Thinking);
     feedback_->play_stop();
     pulseaudio_->unmute_other_apps();
 
@@ -212,10 +226,12 @@ void AutoWhisperDaemon::handle_stop() {
         if (!text.empty()) {
             std::string preview = text.size() > 50 ? text.substr(0, 50) + "..." : text;
             spdlog::info("Transcription: {}", preview);
+            if (avatar_) avatar_->set_state(AvatarState::Writing);
             bool success = output_->inject(text);
             if (!success) {
                 spdlog::warn("Text injection failed");
                 feedback_->play_error();
+                if (avatar_) avatar_->set_state(AvatarState::Error);
             }
         } else {
             spdlog::info("Empty transcription result");
@@ -223,10 +239,12 @@ void AutoWhisperDaemon::handle_stop() {
     } catch (const std::exception& e) {
         spdlog::error("Transcription error: {}", e.what());
         feedback_->play_error();
+        if (avatar_) avatar_->set_state(AvatarState::Error);
     }
 
     state_.store(DaemonState::IDLE);
     tray_->set_state(TrayState::IDLE);
+    if (avatar_) avatar_->set_state(AvatarState::Idle);
 }
 
 void AutoWhisperDaemon::handle_cancel() {
@@ -244,6 +262,7 @@ void AutoWhisperDaemon::handle_cancel() {
 
     state_.store(DaemonState::IDLE);
     tray_->set_state(TrayState::IDLE);
+    if (avatar_) avatar_->set_state(AvatarState::Idle);
 }
 
 void AutoWhisperDaemon::on_hotkey_event(HotkeyEvent event) {
@@ -263,6 +282,16 @@ void AutoWhisperDaemon::request_shutdown() {
 #if defined(__APPLE__)
     // Unwind the NSApp run loop so run() can fall through to cleanup().
     aw_macos_stop_event_loop();
+#endif
+}
+
+bool AutoWhisperDaemon::other_audio_playing() {
+#if defined(__linux__)
+    // PulseAudio/PipeWire: any active sink-input means something is playing.
+    auto res = run_command({"pactl", "list", "short", "sink-inputs"}, 2);
+    return res.exit_code == 0 && !res.stdout_str.empty();
+#else
+    return false;
 #endif
 }
 
@@ -297,6 +326,7 @@ void AutoWhisperDaemon::cleanup() {
     spdlog::info("Cleaning up");
 
     hotkey_->stop();
+    if (avatar_) avatar_->stop();
     tray_->stop();
 
     if (audio_->is_recording()) {

@@ -60,8 +60,8 @@
       id: "feedback",
       number: "06",
       title: "Feedback & tray",
-      lede: "Tune the tones and tray visibility that tell you when dictation is ready, recording, or blocked.",
-      sections: ["feedback", "tray"],
+      lede: "Tones, tray visibility, and the floating companion that listens and writes with you.",
+      sections: ["feedback", "tray", "avatar"],
     },
     {
       id: "diagnostics",

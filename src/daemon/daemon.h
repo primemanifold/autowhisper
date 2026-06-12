@@ -2,6 +2,7 @@
 
 #include "config/config.h"
 #include "audio/audio.h"
+#include "avatar/avatar.h"
 #include "feedback/feedback.h"
 #include "hotkey/hotkey.h"
 #include "inference/inference.h"
@@ -58,6 +59,7 @@ private:
     std::unique_ptr<PulseAudioManager> pulseaudio_;
     std::unique_ptr<HotkeyManager> hotkey_;
     std::unique_ptr<TrayManager> tray_;
+    std::unique_ptr<AvatarManager> avatar_;
 
     static constexpr float MIN_DURATION = 0.5f;
 
@@ -71,6 +73,7 @@ private:
     void remove_pid_file();
     void cleanup();
     void setup_signals();
+    static bool other_audio_playing();
 };
 
 } // namespace autowhisper

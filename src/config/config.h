@@ -71,6 +71,12 @@ struct TrayConfig {
     bool enabled = true;
 };
 
+struct AvatarConfig {
+    bool enabled = false;          // opt-in companion
+    std::string character = "echo"; // echo, hermes, mnemosyne
+    int size = 96;                  // window size in pixels
+};
+
 enum class ValidationSeverity {
     Error,
     Warning,
@@ -99,6 +105,7 @@ struct Config {
     FeedbackConfig feedback;
     DaemonConfig daemon;
     TrayConfig tray;
+    AvatarConfig avatar;
 
     static Config load(const std::string& path);
     static ConfigLoadResult load_with_diagnostics(const std::string& path);

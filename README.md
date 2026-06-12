@@ -32,6 +32,15 @@ Motion is status-only — a breathing record affordance and a live caret
 ([demo](site/assets/screenshots/motion-ios.gif)), disabled under
 `prefers-reduced-motion`.
 
+### The companion
+
+An opt-in floating spirit — **Echo**, who repeats your words — glows when
+summoned, follows your voice while listening, and visibly writes as text
+lands ([live capture](site/assets/screenshots/avatar-linux.gif), real
+Linux build; same pixels verified on the Windows binary under Wine).
+Enable with `[avatar] enabled = true`; forms: `echo`, `hermes`,
+`mnemosyne`. Design: `design/avatar-companion.md`.
+
 ## Install
 
 ```bash

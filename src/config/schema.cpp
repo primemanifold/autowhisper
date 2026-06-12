@@ -126,6 +126,18 @@ const std::vector<KeyDef>& table() {
         {"daemon", "work_dir", Type::String, V{}, std::nullopt, std::nullopt,
             "Working directory. Must be non-empty."},
 
+        // [avatar]
+        {"avatar", "enabled", Type::Bool, V{}, std::nullopt, std::nullopt,
+            "Show the floating companion (Echo) that glows while listening "
+            "and writes while inserting."},
+        {"avatar", "character", Type::Enum,
+            V{"echo", "hermes", "mnemosyne"},
+            std::nullopt, std::nullopt,
+            "Which spirit accompanies you: Echo (answers), Hermes (swift, "
+            "blue), Mnemosyne (memory, amber)."},
+        {"avatar", "size", Type::Int, V{}, 64.0, 192.0,
+            "Companion size in pixels."},
+
         // [tray]
         {"tray", "enabled", Type::Bool, V{}, std::nullopt, std::nullopt,
             "Show the system tray icon."},

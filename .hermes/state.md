@@ -670,3 +670,19 @@ Boundaries:
 Next:
 - Watch CI matrix to green; fix macos job if AppleClang complains.
 - M1 leftovers on a macOS host; then M2 (Windows port) and M4 (intelligence layer) per plan.
+
+
+## Run 2026-06-12 — Echo, the floating companion (all desktops)
+
+- New `src/avatar/`: shared state machine + software rasterizer (premultiplied
+  BGRA) with thin shells — pure-Xlib (Linux), layered window (Windows),
+  NSPanel (macOS). Daemon drives Summoned/Listening(level)/Thinking/Writing/
+  Ambient/Error; `[avatar]` config section (opt-in) flows through schema,
+  validation, JSON API, and the settings UI Feedback pane.
+- Local CI/CD this session: Linux release build, 176/176 ctest, full
+  `avatar demo` runtime under Xvfb (recorded); MinGW windows exe made
+  self-contained after the Wine smoke caught missing runtime DLLs
+  (static link + GGML_OPENMP=OFF), then full demo ran under Wine with
+  pixel-identical output; artifacts + SHA256SUMS committed under dist/.
+- Boundary: macOS shell compiles via branch CI (no Apple toolchain in this
+  container); runtime verification needs a Mac session.

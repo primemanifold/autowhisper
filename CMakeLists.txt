@@ -37,6 +37,11 @@ option(AUTOWHISPER_ENABLE_BENCH "Build the benchmark harness" OFF)
 
 # Include our CMake modules
 include(cmake/CompilerWarnings.cmake)
+if(MINGW)
+    # The MinGW OpenMP runtime only ships usefully as a DLL; ggml falls back
+    # to its internal thread pool so the shipped exe stays self-contained.
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+endif()
 include(cmake/FetchDependencies.cmake)
 include(cmake/PlatformSetup.cmake)
 include(cmake/EmbedAssets.cmake)
@@ -56,6 +61,7 @@ set(CORE_LIB_SOURCES
     src/settings/handlers.cpp
     src/settings/server.cpp
     src/settings/sidecar.cpp
+    src/avatar/avatar_core.cpp
     src/bench/wer.cpp
     src/pipeline/transcript_pipeline.cpp
     src/tray/tray_common.cpp
@@ -111,12 +117,14 @@ set(APP_SOURCES
     src/feedback/feedback.cpp
     src/cli/cli.cpp
     src/cli/cli_settings_ui.cpp
+    src/cli/cli_avatar_demo.cpp
     src/doctor/doctor.cpp
 )
 
 # === Platform-specific sources ===
 if(LINUX)
     list(APPEND APP_SOURCES
+        src/avatar/platform/avatar_x11.cpp
         src/hotkey/platform/hotkey_x11.cpp
         src/output/platform/output_x11.cpp
         src/tray/platform/tray_gtk.cpp
@@ -126,6 +134,7 @@ if(LINUX)
     )
 elseif(APPLE)
     list(APPEND APP_SOURCES
+        src/avatar/platform/avatar_macos.mm
         src/hotkey/platform/hotkey_macos.mm
         src/output/platform/output_macos.mm
         src/tray/platform/tray_macos.mm
@@ -137,6 +146,7 @@ elseif(APPLE)
     )
 elseif(WIN32)
     list(APPEND APP_SOURCES
+        src/avatar/platform/avatar_win32.cpp
         src/hotkey/platform/hotkey_win32.cpp
         src/output/platform/output_win32.cpp
         src/tray/platform/tray_win32.cpp
@@ -225,6 +235,12 @@ elseif(APPLE)
     )
 elseif(WIN32)
     target_link_libraries(autowhisper PRIVATE ws2_32 ole32 uuid shell32 user32)
+    if(MINGW)
+        # Ship a self-contained exe: without this the binary needs
+        # libwinpthread/libgcc/libgomp/libstdc++ DLLs copied beside it
+        # (caught by the Wine runtime smoke).
+        target_link_options(autowhisper PRIVATE -static)
+    endif()
 endif()
 
 # Apply compiler warnings
@@ -268,6 +284,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
     include(Catch)
 
     set(TEST_SOURCES
+        tests/cpp/test_avatar.cpp
         tests/cpp/test_config.cpp
         tests/cpp/test_keycombo.cpp
         tests/cpp/test_logging.cpp
@@ -288,7 +305,8 @@ if(AUTOWHISPER_ENABLE_TESTS)
     if(LINUX)
         list(APPEND TEST_SOURCES
             tests/cpp/test_hotkey_x11.cpp
-            src/hotkey/platform/hotkey_x11.cpp
+            src/avatar/platform/avatar_x11.cpp
+        src/hotkey/platform/hotkey_x11.cpp
         )
     endif()
     if(APPLE)

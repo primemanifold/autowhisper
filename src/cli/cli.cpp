@@ -92,6 +92,17 @@ void setup_cli(CLI::App& app) {
 
     // --- Doctor ---
     static bool doctor_fix = false;
+    auto* avatar_cmd = app.add_subcommand("avatar", "Companion avatar tools");
+    auto* avatar_demo = avatar_cmd->add_subcommand(
+        "demo", "Show the companion and cycle through its states (smoke test)");
+    auto* demo_seconds = new int(14);
+    auto* demo_character = new std::string("echo");
+    avatar_demo->add_option("--seconds", *demo_seconds, "How long to run");
+    avatar_demo->add_option("--character", *demo_character, "echo|hermes|mnemosyne");
+    avatar_demo->callback([demo_seconds, demo_character]() {
+        exit(cmd_avatar_demo(*demo_character, *demo_seconds));
+    });
+
     auto* doctor_cmd = app.add_subcommand("doctor", "Diagnose system configuration");
     doctor_cmd->add_flag("--fix", doctor_fix, "Attempt to fix issues");
     doctor_cmd->callback([]() { std::exit(cmd_doctor(doctor_fix)); });

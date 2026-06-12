@@ -91,6 +91,12 @@ nlohmann::json config_to_json(const Config& c) {
         {"enabled", c.tray.enabled},
     };
 
+    j["avatar"] = {
+        {"enabled", c.avatar.enabled},
+        {"character", c.avatar.character},
+        {"size", c.avatar.size},
+    };
+
     return j;
 }
 
@@ -166,6 +172,10 @@ Config json_to_config(const nlohmann::json& j) {
     get("daemon", "work_dir", c.daemon.work_dir);
 
     get("tray", "enabled", c.tray.enabled);
+
+    get("avatar", "enabled", c.avatar.enabled);
+    get("avatar", "character", c.avatar.character);
+    get("avatar", "size", c.avatar.size);
 
     return c;
 }

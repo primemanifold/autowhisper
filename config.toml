@@ -64,3 +64,10 @@ paste_delay = 0.05
 
 [tray]
 enabled = true
+
+[avatar]
+# The floating companion. Glows while listening, writes while inserting.
+enabled = false
+# character: echo (answers), hermes (swift, blue), mnemosyne (memory, amber)
+character = 'echo'
+size = 96
