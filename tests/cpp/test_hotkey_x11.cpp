@@ -39,7 +39,10 @@ bool xvfb_available() {
            std::filesystem::exists("/usr/local/bin/Xvfb");
 }
 
-// Spawns a private Xvfb on a free display and points $DISPLAY at it.
+// Spawns a private Xvfb and points $DISPLAY at it. Tries a few fixed
+// display numbers and polls XOpenDisplay until the server accepts
+// connections (the xvfb-run -a strategy; -displayfd proved flaky under
+// ctest's fd environment in CI).
 struct XvfbServer {
     pid_t pid = -1;
     std::string display;
@@ -47,52 +50,46 @@ struct XvfbServer {
     bool had_display = false;
 
     bool launch() {
-        int fds[2];
-        if (pipe(fds) != 0) return false;
-
-        pid = fork();
-        if (pid < 0) {
-            close(fds[0]);
-            close(fds[1]);
-            return false;
-        }
-        if (pid == 0) {
-            close(fds[0]);
-            std::string fd_arg = std::to_string(fds[1]);
-            execlp("Xvfb", "Xvfb", "-displayfd", fd_arg.c_str(), "-screen", "0",
-                   "640x480x24", "-nolisten", "tcp", (char*)nullptr);
-            _exit(127);
-        }
-        close(fds[1]);
-
-        // Xvfb writes the chosen display number followed by '\n'.
-        std::string num;
-        const auto deadline = std::chrono::steady_clock::now() + 10s;
-        while (std::chrono::steady_clock::now() < deadline) {
-            fd_set set;
-            FD_ZERO(&set);
-            FD_SET(fds[0], &set);
-            struct timeval tv{0, 200000};
-            if (select(fds[0] + 1, &set, nullptr, nullptr, &tv) > 0) {
-                char c = 0;
-                ssize_t n = read(fds[0], &c, 1);
-                if (n <= 0) break;
-                if (c == '\n') break;
-                num.push_back(c);
-            }
-        }
-        close(fds[0]);
-        if (num.empty()) {
-            terminate();
-            return false;
-        }
-
-        display = ":" + num;
         const char* prev = std::getenv("DISPLAY");
         had_display = prev != nullptr;
         if (prev) saved_display = prev;
-        setenv("DISPLAY", display.c_str(), 1);
-        return true;
+
+        for (int number : {99, 98, 97, 96}) {
+            display = ":" + std::to_string(number);
+
+            pid = fork();
+            if (pid < 0) return false;
+            if (pid == 0) {
+                execlp("Xvfb", "Xvfb", display.c_str(), "-screen", "0",
+                       "640x480x24", "-nolisten", "tcp", (char*)nullptr);
+                _exit(127);
+            }
+
+            // Poll until the server accepts connections or the child dies
+            // (e.g. display already locked by another Xvfb).
+            const auto deadline = std::chrono::steady_clock::now() + 10s;
+            while (std::chrono::steady_clock::now() < deadline) {
+                int status = 0;
+                if (waitpid(pid, &status, WNOHANG) == pid) {
+                    pid = -1;  // child exited; try the next display number
+                    break;
+                }
+                if (Display* probe = XOpenDisplay(display.c_str())) {
+                    XCloseDisplay(probe);
+                    setenv("DISPLAY", display.c_str(), 1);
+                    return true;
+                }
+                std::this_thread::sleep_for(100ms);
+            }
+            if (pid > 0) {
+                // Server never became ready; clean up before trying the next.
+                kill(pid, SIGTERM);
+                int status = 0;
+                waitpid(pid, &status, 0);
+                pid = -1;
+            }
+        }
+        return false;
     }
 
     void terminate() {

@@ -8,18 +8,46 @@
 #include <X11/extensions/record.h>
 #include <X11/extensions/XTest.h>
 
+#include <pthread.h>
+
 #include <chrono>
 #include <cstring>
 #include <mutex>
-#include <sys/select.h>
 #include <thread>
-#include <unistd.h>
 
 namespace autowhisper {
 
-static struct XThreadInit {
+namespace {
+
+// Marks the XRecord listener thread so the IO error handler can tell it
+// apart from the rest of the process.
+thread_local bool t_is_listener_thread = false;
+
+XIOErrorHandler g_previous_io_handler = nullptr;
+
+// Xlib's default IO error handler exits the whole process. If the listener
+// thread's connection dies (X server gone, or a connection abandoned by the
+// bounded-stop fallback), only that thread should die — dictation degrades
+// instead of taking the daemon down. pthread_exit unwinds the thread's
+// stack, so the exit flag destructor still fires.
+int listener_io_error_handler(Display* dpy) {
+    if (t_is_listener_thread) {
+        spdlog::error("X11 hotkey listener lost its X connection; stopping listener thread");
+        pthread_exit(nullptr);
+    }
+    if (g_previous_io_handler && g_previous_io_handler != listener_io_error_handler) {
+        return g_previous_io_handler(dpy);
+    }
+    spdlog::critical("Fatal X11 IO error");
+    _exit(1);
+}
+
+struct XThreadInit {
     XThreadInit() { XInitThreads(); }
-} s_x_thread_init;
+};
+XThreadInit s_x_thread_init;
+
+}  // namespace
 
 struct HotkeyManager::Impl {
     HotkeyManager* manager = nullptr;
@@ -27,22 +55,21 @@ struct HotkeyManager::Impl {
     Display* ctrl_display = nullptr;
     XRecordContext record_ctx = 0;
     std::thread listener_thread;
-    int wake_pipe[2] = {-1, -1};  // pipe to signal thread to stop
 
-    // Guards ctrl_display/record_ctx lifetime so stop()/signal_stop() can
-    // nudge a listener stuck inside XRecordProcessReplies() without racing
-    // the thread's own cleanup. timed_mutex: if the thread is wedged in
-    // XCloseDisplay while holding it, the nudge is skipped rather than
-    // turning stop() into a second hang.
+    // Guards ctrl_display/record_ctx lifetime so stop() can issue
+    // XRecordDisableContext without racing the thread's own cleanup.
+    // timed_mutex: if the thread is wedged in an X call while holding it,
+    // the nudge is skipped rather than turning stop() into a second hang.
     std::timed_mutex x_mutex;
     std::atomic<bool> thread_exited{false};
 
-    // Asks the X server to end the record stream. This is the documented
-    // way to unblock XRecordProcessReplies: the data display receives an
-    // end-of-data reply and returns. Safe cross-thread after XInitThreads.
+    // Asks the X server to end the record stream. The listener blocks inside
+    // the synchronous XRecordEnableContext; this is the documented way to
+    // make it return. Issued from the control connection, which is safe
+    // cross-thread after XInitThreads.
     void nudge_record_shutdown() {
         std::unique_lock<std::timed_mutex> lock(x_mutex, std::defer_lock);
-        if (!lock.try_lock_for(std::chrono::seconds(1))) return;
+        if (!lock.try_lock_for(std::chrono::milliseconds(500))) return;
         if (ctrl_display && record_ctx) {
             XRecordDisableContext(ctrl_display, record_ctx);
             XFlush(ctrl_display);
@@ -162,10 +189,11 @@ void HotkeyManager::start() {
                  }(),
                  config_.mode);
 
-    // Create wake pipe for signaling the thread to stop
-    if (pipe(impl_->wake_pipe) != 0) {
-        spdlog::error("Failed to create wake pipe");
-        return;
+    // Install after GTK (or anything else) has set its own handler so we
+    // can chain to it for non-listener threads.
+    XIOErrorHandler previous = XSetIOErrorHandler(listener_io_error_handler);
+    if (previous != listener_io_error_handler) {
+        g_previous_io_handler = previous;
     }
 
     running_.store(true);
@@ -175,6 +203,8 @@ void HotkeyManager::start() {
     // ever has to abandon the thread it leaks this Impl and re-creates
     // impl_, so the zombie must never dereference the member again.
     impl_->listener_thread = std::thread([this, impl = impl_.get()]() {
+        t_is_listener_thread = true;
+
         struct ExitFlag {
             std::atomic<bool>& flag;
             ~ExitFlag() { flag.store(true); }
@@ -236,68 +266,31 @@ void HotkeyManager::start() {
             return;
         }
 
+        // The create request must reach the server before the data
+        // connection refers to the context.
         XSync(impl->ctrl_display, False);
 
-        // Use async API so we never block indefinitely
-        if (!XRecordEnableContextAsync(impl->data_display, impl->record_ctx,
-                                        Impl::record_callback,
-                                        reinterpret_cast<XPointer>(impl))) {
+        // Canonical XRecord pattern: the synchronous enable blocks here,
+        // dispatching record_callback for each event, and returns when
+        // XRecordDisableContext is issued on the control connection
+        // (stop()'s nudge loop). No bespoke select/pipe machinery.
+        if (!XRecordEnableContext(impl->data_display, impl->record_ctx,
+                                  Impl::record_callback,
+                                  reinterpret_cast<XPointer>(impl))) {
             spdlog::error("Failed to enable XRecord context");
-            running_.store(false);
-            return;
         }
 
-        // Flush the enable request to the X server — without this,
-        // the request sits in Xlib's output buffer and the server
-        // never starts delivering XRecord events.
-        XFlush(impl->data_display);
+        std::lock_guard<std::timed_mutex> lock(impl->x_mutex);
+        XCloseDisplay(impl->data_display);
+        impl->data_display = nullptr;
 
-        int x11_fd = ConnectionNumber(impl->data_display);
-        int pipe_fd = impl->wake_pipe[0];
-        int max_fd = std::max(x11_fd, pipe_fd) + 1;
-
-        while (running_.load()) {
-            fd_set fds;
-            FD_ZERO(&fds);
-            FD_SET(x11_fd, &fds);
-            FD_SET(pipe_fd, &fds);
-
-            struct timeval tv;
-            tv.tv_sec = 0;
-            tv.tv_usec = 200000;  // 200ms
-
-            int ret = select(max_fd, &fds, nullptr, nullptr, &tv);
-
-            if (!running_.load()) break;
-
-            if (ret > 0 && FD_ISSET(pipe_fd, &fds)) {
-                spdlog::debug("Hotkey thread: pipe wakeup received");
-                break;
-            }
-
-            if (ret > 0 && FD_ISSET(x11_fd, &fds)) {
-                XRecordProcessReplies(impl->data_display);
-            }
+        if (impl->record_ctx) {
+            XRecordFreeContext(impl->ctrl_display, impl->record_ctx);
+            impl->record_ctx = 0;
         }
 
-        // Clean up XRecord.  With the async API the data_display
-        // connection may be waiting for server replies, so
-        // XRecordDisableContext can block.  Closing the displays is
-        // sufficient — the X server tears down the record context
-        // automatically when the connection drops.
-        {
-            std::lock_guard<std::timed_mutex> lock(impl->x_mutex);
-            XCloseDisplay(impl->data_display);
-            impl->data_display = nullptr;
-
-            if (impl->record_ctx) {
-                XRecordFreeContext(impl->ctrl_display, impl->record_ctx);
-                impl->record_ctx = 0;
-            }
-
-            XCloseDisplay(impl->ctrl_display);
-            impl->ctrl_display = nullptr;
-        }
+        XCloseDisplay(impl->ctrl_display);
+        impl->ctrl_display = nullptr;
     });
 }
 
@@ -306,16 +299,6 @@ void HotkeyManager::signal_stop() {
 
     spdlog::info("Signaling hotkey listener to stop");
     running_.store(false);
-
-    // Write to pipe to wake the select() immediately
-    if (impl_->wake_pipe[1] >= 0) {
-        char c = 1;
-        ssize_t n = write(impl_->wake_pipe[1], &c, 1);
-        (void)n;
-    }
-
-    // End the record stream so a thread inside XRecordProcessReplies()
-    // returns instead of waiting for more data.
     impl_->nudge_record_shutdown();
 }
 
@@ -323,33 +306,23 @@ void HotkeyManager::stop() {
     running_.store(false);
 
     if (!impl_->listener_thread.joinable()) {
-        // Nothing to wait for; just release pipe fds and cached state.
-        if (impl_->wake_pipe[0] >= 0) { close(impl_->wake_pipe[0]); impl_->wake_pipe[0] = -1; }
-        if (impl_->wake_pipe[1] >= 0) { close(impl_->wake_pipe[1]); impl_->wake_pipe[1] = -1; }
         pressed_modifiers_.clear();
         trigger_pressed_ = false;
         active_trigger_.reset();
         return;
     }
 
-    // Always write to wake pipe — signal_stop() may have been called
-    // earlier without the thread having drained the pipe yet, or the
-    // thread may be blocked in select() and needs another nudge.
-    if (impl_->wake_pipe[1] >= 0) {
-        char c = 1;
-        ssize_t n = write(impl_->wake_pipe[1], &c, 1);
-        (void)n;
-    }
-
-    impl_->nudge_record_shutdown();
-
-    // Bounded wait. The historical settings pause/resume deadlock hung
-    // forever in join() while the listener sat inside
-    // XRecordProcessReplies(); never block shutdown on the X server.
+    // Repeatedly ask the server to end the record stream until the thread
+    // exits. Retrying closes the startup race where a single nudge lands
+    // before the context is enabled and would otherwise be lost — the
+    // historical settings resume path deadlocked exactly like that
+    // (docs/hotkey-resume-deadlock.md). Never block shutdown on the X
+    // server: bound the whole wait.
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
     while (!impl_->thread_exited.load() &&
            std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        impl_->nudge_record_shutdown();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     if (impl_->thread_exited.load()) {
@@ -358,18 +331,17 @@ void HotkeyManager::stop() {
         // Last resort: the X server is unresponsive and the listener cannot
         // exit. Detach and leak the Impl so the zombie thread never touches
         // freed memory; a bounded leak beats a deadlocked or aborted app.
+        // If the zombie's connection later errors, the IO error handler
+        // exits only that thread.
         spdlog::error(
             "Hotkey listener did not exit within 5s (X server unresponsive?); "
             "detaching listener thread and leaking its resources");
         impl_->listener_thread.detach();
-        (void)impl_.release();
+        Impl* leaked = impl_.release();
+        leaked->manager = nullptr;
         impl_ = std::make_unique<Impl>();
         impl_->manager = this;
     }
-
-    // Close pipe
-    if (impl_->wake_pipe[0] >= 0) { close(impl_->wake_pipe[0]); impl_->wake_pipe[0] = -1; }
-    if (impl_->wake_pipe[1] >= 0) { close(impl_->wake_pipe[1]); impl_->wake_pipe[1] = -1; }
 
     // Safe after listener thread has exited (or been abandoned).
     pressed_modifiers_.clear();
