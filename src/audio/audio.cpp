@@ -47,6 +47,12 @@ void AudioManager::audio_callback(void* device_ptr, void* output, const void* in
     // Copy audio data
     std::vector<float> chunk(samples, samples + frame_count);
 
+    // Live peak for the avatar's listening halo (decay smoothed).
+    float peak = 0.f;
+    for (float s : chunk) peak = std::max(peak, std::fabs(s));
+    float prev = mgr->peak_.load(std::memory_order_relaxed);
+    mgr->peak_.store(std::max(peak, prev * 0.82f), std::memory_order_relaxed);
+
     // Check total duration
     size_t total_samples = 0;
     {
@@ -135,6 +141,7 @@ void AudioManager::start_recording() {
         return;
     }
 
+    peak_.store(0.f, std::memory_order_relaxed);
     recording_.store(true);
     spdlog::debug("Recording started");
 }

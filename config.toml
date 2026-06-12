@@ -22,6 +22,15 @@ frequency_start = 800
 frequency_stop = 400
 volume = 0.3
 
+[formatting]
+# Remove hesitation words (um, uh, ...). English only.
+remove_fillers = true
+# Turn standalone "new line" / "new paragraph" into real line breaks.
+spoken_commands = true
+# Personal dictionary: 'spoken => written'.
+# dictionary = [ 'auto whisper => AutoWhisper' ]
+dictionary = [ ]
+
 [hotkeys]
 cancel = [ 'esc' ]
 escape_to_cancel = true
@@ -38,8 +47,9 @@ device = 'cuda'
 language = 'en'
 num_threads = 4
 # size: tiny, tiny.en, base, base.en, small, small.en, medium, medium.en,
-#       large, large-v1, large-v2, large-v3,
+#       large, large-v1, large-v2, large-v3, large-v3-turbo,
 #       distil-large-v2, distil-large-v3, distil-medium.en, distil-small.en
+# language: ISO 639-1 code, or 'auto' to detect (needs a multilingual model)
 size = 'distil-small.en'
 
 [output]
@@ -54,3 +64,10 @@ paste_delay = 0.05
 
 [tray]
 enabled = true
+
+[avatar]
+# The floating companion. Glows while listening, writes while inserting.
+enabled = false
+# character: echo (answers), hermes (swift, blue), mnemosyne (memory, amber)
+character = 'echo'
+size = 96

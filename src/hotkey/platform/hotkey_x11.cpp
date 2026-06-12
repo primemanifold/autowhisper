@@ -8,16 +8,46 @@
 #include <X11/extensions/record.h>
 #include <X11/extensions/XTest.h>
 
+#include <pthread.h>
+
+#include <chrono>
 #include <cstring>
-#include <sys/select.h>
+#include <mutex>
 #include <thread>
-#include <unistd.h>
 
 namespace autowhisper {
 
-static struct XThreadInit {
+namespace {
+
+// Marks the XRecord listener thread so the IO error handler can tell it
+// apart from the rest of the process.
+thread_local bool t_is_listener_thread = false;
+
+XIOErrorHandler g_previous_io_handler = nullptr;
+
+// Xlib's default IO error handler exits the whole process. If the listener
+// thread's connection dies (X server gone, or a connection abandoned by the
+// bounded-stop fallback), only that thread should die — dictation degrades
+// instead of taking the daemon down. pthread_exit unwinds the thread's
+// stack, so the exit flag destructor still fires.
+int listener_io_error_handler(Display* dpy) {
+    if (t_is_listener_thread) {
+        spdlog::error("X11 hotkey listener lost its X connection; stopping listener thread");
+        pthread_exit(nullptr);
+    }
+    if (g_previous_io_handler && g_previous_io_handler != listener_io_error_handler) {
+        return g_previous_io_handler(dpy);
+    }
+    spdlog::critical("Fatal X11 IO error");
+    _exit(1);
+}
+
+struct XThreadInit {
     XThreadInit() { XInitThreads(); }
-} s_x_thread_init;
+};
+XThreadInit s_x_thread_init;
+
+}  // namespace
 
 struct HotkeyManager::Impl {
     HotkeyManager* manager = nullptr;
@@ -25,7 +55,26 @@ struct HotkeyManager::Impl {
     Display* ctrl_display = nullptr;
     XRecordContext record_ctx = 0;
     std::thread listener_thread;
-    int wake_pipe[2] = {-1, -1};  // pipe to signal thread to stop
+
+    // Guards ctrl_display/record_ctx lifetime so stop() can issue
+    // XRecordDisableContext without racing the thread's own cleanup.
+    // timed_mutex: if the thread is wedged in an X call while holding it,
+    // the nudge is skipped rather than turning stop() into a second hang.
+    std::timed_mutex x_mutex;
+    std::atomic<bool> thread_exited{false};
+
+    // Asks the X server to end the record stream. The listener blocks inside
+    // the synchronous XRecordEnableContext; this is the documented way to
+    // make it return. Issued from the control connection, which is safe
+    // cross-thread after XInitThreads.
+    void nudge_record_shutdown() {
+        std::unique_lock<std::timed_mutex> lock(x_mutex, std::defer_lock);
+        if (!lock.try_lock_for(std::chrono::milliseconds(500))) return;
+        if (ctrl_display && record_ctx) {
+            XRecordDisableContext(ctrl_display, record_ctx);
+            XFlush(ctrl_display);
+        }
+    }
 
     static std::string keycode_to_modifier(Display* dpy, unsigned int keycode) {
         KeySym ks = XkbKeycodeToKeysym(dpy, keycode, 0, 0);
@@ -140,43 +189,63 @@ void HotkeyManager::start() {
                  }(),
                  config_.mode);
 
-    // Create wake pipe for signaling the thread to stop
-    if (pipe(impl_->wake_pipe) != 0) {
-        spdlog::error("Failed to create wake pipe");
-        return;
+    // Install after GTK (or anything else) has set its own handler so we
+    // can chain to it for non-listener threads.
+    XIOErrorHandler previous = XSetIOErrorHandler(listener_io_error_handler);
+    if (previous != listener_io_error_handler) {
+        g_previous_io_handler = previous;
     }
 
     running_.store(true);
+    impl_->thread_exited.store(false);
 
-    impl_->listener_thread = std::thread([this]() {
-        impl_->ctrl_display = XOpenDisplay(nullptr);
-        impl_->data_display = XOpenDisplay(nullptr);
+    // The thread works through a raw Impl pointer captured here: if stop()
+    // ever has to abandon the thread it leaks this Impl and re-creates
+    // impl_, so the zombie must never dereference the member again.
+    impl_->listener_thread = std::thread([this, impl = impl_.get()]() {
+        t_is_listener_thread = true;
 
-        if (!impl_->data_display || !impl_->ctrl_display) {
-            spdlog::error("Failed to open X11 display for hotkey listener");
+        struct ExitFlag {
+            std::atomic<bool>& flag;
+            ~ExitFlag() { flag.store(true); }
+        } exit_flag{impl->thread_exited};
+
+        {
+            std::lock_guard<std::timed_mutex> lock(impl->x_mutex);
+            impl->ctrl_display = XOpenDisplay(nullptr);
+            impl->data_display = XOpenDisplay(nullptr);
+        }
+
+        auto fail_cleanup = [this, impl]() {
+            std::lock_guard<std::timed_mutex> lock(impl->x_mutex);
+            if (impl->data_display) {
+                XCloseDisplay(impl->data_display);
+                impl->data_display = nullptr;
+            }
+            if (impl->ctrl_display) {
+                XCloseDisplay(impl->ctrl_display);
+                impl->ctrl_display = nullptr;
+            }
             running_.store(false);
+        };
+
+        if (!impl->data_display || !impl->ctrl_display) {
+            spdlog::error("Failed to open X11 display for hotkey listener");
+            fail_cleanup();
             return;
         }
 
         int major, minor;
-        if (!XRecordQueryVersion(impl_->ctrl_display, &major, &minor)) {
+        if (!XRecordQueryVersion(impl->ctrl_display, &major, &minor)) {
             spdlog::error("XRecord extension not available");
-            XCloseDisplay(impl_->data_display);
-            XCloseDisplay(impl_->ctrl_display);
-            impl_->data_display = nullptr;
-            impl_->ctrl_display = nullptr;
-            running_.store(false);
+            fail_cleanup();
             return;
         }
 
         XRecordRange* range = XRecordAllocRange();
         if (!range) {
             spdlog::error("Failed to allocate XRecord range");
-            XCloseDisplay(impl_->data_display);
-            XCloseDisplay(impl_->ctrl_display);
-            impl_->data_display = nullptr;
-            impl_->ctrl_display = nullptr;
-            running_.store(false);
+            fail_cleanup();
             return;
         }
 
@@ -184,78 +253,44 @@ void HotkeyManager::start() {
         range->device_events.last = KeyRelease;
 
         XRecordClientSpec clients = XRecordAllClients;
-        impl_->record_ctx = XRecordCreateContext(impl_->ctrl_display, 0, &clients, 1, &range, 1);
+        {
+            std::lock_guard<std::timed_mutex> lock(impl->x_mutex);
+            impl->record_ctx =
+                XRecordCreateContext(impl->ctrl_display, 0, &clients, 1, &range, 1);
+        }
         XFree(range);
 
-        if (!impl_->record_ctx) {
+        if (!impl->record_ctx) {
             spdlog::error("Failed to create XRecord context");
-            XCloseDisplay(impl_->data_display);
-            XCloseDisplay(impl_->ctrl_display);
-            impl_->data_display = nullptr;
-            impl_->ctrl_display = nullptr;
-            running_.store(false);
+            fail_cleanup();
             return;
         }
 
-        XSync(impl_->ctrl_display, False);
+        // The create request must reach the server before the data
+        // connection refers to the context.
+        XSync(impl->ctrl_display, False);
 
-        // Use async API so we never block indefinitely
-        if (!XRecordEnableContextAsync(impl_->data_display, impl_->record_ctx,
-                                        Impl::record_callback,
-                                        reinterpret_cast<XPointer>(impl_.get()))) {
+        // Canonical XRecord pattern: the synchronous enable blocks here,
+        // dispatching record_callback for each event, and returns when
+        // XRecordDisableContext is issued on the control connection
+        // (stop()'s nudge loop). No bespoke select/pipe machinery.
+        if (!XRecordEnableContext(impl->data_display, impl->record_ctx,
+                                  Impl::record_callback,
+                                  reinterpret_cast<XPointer>(impl))) {
             spdlog::error("Failed to enable XRecord context");
-            running_.store(false);
-            return;
         }
 
-        // Flush the enable request to the X server — without this,
-        // the request sits in Xlib's output buffer and the server
-        // never starts delivering XRecord events.
-        XFlush(impl_->data_display);
+        std::lock_guard<std::timed_mutex> lock(impl->x_mutex);
+        XCloseDisplay(impl->data_display);
+        impl->data_display = nullptr;
 
-        int x11_fd = ConnectionNumber(impl_->data_display);
-        int pipe_fd = impl_->wake_pipe[0];
-        int max_fd = std::max(x11_fd, pipe_fd) + 1;
-
-        while (running_.load()) {
-            fd_set fds;
-            FD_ZERO(&fds);
-            FD_SET(x11_fd, &fds);
-            FD_SET(pipe_fd, &fds);
-
-            struct timeval tv;
-            tv.tv_sec = 0;
-            tv.tv_usec = 200000;  // 200ms
-
-            int ret = select(max_fd, &fds, nullptr, nullptr, &tv);
-
-            if (!running_.load()) break;
-
-            if (ret > 0 && FD_ISSET(pipe_fd, &fds)) {
-                spdlog::debug("Hotkey thread: pipe wakeup received");
-                break;
-            }
-
-            if (ret > 0 && FD_ISSET(x11_fd, &fds)) {
-                XRecordProcessReplies(impl_->data_display);
-            }
+        if (impl->record_ctx) {
+            XRecordFreeContext(impl->ctrl_display, impl->record_ctx);
+            impl->record_ctx = 0;
         }
 
-        // Clean up XRecord.  With the async API the data_display
-        // connection may be waiting for server replies, so
-        // XRecordDisableContext can block.  Closing the displays is
-        // sufficient — the X server tears down the record context
-        // automatically when the connection drops.
-        XCloseDisplay(impl_->data_display);
-        impl_->data_display = nullptr;
-
-        if (impl_->record_ctx) {
-            XRecordFreeContext(impl_->ctrl_display, impl_->record_ctx);
-            impl_->record_ctx = 0;
-        }
-
-        XCloseDisplay(impl_->ctrl_display);
-        impl_->ctrl_display = nullptr;
+        XCloseDisplay(impl->ctrl_display);
+        impl->ctrl_display = nullptr;
     });
 }
 
@@ -264,36 +299,51 @@ void HotkeyManager::signal_stop() {
 
     spdlog::info("Signaling hotkey listener to stop");
     running_.store(false);
-
-    // Write to pipe to wake the select() immediately
-    if (impl_->wake_pipe[1] >= 0) {
-        char c = 1;
-        ssize_t n = write(impl_->wake_pipe[1], &c, 1);
-        (void)n;
-    }
+    impl_->nudge_record_shutdown();
 }
 
 void HotkeyManager::stop() {
     running_.store(false);
 
-    // Always write to wake pipe — signal_stop() may have been called
-    // earlier without the thread having drained the pipe yet, or the
-    // thread may be blocked in select() and needs another nudge.
-    if (impl_->wake_pipe[1] >= 0) {
-        char c = 1;
-        ssize_t n = write(impl_->wake_pipe[1], &c, 1);
-        (void)n;
+    if (!impl_->listener_thread.joinable()) {
+        pressed_modifiers_.clear();
+        trigger_pressed_ = false;
+        active_trigger_.reset();
+        return;
     }
 
-    if (impl_->listener_thread.joinable()) {
+    // Repeatedly ask the server to end the record stream until the thread
+    // exits. Retrying closes the startup race where a single nudge lands
+    // before the context is enabled and would otherwise be lost — the
+    // historical settings resume path deadlocked exactly like that
+    // (docs/hotkey-resume-deadlock.md). Never block shutdown on the X
+    // server: bound the whole wait.
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (!impl_->thread_exited.load() &&
+           std::chrono::steady_clock::now() < deadline) {
+        impl_->nudge_record_shutdown();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
+    if (impl_->thread_exited.load()) {
         impl_->listener_thread.join();
+    } else {
+        // Last resort: the X server is unresponsive and the listener cannot
+        // exit. Detach and leak the Impl so the zombie thread never touches
+        // freed memory; a bounded leak beats a deadlocked or aborted app.
+        // If the zombie's connection later errors, the IO error handler
+        // exits only that thread.
+        spdlog::error(
+            "Hotkey listener did not exit within 5s (X server unresponsive?); "
+            "detaching listener thread and leaking its resources");
+        impl_->listener_thread.detach();
+        Impl* leaked = impl_.release();
+        leaked->manager = nullptr;
+        impl_ = std::make_unique<Impl>();
+        impl_->manager = this;
     }
 
-    // Close pipe
-    if (impl_->wake_pipe[0] >= 0) { close(impl_->wake_pipe[0]); impl_->wake_pipe[0] = -1; }
-    if (impl_->wake_pipe[1] >= 0) { close(impl_->wake_pipe[1]); impl_->wake_pipe[1] = -1; }
-
-    // Safe after listener thread has exited.
+    // Safe after listener thread has exited (or been abandoned).
     pressed_modifiers_.clear();
     trigger_pressed_ = false;
     active_trigger_.reset();

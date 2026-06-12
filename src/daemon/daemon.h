@@ -2,10 +2,12 @@
 
 #include "config/config.h"
 #include "audio/audio.h"
+#include "avatar/avatar.h"
 #include "feedback/feedback.h"
 #include "hotkey/hotkey.h"
 #include "inference/inference.h"
 #include "output/output.h"
+#include "pipeline/transcript_pipeline.h"
 #include "pulseaudio/pulseaudio.h"
 #include "tray/tray.h"
 
@@ -51,11 +53,13 @@ private:
     // Components
     std::unique_ptr<AudioManager> audio_;
     std::unique_ptr<WhisperInference> whisper_;
+    std::unique_ptr<TranscriptPipeline> pipeline_;
     std::unique_ptr<OutputManager> output_;
     std::unique_ptr<FeedbackManager> feedback_;
     std::unique_ptr<PulseAudioManager> pulseaudio_;
     std::unique_ptr<HotkeyManager> hotkey_;
     std::unique_ptr<TrayManager> tray_;
+    std::unique_ptr<AvatarManager> avatar_;
 
     static constexpr float MIN_DURATION = 0.5f;
 
@@ -69,6 +73,7 @@ private:
     void remove_pid_file();
     void cleanup();
     void setup_signals();
+    static bool other_audio_playing();
 };
 
 } // namespace autowhisper

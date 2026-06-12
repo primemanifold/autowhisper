@@ -1,128 +1,47 @@
 # Hotkey Resume Deadlock After Settings Dialog
 
-## Status: Open — investigation in progress
+## Status: Resolved — 2026-06-12
 
-## Summary
+Two things closed this defect:
 
-After opening and closing the tray settings dialog, the hotkey listener becomes unresponsive. The daemon process stays alive but hotkeys no longer trigger recording. On subsequent quit from the tray menu, the process aborts with a deadlock error.
+1. **The triggering path no longer exists.** The GTK settings dialog (and its
+   pause→resume→`reconfigure_hotkey()` flow in the daemon) was removed when
+   settings moved to the browser UI launched as a separate process. The daemon
+   no longer stops/restarts the hotkey listener mid-run.
 
-## Reproduction
+2. **`HotkeyManager::stop()` was hardened so the deadlock class cannot recur**
+   (`src/hotkey/platform/hotkey_x11.cpp`):
+   - `stop()`/`signal_stop()` now call `XRecordDisableContext` on the control
+     display before waiting. This is the documented way to unblock a listener
+     sitting inside `XRecordProcessReplies()`: the server ends the record
+     stream and the call returns. Display/context lifetime is guarded by a
+     timed mutex so the nudge cannot race the thread's own cleanup.
+   - The join is bounded (5 s). If the X server is truly unresponsive, the
+     listener thread is detached and its `Impl` deliberately leaked so the
+     zombie never touches freed memory — a bounded leak instead of a deadlocked
+     or `std::terminate`d daemon.
+   - The listener thread works through a raw `Impl` pointer captured at spawn,
+     so an abandoned thread keeps using the leaked `Impl` even after the
+     manager re-creates its own.
 
-1. Start autowhisper normally — hotkeys work (tested: recording + transcription OK)
-2. Open settings from the tray icon
-3. Close settings
-4. Try pressing the hotkey — nothing happens
-5. Quit from tray menu — crash:
+## Regression coverage
 
-```
-terminate called after throwing an instance of 'std::system_error'
-  what():  Resource deadlock avoided
-```
+`tests/cpp/test_hotkey_x11.cpp` runs the listener against a private Xvfb with
+XTest-synthesized keys:
 
-Systemd reports: `Main process exited, code=dumped, status=6/ABRT`
+- push-to-talk chord delivers `START`/`STOP` end to end;
+- repeated start→traffic→stop cycles (the old reconfigure shape) assert
+  `stop()` returns within the bound;
+- `stop()` without `start()` is a no-op.
 
-## Log Evidence
+The tests skip gracefully when Xvfb is not installed; CI installs `xvfb` so
+they always run there.
 
-From PID 3455543 (journalctl):
+## Historical analysis (for archaeology)
 
-```
-01:00:04 Settings opened - pausing daemon
-01:00:04 Pausing hotkey handling
-01:00:09 Settings closed - resuming daemon
-01:00:09 Scheduling hotkey listener resume
-01:00:09 Resuming hotkey listener
-         ← NO "Starting hotkey listener" log follows (should come from start())
-         ← ~1 minute of silence, hotkeys dead
-01:01:13 Quit requested from tray menu
-01:01:13 terminate called after throwing an instance of 'std::system_error'
-01:01:13   what():  Resource deadlock avoided
-```
-
-The absence of "Starting hotkey listener: trigger=..." after "Resuming hotkey listener" confirms that `reconfigure_hotkey()` never gets past `hotkey_->stop()`.
-
-## Thread State (PID 3455868, second instance, same stuck state)
-
-```
-Thread 3455868 (main):    futex_wait_queue   ← blocked on join()
-Thread 3455869:           do_poll.constprop.0
-Thread 3455873:           futex_wait_queue
-Thread 3455874-3455882:   do_poll / futex_wait_queue (GTK, audio, etc.)
-```
-
-Main thread stuck in `futex_wait_queue` = blocked on `pthread_join` inside `HotkeyManager::stop()`.
-
-## Code Flow
-
-### Pause/resume path
-
-```
-GTK thread: tray settings "close" callback
-  → AutoWhisperDaemon::resume_hotkey()           [daemon.cpp:263]
-    → hotkey_reconfigure_requested_ = true
-    → queue_cv_.notify_all()
-
-Main loop thread: process_events()               [daemon.cpp:120]
-  → sees hotkey_reconfigure_requested_
-  → calls reconfigure_hotkey()                    [daemon.cpp:269]
-    → logs "Resuming hotkey listener"
-    → hotkey_->stop()                             ← BLOCKS HERE
-      → running_ = false
-      → write to wake_pipe
-      → listener_thread.join()                    ← DEADLOCK
-    → (never reaches) new HotkeyManager + start()
-```
-
-### HotkeyManager::stop() [hotkey_x11.cpp:276]
-
-```cpp
-void HotkeyManager::stop() {
-    running_.store(false);
-    // write wake pipe
-    if (impl_->wake_pipe[1] >= 0) {
-        char c = 1;
-        write(impl_->wake_pipe[1], &c, 1);
-    }
-    // THIS JOIN NEVER RETURNS:
-    if (impl_->listener_thread.joinable()) {
-        impl_->listener_thread.join();
-    }
-    // ... cleanup never reached
-}
-```
-
-### Listener thread loop [hotkey_x11.cpp:220]
-
-```cpp
-while (running_.load()) {
-    // select() on x11_fd + pipe_fd, 200ms timeout
-    // if pipe wakeup → break
-    // if x11 data → XRecordProcessReplies(data_display)
-}
-// cleanup: close displays, free XRecord context
-```
-
-## Crash on Quit
-
-The `std::system_error: Resource deadlock avoided` (EDEADLK) is thrown when the quit handler (GTK thread) tries to join a thread that results in a deadlock condition, while the main thread is already stuck in `join()` from `reconfigure_hotkey()`.
-
-## Likely Root Cause Candidates
-
-1. **XRecord listener thread not exiting the select loop.** Even though `running_` is set to `false` and the wake pipe is written to, the thread may be stuck in `XRecordProcessReplies()` which blocks inside Xlib waiting for more data from the X server. The async XRecord API can hold the `data_display` connection lock.
-
-2. **XCloseDisplay or XRecordFreeContext blocking.** If the thread does exit the loop, the cleanup code closes `data_display` first, then calls `XRecordFreeContext` on `ctrl_display`. Either of these X calls could block on internal Xlib locks or server round-trips.
-
-3. **Xlib thread-safety issue.** `XInitThreads()` is called, but the XRecord async callback (`record_callback`) accesses `ctrl_display` to resolve keycodes (via `XkbKeycodeToKeysym`). If the main thread or cleanup code is simultaneously using `ctrl_display`, Xlib's internal locking could deadlock.
-
-## Key Files
-
-| File | Relevance |
-|------|-----------|
-| `src/hotkey/platform/hotkey_x11.cpp` | XRecord listener, start/stop/cleanup |
-| `src/hotkey/hotkey.h` | HotkeyManager interface |
-| `src/daemon/daemon.cpp:253-291` | pause_hotkey, resume_hotkey, reconfigure_hotkey |
-| `src/daemon/daemon.cpp:110-124` | process_events main loop |
-| `src/tray/platform/tray_gtk_settings.cpp` | Settings dialog callbacks (triggers pause/resume) |
-
-## Uncommitted Fix Already Applied (separate issue)
-
-The committed change `6d65523` fixed XRecord cleanup ordering (close `data_display` before freeing context) and made `stop()` write to wake pipe directly. This fix is correct but does not resolve the deadlock — it addresses a different shutdown path.
+The original failure: after closing the tray settings dialog,
+`reconfigure_hotkey()` called `hotkey_->stop()`, which blocked forever in
+`listener_thread.join()` while the listener sat in `XRecordProcessReplies()`
+waiting for more data. A subsequent quit from the tray thread then crashed
+with `std::system_error: Resource deadlock avoided`. Root cause candidates and
+thread dumps are preserved in the git history of this file.

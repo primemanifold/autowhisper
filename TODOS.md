@@ -41,7 +41,6 @@ tracked so they aren't lost.
   to `Info.plist.in`. Cosmetic Finder icon; menu-bar tray uses SF Symbols
   so doesn't affect functionality. ISSUE-001 from the /qa report.
   Effort: S (CC ~15 min).
-- **Settings UI `/api/config` PUT float precision** — round floats to their
-  source precision on write so `silence_duration = 0.3` doesn't become
-  `0.30000001192092896` after a round-trip. Pre-existing, not mac-specific.
-  ISSUE-002 from the /qa report. Effort: S.
+- ~~**Settings UI `/api/config` PUT float precision**~~ — Done 2026-06-12:
+  floats now serialize as their shortest round-trip decimal (charconv off
+  Apple, relaxed precision on Apple). Covered by config round-trip tests.

@@ -9,6 +9,16 @@
   const sectionLede = document.getElementById("active-section-lede");
   const nav = document.getElementById("settings-nav");
 
+  // Session token issued by the local settings server. It arrives once via
+  // the launch URL; keep it in sessionStorage so same-tab reloads work, and
+  // send it on every API call as a Bearer header.
+  const urlToken = new URLSearchParams(window.location.search).get("token");
+  if (urlToken) {
+    sessionStorage.setItem("aw-session-token", urlToken);
+  }
+  const sessionToken = urlToken || sessionStorage.getItem("aw-session-token") || "";
+  const authHeaders = sessionToken ? { Authorization: "Bearer " + sessionToken } : {};
+
   const IA_SECTIONS = [
     {
       id: "dictation",
@@ -35,8 +45,8 @@
       id: "output",
       number: "04",
       title: "Output & insertion",
-      lede: "Control how text reaches the current app and what fallback behavior is allowed.",
-      sections: ["output"],
+      lede: "Control how text reaches the current app, how transcripts are cleaned up, and what fallback behavior is allowed.",
+      sections: ["output", "formatting"],
     },
     {
       id: "privacy",
@@ -50,8 +60,8 @@
       id: "feedback",
       number: "06",
       title: "Feedback & tray",
-      lede: "Tune the tones and tray visibility that tell you when dictation is ready, recording, or blocked.",
-      sections: ["feedback", "tray"],
+      lede: "Tones, tray visibility, and the floating companion that listens and writes with you.",
+      sections: ["feedback", "tray", "avatar"],
     },
     {
       id: "diagnostics",
@@ -109,7 +119,7 @@
     try {
       const res = await fetch("/api/config", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify(body),
       });
       if (res.status === 204) {
@@ -149,7 +159,7 @@
   });
 
   async function loadJson(url) {
-    const r = await fetch(url);
+    const r = await fetch(url, { headers: authHeaders });
     if (!r.ok) {
       let detail = r.statusText;
       try {

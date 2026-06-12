@@ -13,6 +13,9 @@
 #ifndef W_OK
 #define W_OK 2
 #endif
+#ifndef S_ISDIR
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#endif
 #define access _access
 #define getpid _getpid
 #else
@@ -91,12 +94,16 @@ std::optional<SidecarContents> parse_sidecar(std::string_view raw) {
     }
     if (c.pid <= 0 || c.port <= 0 || c.port > 65535) return std::nullopt;
     c.canonical_path = path_line;
+    std::string token_line;
+    if (std::getline(is, token_line)) {
+        c.token = token_line;
+    }
     return c;
 }
 
 std::string format_sidecar(const SidecarContents& c) {
     std::ostringstream os;
-    os << c.pid << "\n" << c.port << "\n" << c.canonical_path << "\n";
+    os << c.pid << "\n" << c.port << "\n" << c.canonical_path << "\n" << c.token << "\n";
     return os.str();
 }
 

@@ -1,3 +1,25 @@
+autowhisper (0.8.0-1) noble; urgency=medium
+
+  * Truth & foundations release (production plan M1) plus the companion.
+    - Multilingual model catalog (incl. large-v3-turbo) with language=auto
+      and SHA-256-verified, self-healing model downloads
+    - Transcript pipeline: filler removal, personal dictionary
+      ("spoken => written"), spoken commands (new line / new paragraph)
+    - Echo, the floating companion: click-to-dictate button with live
+      voice halo and state captions; forms echo/hermes/mnemosyne
+    - Windows: real global hotkey (WH_KEYBOARD_LL), SendInput Unicode
+      text injection and clipboard (closes #14)
+    - X11 hotkey listener rewritten to the canonical sync XRecord
+      pattern with bounded shutdown; settings-resume deadlock closed
+    - Settings server hardened: per-session bearer token and loopback
+      Host allowlist; config floats serialize as shortest round-trip
+    - Neutral light/dark design system across settings UI and site;
+      status-only motion with prefers-reduced-motion support
+    - Benchmark harness (latency/RTF/WER); CI builds and uploads
+      artifacts for Linux, macOS, and Windows on every push
+
+ -- AutoWhisper Maintainers <maintainers@autowhisper.dev>  Fri, 12 Jun 2026 17:00:00 +0000
+
 autowhisper (0.7.0-1) noble; urgency=medium
 
   * macOS port: first-class mac target via native frameworks

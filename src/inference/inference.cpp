@@ -1,4 +1,5 @@
 #include "inference/inference.h"
+#include "models/models.h"
 
 #include <spdlog/spdlog.h>
 #include <whisper.h>
@@ -34,7 +35,13 @@ std::string WhisperInference::resolve_model_path() const {
 
     std::vector<std::string> search_paths;
 
-    // Exact filename match first
+    // The catalog is the source of truth for filenames (some models, e.g.
+    // distil-medium.en, use a filename that does not match "ggml-<name>.bin").
+    if (const ModelInfo* info = find_model(model_name)) {
+        search_paths.push_back(home_dir + "/.cache/whisper/" + info->ggml_file);
+    }
+
+    // Name-derived fallback for models supplied manually.
     std::string ggml_name = "ggml-" + model_name + ".bin";
     search_paths.push_back(home_dir + "/.cache/whisper/" + ggml_name);
     search_paths.push_back(home_dir + "/.cache/whisper.cpp/" + ggml_name);

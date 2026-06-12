@@ -44,6 +44,13 @@ struct OutputConfig {
     bool also_copy_to_clipboard = true;
 };
 
+struct FormattingConfig {
+    bool remove_fillers = true;
+    bool spoken_commands = true;
+    // Personal dictionary entries, "spoken => written".
+    std::vector<std::string> dictionary;
+};
+
 struct FeedbackConfig {
     bool enabled = true;
     int frequency_start = 800;
@@ -62,6 +69,12 @@ struct DaemonConfig {
 
 struct TrayConfig {
     bool enabled = true;
+};
+
+struct AvatarConfig {
+    bool enabled = false;          // opt-in companion
+    std::string character = "echo"; // echo, hermes, mnemosyne
+    int size = 96;                  // window size in pixels
 };
 
 enum class ValidationSeverity {
@@ -88,9 +101,11 @@ struct Config {
     AudioConfig audio;
     HotkeyConfig hotkeys;
     OutputConfig output;
+    FormattingConfig formatting;
     FeedbackConfig feedback;
     DaemonConfig daemon;
     TrayConfig tray;
+    AvatarConfig avatar;
 
     static Config load(const std::string& path);
     static ConfigLoadResult load_with_diagnostics(const std::string& path);
@@ -118,5 +133,10 @@ std::string resolve_config_path();
 // Ensure a writable per-user config exists. If the user config is absent,
 // copy the bundled/default config when available, otherwise write defaults.
 std::string ensure_user_config_file();
+
+// The shortest double whose decimal form round-trips the float exactly.
+// Used wherever config floats are serialized (TOML, settings JSON) so
+// 0.05f surfaces as 0.05, never 0.05000000074505806.
+double shortest_double(float v);
 
 } // namespace autowhisper

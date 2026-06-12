@@ -130,3 +130,36 @@ Treat this slice as a desktop-platform foundation gate: macOS is validated host-
 - Platform diagnostics explicitly expose ready/partial/placeholder/unsupported feature states.
 - `engineering/desktop-platform-foundation.md` documents Docker limits and avoids claiming macOS containers or Windows runtime execution.
 - Cross-compiled tests are not registered unless `CMAKE_CROSSCOMPILING_EMULATOR` is present.
+
+
+## ADR-0008 — Production-readiness plan and decisions D1–D7 ratified
+
+Date: 2026-06-12
+
+### Context
+
+Channa requested a plan to take AutoWhisper to production level and public readiness on
+macOS, Windows, and Linux, with complete sign-on and feature parity with Wispr Flow. The
+plan was authored as `docs/plans/2026-06-12-production-readiness-plan.md` (goals G1–G8,
+milestones M1–M7, decision log D1–D7) and Channa signed off on the strategic calls.
+
+### Decision
+
+The plan is ratified and supersedes the provisional milestones in `.hermes/roadmap.md`.
+Decisions adopted as recommended:
+
+- D1: local dictation stays free/unlimited; Pro = sync + hosted AI polish; open-core boundary at the client/backend line.
+- D2: managed identity provider (Auth0/Clerk class) with Google, Apple, Microsoft, email and a SAML path.
+- D3: hybrid LLM strategy — bundled local small model by default, BYO cloud key opt-in.
+- D4: Windows code signing via Azure Trusted Signing.
+- D5: Sentry Native crash reporting, strictly opt-in.
+- D6: trademark review of the "AutoWhisper" name before public launch (M6 gate).
+- D7: transcription history off by default.
+
+### Consequences
+
+- M1 ("Truth & foundations") execution starts immediately: X11 resume-deadlock fix,
+  multilingual model catalog with auto language detection, CI matrix (macOS/Windows),
+  settings-server hardening, model checksum verification, benchmark harness.
+- Parity is experience parity: the offline/local-first/open-source/Linux differentiators
+  are preserved in every milestone.

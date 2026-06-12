@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(autowhisper VERSION 0.7.1 LANGUAGES CXX)
+project(autowhisper VERSION 0.8.0 LANGUAGES CXX)
 
 # macOS: Objective-C++ for .mm files, ARC, minimum target, universal binary.
 if(APPLE)
@@ -19,6 +19,10 @@ if(APPLE)
 endif()
 
 set(CMAKE_CXX_STANDARD 20)
+if(MSVC)
+    # Self-contained exe: no VC++ redistributable required on user machines.
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -33,9 +37,15 @@ endif()
 # Options
 option(AUTOWHISPER_ENABLE_CUDA "Enable CUDA support via whisper.cpp" OFF)
 option(AUTOWHISPER_ENABLE_TESTS "Build tests" ON)
+option(AUTOWHISPER_ENABLE_BENCH "Build the benchmark harness" OFF)
 
 # Include our CMake modules
 include(cmake/CompilerWarnings.cmake)
+if(MINGW)
+    # The MinGW OpenMP runtime only ships usefully as a DLL; ggml falls back
+    # to its internal thread pool so the shipped exe stays self-contained.
+    set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+endif()
 include(cmake/FetchDependencies.cmake)
 include(cmake/PlatformSetup.cmake)
 include(cmake/EmbedAssets.cmake)
@@ -53,9 +63,14 @@ set(CORE_LIB_SOURCES
     src/platform/capabilities.cpp
     src/output/output_common.cpp
     src/settings/handlers.cpp
+    src/settings/server.cpp
     src/settings/sidecar.cpp
+    src/avatar/avatar_core.cpp
+    src/bench/wer.cpp
+    src/pipeline/transcript_pipeline.cpp
     src/tray/tray_common.cpp
     src/util/logging.cpp
+    src/util/sha256.cpp
     src/util/subprocess.cpp
 )
 
@@ -67,6 +82,7 @@ target_link_libraries(autowhisper_core PUBLIC
     tomlplusplus::tomlplusplus
     spdlog::spdlog
     nlohmann_json
+    cpp_httplib
     Threads::Threads
 )
 target_compile_definitions(autowhisper_core PUBLIC
@@ -75,6 +91,26 @@ target_compile_definitions(autowhisper_core PUBLIC
     AUTOWHISPER_VERSION_MINOR=${PROJECT_VERSION_MINOR}
     AUTOWHISPER_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
+if(NOT APPLE)
+    # toml++ disables float <charconv> on GCC/Clang based on a stale 2020-era
+    # probe; GCC >= 11 and MSVC support it fully. With it, floats serialize as
+    # their shortest round-trip decimal ("0.3", not "0.29999999999999999").
+    # Apple's libc++ gates floating-point to_chars behind macOS 13.3 while our
+    # deployment target is 12.0, so macOS uses relaxed precision in
+    # Config::save instead.
+    target_compile_definitions(autowhisper_core PUBLIC TOML_FLOAT_CHARCONV=1)
+endif()
+if(WIN32)
+    # settings/server.cpp compiles cpp-httplib into the core library.
+    target_link_libraries(autowhisper_core PUBLIC ws2_32)
+    # windows.h defines min/max macros that break std::min/std::max, and
+    # MSVC warns on every getenv call without _CRT_SECURE_NO_WARNINGS.
+    target_compile_definitions(autowhisper_core PUBLIC
+        NOMINMAX
+        _CRT_SECURE_NO_WARNINGS
+        _USE_MATH_DEFINES
+    )
+endif()
 autowhisper_set_warnings(autowhisper_core)
 
 # === Application sources (need platform libs, whisper, miniaudio) ===
@@ -86,12 +122,14 @@ set(APP_SOURCES
     src/feedback/feedback.cpp
     src/cli/cli.cpp
     src/cli/cli_settings_ui.cpp
+    src/cli/cli_avatar_demo.cpp
     src/doctor/doctor.cpp
 )
 
 # === Platform-specific sources ===
 if(LINUX)
     list(APPEND APP_SOURCES
+        src/avatar/platform/avatar_x11.cpp
         src/hotkey/platform/hotkey_x11.cpp
         src/output/platform/output_x11.cpp
         src/tray/platform/tray_gtk.cpp
@@ -101,6 +139,7 @@ if(LINUX)
     )
 elseif(APPLE)
     list(APPEND APP_SOURCES
+        src/avatar/platform/avatar_macos.mm
         src/hotkey/platform/hotkey_macos.mm
         src/output/platform/output_macos.mm
         src/tray/platform/tray_macos.mm
@@ -112,6 +151,7 @@ elseif(APPLE)
     )
 elseif(WIN32)
     list(APPEND APP_SOURCES
+        src/avatar/platform/avatar_win32.cpp
         src/hotkey/platform/hotkey_win32.cpp
         src/output/platform/output_win32.cpp
         src/tray/platform/tray_win32.cpp
@@ -186,6 +226,7 @@ elseif(APPLE)
     find_library(COREMEDIA_FRAMEWORK CoreMedia)
     find_library(METAL_FRAMEWORK    Metal)
     find_library(IOKIT_FRAMEWORK    IOKit)
+    find_library(QUARTZCORE_FRAMEWORK QuartzCore)
     target_link_libraries(autowhisper PRIVATE
         ${COCOA_FRAMEWORK}
         ${APPKIT_FRAMEWORK}
@@ -197,13 +238,42 @@ elseif(APPLE)
         ${COREMEDIA_FRAMEWORK}
         ${METAL_FRAMEWORK}
         ${IOKIT_FRAMEWORK}
+        ${QUARTZCORE_FRAMEWORK}
     )
 elseif(WIN32)
     target_link_libraries(autowhisper PRIVATE ws2_32 ole32 uuid shell32 user32)
+    if(MINGW)
+        # Ship a self-contained exe: without this the binary needs
+        # libwinpthread/libgcc/libgomp/libstdc++ DLLs copied beside it
+        # (caught by the Wine runtime smoke).
+        target_link_options(autowhisper PRIVATE -static)
+    endif()
 endif()
 
 # Apply compiler warnings
 autowhisper_set_warnings(autowhisper)
+
+# Benchmark harness (latency/RTF/WER source of truth; see bench/README.md)
+if(AUTOWHISPER_ENABLE_BENCH)
+    add_executable(autowhisper_bench
+        tools/bench/bench_main.cpp
+        src/inference/inference.cpp
+    )
+    target_link_libraries(autowhisper_bench PRIVATE
+        autowhisper_core
+        whisper
+        miniaudio
+    )
+    if(APPLE)
+        target_link_libraries(autowhisper_bench PRIVATE
+            ${FOUNDATION_FRAMEWORK}
+            ${AVFOUNDATION_FRAMEWORK}
+            ${COREMEDIA_FRAMEWORK}
+            ${METAL_FRAMEWORK}
+        )
+    endif()
+    autowhisper_set_warnings(autowhisper_bench)
+endif()
 
 # Install
 install(TARGETS autowhisper RUNTIME DESTINATION bin)
@@ -221,6 +291,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
     include(Catch)
 
     set(TEST_SOURCES
+        tests/cpp/test_avatar.cpp
         tests/cpp/test_config.cpp
         tests/cpp/test_keycombo.cpp
         tests/cpp/test_logging.cpp
@@ -231,10 +302,20 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_schema.cpp
         tests/cpp/test_settings_handlers.cpp
         tests/cpp/test_settings_http.cpp
+        tests/cpp/test_sha256.cpp
         tests/cpp/test_sidecar.cpp
         tests/cpp/test_subprocess.cpp
+        tests/cpp/test_transcript_pipeline.cpp
         tests/cpp/test_tray_display.cpp
+        tests/cpp/test_wer.cpp
     )
+    if(LINUX)
+        list(APPEND TEST_SOURCES
+            tests/cpp/test_hotkey_x11.cpp
+            src/avatar/platform/avatar_x11.cpp
+        src/hotkey/platform/hotkey_x11.cpp
+        )
+    endif()
     if(APPLE)
         list(APPEND TEST_SOURCES
             tests/cpp/test_keycombo_platform.cpp
@@ -254,6 +335,13 @@ if(AUTOWHISPER_ENABLE_TESTS)
         cpp_httplib
         Catch2::Catch2WithMain
     )
+    if(LINUX)
+        target_link_libraries(autowhisper_tests PRIVATE
+            ${X11_LIBRARIES}
+            ${X11_Xtst_LIB}
+        )
+        target_include_directories(autowhisper_tests PRIVATE ${X11_INCLUDE_DIR})
+    endif()
     if(WIN32)
         target_link_libraries(autowhisper_tests PRIVATE ws2_32)
     endif()

@@ -17,9 +17,11 @@ const std::vector<KeyDef>& table() {
         {"model", "size", Type::Enum,
             V{"tiny", "tiny.en", "base", "base.en", "small", "small.en",
               "medium", "medium.en", "large", "large-v1", "large-v2", "large-v3",
+              "large-v3-turbo",
               "distil-large-v2", "distil-large-v3", "distil-medium.en", "distil-small.en"},
             std::nullopt, std::nullopt,
-            "Whisper model variant. Smaller = faster, larger = more accurate."},
+            "Whisper model variant. Smaller = faster, larger = more accurate. "
+            "Models without '.en'/'distil' suffixes are multilingual."},
         {"model", "device", Type::Enum,
             V{"cuda", "cpu", "auto"},
             std::nullopt, std::nullopt,
@@ -32,7 +34,8 @@ const std::vector<KeyDef>& table() {
         {"model", "beam_size", Type::Int, V{}, 1.0, 10.0,
             "Beam search width. 1 = greedy."},
         {"model", "language", Type::String, V{}, std::nullopt, std::nullopt,
-            "ISO 639-1 language code (e.g. 'en')."},
+            "ISO 639-1 language code (e.g. 'en'), or 'auto' to detect the spoken "
+            "language (requires a multilingual model)."},
         {"model", "num_threads", Type::Int, V{}, 1.0, 256.0,
             "CPU threads for inference."},
 
@@ -88,6 +91,15 @@ const std::vector<KeyDef>& table() {
         {"output", "also_copy_to_clipboard", Type::Bool, V{}, std::nullopt, std::nullopt,
             "Copy to clipboard in addition to the primary method."},
 
+        // [formatting]
+        {"formatting", "remove_fillers", Type::Bool, V{}, std::nullopt, std::nullopt,
+            "Remove hesitation words (um, uh, ...) from transcripts. English only."},
+        {"formatting", "spoken_commands", Type::Bool, V{}, std::nullopt, std::nullopt,
+            "Turn standalone 'new line' / 'new paragraph' into real line breaks."},
+        {"formatting", "dictionary", Type::StringArray, V{}, std::nullopt, std::nullopt,
+            "Personal dictionary, entries of the form 'spoken => written', "
+            "e.g. 'auto whisper => AutoWhisper'."},
+
         // [feedback]
         {"feedback", "enabled", Type::Bool, V{}, std::nullopt, std::nullopt,
             "Play tones on record start/stop/error."},
@@ -113,6 +125,18 @@ const std::vector<KeyDef>& table() {
             "PID file path. Must be non-empty."},
         {"daemon", "work_dir", Type::String, V{}, std::nullopt, std::nullopt,
             "Working directory. Must be non-empty."},
+
+        // [avatar]
+        {"avatar", "enabled", Type::Bool, V{}, std::nullopt, std::nullopt,
+            "Show the floating companion (Echo) that glows while listening "
+            "and writes while inserting."},
+        {"avatar", "character", Type::Enum,
+            V{"echo", "hermes", "mnemosyne"},
+            std::nullopt, std::nullopt,
+            "Which spirit accompanies you: Echo (answers), Hermes (swift, "
+            "blue), Mnemosyne (memory, amber)."},
+        {"avatar", "size", Type::Int, V{}, 64.0, 192.0,
+            "Companion size in pixels."},
 
         // [tray]
         {"tray", "enabled", Type::Bool, V{}, std::nullopt, std::nullopt,

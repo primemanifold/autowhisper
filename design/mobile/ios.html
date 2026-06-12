@@ -1,0 +1,86 @@
+<!doctype html>
+<!-- AutoWhisper iOS design preview (concept comp, not a shipping app).
+     ADR-0006 loop: foreground app, hold to dictate, on-device whisper.cpp,
+     copy or share out. Rendered as bare app screens — light and dark —
+     with no fake device hardware. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AutoWhisper iOS — design preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { background: oklch(0.965 0 0);
+         font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+         display: grid; place-items: center; min-height: 100vh; padding: 40px; }
+  .stage { display: flex; flex-direction: column; align-items: center; gap: 22px; padding: 8px 6px; }
+  .row { display: flex; gap: 28px; }
+  .screen { width: 300px; height: 620px; border-radius: 32px; overflow: hidden;
+            display: flex; flex-direction: column; padding: 26px 22px 30px;
+            box-shadow: 0 24px 70px oklch(0 0 0 / .16); }
+  .light { background: oklch(0.985 0 0); --ink: oklch(0.205 0 0); --ink-2: oklch(0.50 0 0);
+           --ink-3: oklch(0.65 0 0); --hair: oklch(0.91 0 0); }
+  .dark  { background: oklch(0.150 0 0); --ink: oklch(0.95 0 0); --ink-2: oklch(0.66 0 0);
+           --ink-3: oklch(0.50 0 0); --hair: oklch(0.27 0 0); }
+  .top { display: flex; justify-content: space-between; align-items: center; }
+  .app { font-size: 15px; font-weight: 650; letter-spacing: -.01em; color: var(--ink); }
+  .model { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .t { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
+  .t p { font-size: 24px; line-height: 1.32; letter-spacing: -.015em; font-weight: 500;
+         color: var(--ink); }
+  .t p i { font-style: normal; color: var(--ink-3); }
+  .actions { display: flex; gap: 22px; font-size: 14px; font-weight: 550; color: var(--ink-2); }
+  .bottom { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 22px;
+            border-top: 1px solid var(--hair); }
+  /* Motion: status-only cues per platform research (breathing record
+     affordance + live caret). Stills must read perfectly without it. */
+  .mic { width: 74px; height: 74px; border-radius: 50%; background: oklch(0.585 0.215 28);
+         display: grid; place-items: center; position: relative; }
+  .mic::after { content: ""; position: absolute; inset: -7px; border-radius: 50%;
+               border: 2px solid oklch(0.585 0.215 28 / .35);
+               animation: breathe 2.8s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { transform: scale(1); opacity: .9; }
+                       50% { transform: scale(1.12); opacity: .25; } }
+  .t p i { animation: caret 1.1s steps(1) infinite; }
+  @keyframes caret { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; }
+  }
+  .dark .mic { background: oklch(0.640 0.205 28); }
+  .mic svg { width: 30px; height: 30px; fill: white; }
+  .hint { font-size: 12px; color: var(--ink-3); }
+  .caption { color: oklch(0.45 0 0); font-size: 12px; letter-spacing: .02em; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="row">
+    <div class="screen light">
+      <div class="top"><span class="app">AutoWhisper</span><span class="model">on-device</span></div>
+      <div class="t">
+        <p>The launch checklist is ready for review — benchmarks are in from
+          last night's run.<i>|</i></p>
+        <div class="actions"><span>Copy</span><span>Share</span></div>
+      </div>
+      <div class="bottom">
+        <div class="mic"><svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11h-2z"/></svg></div>
+        <span class="hint">Hold to dictate</span>
+      </div>
+    </div>
+    <div class="screen dark">
+      <div class="top"><span class="app">AutoWhisper</span><span class="model">on-device</span></div>
+      <div class="t">
+        <p>The launch checklist is ready for review — benchmarks are in from
+          last night's run.<i>|</i></p>
+        <div class="actions"><span>Copy</span><span>Share</span></div>
+      </div>
+      <div class="bottom">
+        <div class="mic"><svg viewBox="0 0 24 24"><path d="M12 15a4 4 0 0 0 4-4V6a4 4 0 1 0-8 0v5a4 4 0 0 0 4 4zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11h-2z"/></svg></div>
+        <span class="hint">Hold to dictate</span>
+      </div>
+    </div>
+  </div>
+  <span class="caption">iOS — design preview, not yet shipping</span>
+</div>
+</body>
+</html>

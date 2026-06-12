@@ -2,6 +2,11 @@
 
 Status: Phase 0 bootstrap. This roadmap is intentionally provisional until Phase 1 benchmark and Phase 2 positioning are complete.
 
+> **2026-06-12:** A full production-readiness and Wispr Flow parity plan (goals G1–G8,
+> milestones M1–M7 through v1.0, decision log D1–D7) is proposed in
+> [`docs/plans/2026-06-12-production-readiness-plan.md`](../docs/plans/2026-06-12-production-readiness-plan.md).
+> Once ratified, it supersedes the provisional milestones below.
+
 ## Current phase gate
 
 ### Phase 0 — Orient

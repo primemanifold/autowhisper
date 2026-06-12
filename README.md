@@ -1,126 +1,86 @@
 # AutoWhisper
 
-GPU-accelerated voice-to-text for Ubuntu. Press a hotkey, speak, release — text appears at your cursor.
+**Speak. It types.** Hold a key — or click the floating companion — and your words land at the cursor. Offline, local-first, open source.
 
-Native C++ application powered by [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Runs entirely offline.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="site/assets/screenshots/settings-desktop-dark.png">
+  <img src="site/assets/screenshots/settings-desktop.png" alt="AutoWhisper settings — real product UI, light and dark" width="100%">
+</picture>
+
+Native C++ on [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Your voice never leaves your machine: no cloud, no account, no telemetry. 100+ languages with auto-detection.
+
+| Platform | Status |
+|---|---|
+| Linux (X11) | Production — PPA, systemd service |
+| macOS 12+ | Beta — notarized `.app` ([v0.7.1 release](https://github.com/primemanifold/autowhisper/releases/latest)) |
+| Windows 10/11 | Beta — hotkeys, text insertion, and the companion work; tray and installer in progress |
 
 ## Install
 
+**Fastest:** download your OS's binary from the latest green [Actions run](https://github.com/primemanifold/autowhisper/actions/workflows/ci.yml) → Artifacts, then follow **[docs/INSTALL-UNSIGNED.md](docs/INSTALL-UNSIGNED.md)** (one-time unsigned-binary prompt on Windows/macOS; nothing to skip on Linux).
+
 ```bash
+# Ubuntu / Debian
 sudo add-apt-repository ppa:primemanifold/autowhisper
-sudo apt update
-sudo apt install autowhisper
+sudo apt update && sudo apt install autowhisper
 ```
 
-## Quick Start
+**First run on any machine** — models aren't bundled (78 MB–3 GB). One command, once:
 
 ```bash
-autowhisper doctor              # check system requirements
-systemctl --user enable --now autowhisper
+autowhisper model download distil-small.en   # recommended English model, SHA-256 verified
+autowhisper doctor                            # check mic, GPU, permissions
+autowhisper run                               # hold Shift+Super (Ctrl+Alt+Space on Windows), speak, release
 ```
 
-Press `Shift+Super`, speak, release. Text appears at your cursor.
+No model yet? The binary tells you this exact command instead of crashing. Zero-setup proof of life: `autowhisper avatar demo`.
 
-## Usage
+## The companion
 
-```bash
-autowhisper doctor              # diagnose system
-autowhisper config              # open settings GUI
-autowhisper model list          # show available models
-autowhisper model download <name>  # download a model
-autowhisper run                 # run in foreground
+Echo — the nymph who can only repeat your words — is an opt-in floating button in the Wispr Flow tradition: **click to dictate**, watch the halo follow your voice, see her caption her own state and write your words down.
+
+![Echo, the floating dictation button — live capture from the Linux build](site/assets/screenshots/avatar-floating-button.gif)
+
+```toml
+[avatar]
+enabled = true      # forms: echo, hermes, mnemosyne
 ```
 
-View logs:
-```bash
-journalctl --user -u autowhisper -f
-```
+## What it does
 
-## Build from Source
+- **Push-to-talk or toggle** dictation into any focused app, with a cancel key.
+- **Cleans transcripts as you speak**: filler words removed, personal dictionary (`"auto whisper => AutoWhisper"`), spoken "new line" / "new paragraph".
+- **Local settings app** served by the binary itself (`autowhisper config ui`) — token-protected, framework-free, light and dark.
+- **Measured, not claimed**: speed numbers come from the bundled benchmark harness (`bench/`). Reference: 11 s of audio in ~0.8 s on 4 CPU threads with `tiny.en`.
 
-### Dependencies (Ubuntu)
+Mobile (iOS / Android / watchOS) exists as a [design preview](design/mobile/) only — not shipping apps.
 
-```bash
-sudo apt install cmake g++ pkg-config \
-  libx11-dev libxtst-dev libxext-dev libxi-dev libxrandr-dev \
-  libgtk-3-dev libayatana-appindicator3-dev libpulse-dev libssl-dev
-```
-
-### Build
+## Build from source
 
 ```bash
-git clone https://github.com/primemanifold/autowhisper.git
+sudo apt install cmake g++ pkg-config libx11-dev libxtst-dev libxext-dev \
+  libxi-dev libxrandr-dev libgtk-3-dev libayatana-appindicator3-dev libpulse-dev   # Ubuntu
+git clone --recurse-submodules https://github.com/primemanifold/autowhisper.git
 cd autowhisper
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
+ctest --test-dir build          # 178 tests
 ```
 
-The binary is at `build/autowhisper`.
+macOS needs only Xcode CLT + CMake (`cmake -B build && cmake --build build`). Windows builds with MSVC or the MinGW toolchain file (`cmake/toolchains/`). CUDA: `-DAUTOWHISPER_ENABLE_CUDA=ON` (12.x).
 
-### Options
+**Building or contributing with an AI agent?** Read **[AGENTS.md](AGENTS.md)** — exact build/test/verify commands, repo conventions, and how the planning docs fit together.
 
-| CMake Option | Default | Description |
-|---|---|---|
-| `AUTOWHISPER_ENABLE_CUDA` | OFF | Enable CUDA GPU acceleration via whisper.cpp |
-| `AUTOWHISPER_ENABLE_TESTS` | ON | Build the Catch2 test suite |
+## Bugs and requests
 
-```bash
-# Build with CUDA support (requires CUDA toolkit 12.x)
-sudo apt install cuda-toolkit-12-8  # or any 12.x version
-cmake -B build -DCMAKE_BUILD_TYPE=Release \
-  -DAUTOWHISPER_ENABLE_CUDA=ON \
-  -DCMAKE_CUDA_ARCHITECTURES=native \
-  -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.8/bin/nvcc
-cmake --build build -j$(nproc)
+Open an issue with the [bug](.github/ISSUE_TEMPLATE/bug_report.yml) or [feature](.github/ISSUE_TEMPLATE/feature_request.yml) template. Using Claude or another agent? Prompt it like:
 
-# Run tests
-cd build && ctest --output-on-failure
-```
+> Look at primemanifold/autowhisper and file a bug: when I do X on `<OS>`, Y happens instead of Z. Include the output of `autowhisper doctor`, the artifact/run ID I used, and the relevant source file if you can find it.
 
-> **Note:** CUDA 13.x is not yet supported (whisper.cpp v1.7.3 uses deprecated CUDA
-> runtime APIs removed in CUDA 13). Use CUDA 12.8 or 12.9 — the NVIDIA driver is
-> backwards-compatible, so a newer driver works fine with an older toolkit.
+Maintainer agents triage issues against `docs/plans/2026-06-12-production-readiness-plan.md`; well-scoped reports like [#14](https://github.com/primemanifold/autowhisper/issues/14) get implemented fast.
 
-## Configure
+## More
 
-Run `autowhisper config` to open the settings GUI, or edit the config file directly:
+`CHANGELOG.md` · production plan in `docs/plans/` · design system in `design/` · benchmark methodology in `bench/` · settings UI at phone width and mobile design previews in [`site/assets/screenshots/`](site/assets/screenshots/)
 
-```
-~/.config/autowhisper/config.toml   # user config
-/etc/autowhisper/config.toml        # system default
-```
-
-Example:
-```toml
-[model]
-size = "distil-small.en"  # tiny.en (fastest) to distil-large-v3 (best)
-device = "cuda"           # cuda, cpu, or auto
-compute_type = "bfloat16" # bfloat16 (RTX 50xx), float16 (RTX 20-40xx)
-
-[hotkeys]
-mode = "push_to_talk"     # or "toggle"
-trigger = ["shift+super"]
-
-[output]
-method = "inject"         # or "clipboard"
-ending_action = "none"    # none, newline, or return_key
-```
-
-## Models
-
-| Model | Speed | Accuracy |
-|-------|-------|----------|
-| tiny.en | 78ms | Good |
-| distil-small.en | 198ms | Very Good |
-| distil-large-v3 | 448ms | Best |
-
-## Troubleshooting
-
-```bash
-autowhisper doctor                     # diagnose issues
-journalctl --user -u autowhisper -f    # view logs
-```
-
-## License
-
-Apache 2.0
+Apache-2.0

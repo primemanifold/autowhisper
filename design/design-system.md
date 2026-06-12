@@ -34,6 +34,14 @@ A developer, writer, or operator uses AutoWhisper while focused in another deskt
 
 Production CSS tokens live in `src/settings/web/style.css` and use the `--aw-` prefix.
 
+2026-06-12 refactor: the palette moved from warm paper/terracotta to a pure
+neutral system (zero-chroma greys) with dark mode as a first-class theme
+built on elevation steps rather than borders. Color now carries meaning
+only: red is reserved for the record action, blue for focus, green/amber
+for status. Primary actions are ink-on-paper pills (black in light mode,
+white in dark). Decorative gradients, numbered navigation, and uppercase
+mono labels outside technical readouts were removed.
+
 Core roles:
 
 - `--aw-paper-0` through `--aw-paper-3`: canvas and surface stack
@@ -84,6 +92,25 @@ Still needed:
 - onboarding checklist
 - local-first proof panel backed by actual diagnostics
 - benchmark and latency readout components
+
+## Motion
+
+Researched per platform in `design/research/2026-06-12-motion-platform-research.md`.
+
+- Tokens: `--aw-dur-1` 120ms (hover/press), `--aw-dur-2` 180ms (state
+  changes), `--aw-dur-3` 320ms (entrances); `--aw-ease-out` default,
+  `--aw-ease-spring` reserved for Android spatial moves (M3 physics).
+- Settings UI animates state changes only (pane switch, status arrival,
+  press feedback) — never idle chrome, per Apple HIG "avoid motion on
+  frequent interactions".
+- Landing: one-time hero entrance + scroll-driven reveals via
+  `animation-timeline: view()` inside `@supports`. Scroll reveals must not
+  use `backwards` fill: an inactive view timeline (page fits the viewport)
+  would freeze content invisible.
+- Mobile/watch comps: a breathing record affordance and a live caret —
+  status cues, not decoration. Watch gets the slowest loop (3.6s).
+- Every surface ships a `prefers-reduced-motion: reduce` block that
+  disables all animation; stills must read perfectly without motion.
 
 ## Accessibility requirements
 

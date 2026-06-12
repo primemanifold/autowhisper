@@ -1,6 +1,7 @@
 #include "config/config.h"
 
 #include "config/schema.h"
+#include "models/models.h"
 
 #include <spdlog/spdlog.h>
 #include <toml++/toml.hpp>
@@ -233,6 +234,16 @@ ConfigLoadResult Config::load_with_diagnostics(const std::string& path) {
         }
     }
 
+    // [formatting]
+    if (auto formatting = tbl["formatting"].as_table()) {
+        config.formatting.remove_fillers =
+            get_or(*formatting, "remove_fillers", config.formatting.remove_fillers);
+        config.formatting.spoken_commands =
+            get_or(*formatting, "spoken_commands", config.formatting.spoken_commands);
+        config.formatting.dictionary =
+            get_string_array(*formatting, "dictionary", config.formatting.dictionary);
+    }
+
     // [feedback]
     if (auto feedback = tbl["feedback"].as_table()) {
         config.feedback.enabled = get_or(*feedback, "enabled", config.feedback.enabled);
@@ -256,6 +267,13 @@ ConfigLoadResult Config::load_with_diagnostics(const std::string& path) {
         config.tray.enabled = get_or(*tray, "enabled", config.tray.enabled);
     }
 
+    // [avatar]
+    if (auto avatar = tbl["avatar"].as_table()) {
+        config.avatar.enabled = get_or(*avatar, "enabled", config.avatar.enabled);
+        config.avatar.character = get_or(*avatar, "character", config.avatar.character);
+        config.avatar.size = get_or(*avatar, "size", config.avatar.size);
+    }
+
     auto validation_issues = config.validate_all();
     issues.insert(issues.end(), validation_issues.begin(), validation_issues.end());
     return ConfigLoadResult{config, std::move(issues)};
@@ -276,6 +294,19 @@ std::vector<ValidationIssue> Config::validate_all() const {
     }
     if (!is_allowed_enum("model", "compute_type", model.compute_type)) {
         add_error(issues, "model.compute_type", "invalid_enum", "Invalid compute_type: " + model.compute_type);
+    }
+
+    if (model.language == "auto" && model_is_english_only(model.size)) {
+        issues.push_back(make_issue(ValidationSeverity::Warning, "model.language",
+            "language_model_mismatch",
+            "language='auto' requires a multilingual model, but '" + model.size +
+            "' is English-only. Use e.g. 'large-v3-turbo', 'small', or 'base'."));
+    } else if (model.language != "en" && model.language != "auto" && !model.language.empty() &&
+               model_is_english_only(model.size)) {
+        issues.push_back(make_issue(ValidationSeverity::Warning, "model.language",
+            "language_model_mismatch",
+            "language='" + model.language + "' requires a multilingual model, but '" +
+            model.size + "' is English-only."));
     }
 
     if (model.beam_size <= 0 || model.beam_size > 10) {
@@ -333,6 +364,17 @@ std::vector<ValidationIssue> Config::validate_all() const {
         add_error(issues, "output.ending_action", "invalid_enum", "Invalid ending_action: " + output.ending_action);
     }
 
+    for (const auto& entry : formatting.dictionary) {
+        const auto sep = entry.find("=>");
+        const bool has_lhs = sep != std::string::npos &&
+                             entry.find_first_not_of(" \t") < sep;
+        if (!has_lhs) {
+            issues.push_back(make_issue(ValidationSeverity::Warning,
+                "formatting.dictionary", "malformed_entry",
+                "Dictionary entry is not 'spoken => written' and will be ignored: " + entry));
+        }
+    }
+
     if (!std::isfinite(feedback.volume) || feedback.volume < 0.0f || feedback.volume > 1.0f) {
         add_error(issues, "feedback.volume", "out_of_range", "Invalid volume: must be between 0.0 and 1.0");
     }
@@ -354,6 +396,15 @@ std::vector<ValidationIssue> Config::validate_all() const {
         add_error(issues, "daemon.work_dir", "empty_value", "Invalid daemon.work_dir: cannot be empty");
     }
 
+    if (!is_allowed_enum("avatar", "character", avatar.character)) {
+        add_error(issues, "avatar.character", "invalid_enum",
+                  "Invalid avatar.character: " + avatar.character);
+    }
+    if (avatar.size < 64 || avatar.size > 192) {
+        add_error(issues, "avatar.size", "out_of_range",
+                  "Invalid avatar.size: must be between 64 and 192");
+    }
+
     return issues;
 }
 
@@ -373,6 +424,23 @@ void Config::validate() const {
     if (audio.sample_rate != 16000) {
         spdlog::warn("Sample rate {} is not Whisper's native 16kHz", audio.sample_rate);
     }
+}
+
+namespace {
+
+}  // namespace
+
+// Widening float→double directly turns 0.3f into 0.30000001192092896 in the
+// written TOML/JSON. Use the shortest decimal that round-trips the float.
+double shortest_double(float v) {
+    char buf[64];
+    for (int precision = 1; precision <= 9; precision++) {
+        std::snprintf(buf, sizeof(buf), "%.*g", precision, static_cast<double>(v));
+        if (std::strtof(buf, nullptr) == v) {
+            return std::strtod(buf, nullptr);
+        }
+    }
+    return static_cast<double>(v);
 }
 
 void Config::save(const std::string& path) const {
@@ -398,9 +466,9 @@ void Config::save(const std::string& path) const {
     if (audio.device) audio_tbl.insert("device", *audio.device);
     if (audio.output_device) audio_tbl.insert("output_device", *audio.output_device);
     audio_tbl.insert("vad_enabled", audio.vad_enabled);
-    audio_tbl.insert("vad_threshold", static_cast<double>(audio.vad_threshold));
-    audio_tbl.insert("silence_duration", static_cast<double>(audio.silence_duration));
-    audio_tbl.insert("max_duration", static_cast<double>(audio.max_duration));
+    audio_tbl.insert("vad_threshold", shortest_double(audio.vad_threshold));
+    audio_tbl.insert("silence_duration", shortest_double(audio.silence_duration));
+    audio_tbl.insert("max_duration", shortest_double(audio.max_duration));
     audio_tbl.insert("mute_other_apps", audio.mute_other_apps);
     tbl.insert("audio", std::move(audio_tbl));
 
@@ -421,9 +489,18 @@ void Config::save(const std::string& path) const {
         {"method", output.method},
         {"also_copy_to_clipboard", output.also_copy_to_clipboard},
         {"auto_paste", output.auto_paste},
-        {"paste_delay", static_cast<double>(output.paste_delay)},
+        {"paste_delay", shortest_double(output.paste_delay)},
         {"ending_action", output.ending_action},
         {"lowercase", output.lowercase},
+    });
+
+    // [formatting]
+    toml::array dictionary_arr;
+    for (const auto& d : formatting.dictionary) dictionary_arr.push_back(d);
+    tbl.insert("formatting", toml::table{
+        {"remove_fillers", formatting.remove_fillers},
+        {"spoken_commands", formatting.spoken_commands},
+        {"dictionary", std::move(dictionary_arr)},
     });
 
     // [feedback]
@@ -432,8 +509,8 @@ void Config::save(const std::string& path) const {
         {"frequency_start", static_cast<int64_t>(feedback.frequency_start)},
         {"frequency_stop", static_cast<int64_t>(feedback.frequency_stop)},
         {"frequency_error", static_cast<int64_t>(feedback.frequency_error)},
-        {"duration", static_cast<double>(feedback.duration)},
-        {"volume", static_cast<double>(feedback.volume)},
+        {"duration", shortest_double(feedback.duration)},
+        {"volume", shortest_double(feedback.volume)},
     });
 
     // [daemon]
@@ -447,6 +524,13 @@ void Config::save(const std::string& path) const {
     // [tray]
     tbl.insert("tray", toml::table{
         {"enabled", tray.enabled},
+    });
+
+    // [avatar]
+    tbl.insert("avatar", toml::table{
+        {"enabled", avatar.enabled},
+        {"character", avatar.character},
+        {"size", static_cast<int64_t>(avatar.size)},
     });
 
     // Write to file
@@ -464,7 +548,14 @@ void Config::save(const std::string& path) const {
     if (!ofs) {
         throw std::runtime_error("Cannot open config file for writing: " + path);
     }
+#if defined(__APPLE__)
+    // Without float charconv (see CMakeLists), full-precision doubles print as
+    // 17-digit noise. Six significant digits cover every human-entered value.
+    ofs << toml::toml_formatter{tbl, toml::toml_formatter::default_flags
+                                         | toml::format_flags::relaxed_float_precision};
+#else
     ofs << tbl;
+#endif
 }
 
 std::string find_config_file() {

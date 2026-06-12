@@ -40,6 +40,25 @@ struct TempFile {
     TempFile& operator=(const TempFile&) = delete;
 };
 
+struct TempConfigDir {
+    fs::path path;
+
+    TempConfigDir() {
+        path = fs::temp_directory_path() /
+               ("autowhisper_cfgdir_" +
+                std::to_string(std::hash<std::thread::id>{}(std::this_thread::get_id())));
+        fs::create_directories(path);
+    }
+
+    ~TempConfigDir() {
+        std::error_code ec;
+        fs::remove_all(path, ec);
+    }
+
+    TempConfigDir(const TempConfigDir&) = delete;
+    TempConfigDir& operator=(const TempConfigDir&) = delete;
+};
+
 } // namespace
 
 // ============================================================
@@ -282,6 +301,89 @@ TEST_CASE("ConfigValidator::validate returns validation issues without throwing"
 TEST_CASE("Config::validate_all returns empty for valid defaults", "[config][validate]") {
     auto cfg = Config::default_config();
     CHECK(cfg.validate_all().empty());
+}
+
+TEST_CASE("Config::save writes floats with shortest round-trip precision", "[config][io]") {
+    TempConfigDir tmp;
+    auto path = (tmp.path / "float.toml").string();
+
+    auto cfg = Config::default_config();
+    cfg.audio.silence_duration = 0.3f;
+    cfg.audio.vad_threshold = 0.5f;
+    cfg.output.paste_delay = 0.05f;
+    cfg.save(path);
+
+    std::ifstream in(path);
+    std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+
+    CHECK(text.find("silence_duration = 0.3\n") != std::string::npos);
+    CHECK(text.find("vad_threshold = 0.5\n") != std::string::npos);
+    CHECK(text.find("paste_delay = 0.05\n") != std::string::npos);
+    CHECK(text.find("0.30000001") == std::string::npos);
+
+    // Values still round-trip exactly through load.
+    auto loaded = Config::load(path);
+    CHECK(loaded.audio.silence_duration == 0.3f);
+    CHECK(loaded.audio.vad_threshold == 0.5f);
+    CHECK(loaded.output.paste_delay == 0.05f);
+}
+
+TEST_CASE("Config::save round-trips awkward float values", "[config][io]") {
+    TempConfigDir tmp;
+    auto path = (tmp.path / "float2.toml").string();
+
+    auto cfg = Config::default_config();
+    cfg.audio.silence_duration = 1.0f / 3.0f;
+    cfg.audio.vad_threshold = 0.123456789f;
+    cfg.save(path);
+
+    auto loaded = Config::load(path);
+#if defined(__APPLE__)
+    // macOS serializes floats at 6 significant digits (no float charconv on
+    // libc++ with deployment target < 13.3); see Config::save.
+    CHECK(std::abs(loaded.audio.silence_duration - 1.0f / 3.0f) < 1e-6f);
+    CHECK(std::abs(loaded.audio.vad_threshold - 0.123456789f) < 1e-6f);
+#else
+    CHECK(loaded.audio.silence_duration == 1.0f / 3.0f);
+    CHECK(loaded.audio.vad_threshold == 0.123456789f);
+#endif
+}
+
+TEST_CASE("Config::validate_all warns on language/model mismatch", "[config][validate]") {
+    auto cfg = Config::default_config();
+
+    SECTION("auto language with English-only model warns") {
+        cfg.model.size = "distil-small.en";
+        cfg.model.language = "auto";
+        auto issues = cfg.validate_all();
+        REQUIRE(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+            return issue.severity == ValidationSeverity::Warning &&
+                   issue.path == "model.language" &&
+                   issue.code == "language_model_mismatch";
+        }));
+    }
+
+    SECTION("non-English language with English-only model warns") {
+        cfg.model.size = "tiny.en";
+        cfg.model.language = "de";
+        auto issues = cfg.validate_all();
+        REQUIRE(std::any_of(issues.begin(), issues.end(), [](const auto& issue) {
+            return issue.severity == ValidationSeverity::Warning &&
+                   issue.code == "language_model_mismatch";
+        }));
+    }
+
+    SECTION("auto language with multilingual model is clean") {
+        cfg.model.size = "large-v3-turbo";
+        cfg.model.language = "auto";
+        CHECK(cfg.validate_all().empty());
+    }
+
+    SECTION("English language with English-only model is clean") {
+        cfg.model.size = "distil-small.en";
+        cfg.model.language = "en";
+        CHECK(cfg.validate_all().empty());
+    }
 }
 
 TEST_CASE("Config::validate rejects invalid numeric ranges", "[config][validate]") {
