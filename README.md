@@ -28,6 +28,10 @@ rule: speech is processed on your devices.
 |---|---|---|
 | ![iOS design preview, light and dark](site/assets/screenshots/concept-ios.png) | ![Android design preview, light and dark](site/assets/screenshots/concept-android.png) | ![watchOS design preview](site/assets/screenshots/concept-watchos.png) |
 
+Motion is status-only — a breathing record affordance and a live caret
+([demo](site/assets/screenshots/motion-ios.gif)), disabled under
+`prefers-reduced-motion`.
+
 ## Install
 
 ```bash

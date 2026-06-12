@@ -115,3 +115,25 @@ all removed:
 
 Static tests now also pin the dark-mode hero swap and the expanded asset
 set. All captures regenerated.
+
+
+## Round 3 — motion loops (same day)
+
+Three research→apply→capture→critique loops added subtle animation,
+grounded in per-platform research (`design/research/`):
+
+- **Loop 1 (foundation):** settings UI gained pane-switch rise (180ms),
+  status arrival, and press feedback — state changes only. Landing gained a
+  staggered hero entrance and CSS-only scroll reveals. Comps gained a
+  breathing record affordance (2.8s; 3.6s on watch) and a live caret.
+  All gated behind `prefers-reduced-motion`.
+- **Loop 2 (critique):** full-page capture exposed a real spec trap — with
+  `fill: backwards`, an inactive `view()` timeline (page fits the
+  scrollport: tall monitors, print, capture) freezes sections at opacity 0.
+  Entire below-fold content vanished. Fixed by dropping the backwards fill
+  on scroll-driven reveals so they degrade to visible; re-captured clean.
+- **Loop 3 (verify + record):** stills re-checked (idle states read
+  perfectly without motion — the watch always-on principle applied
+  everywhere); motion demos recorded (`motion-ios.gif` in
+  site/assets/screenshots, landing/settings walkthroughs delivered as
+  session artifacts).

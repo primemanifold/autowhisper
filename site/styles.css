@@ -130,3 +130,49 @@ figcaption { margin-top: 12px; }
   .facts { grid-template-columns: 1fr; gap: 30px; }
   .hero { padding: 64px 0 40px; }
 }
+
+/* Motion — research: design/research/2026-06-12-motion-platform-research.md.
+   One-time hero entrance; below-the-fold sections reveal on scroll entry
+   (scroll-driven animations: Chrome/Edge 115+, Safari 26; Firefox sees the
+   static page). Everything gated on prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes rise-in {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero h1,
+  .hero-copy,
+  .hero-actions,
+  .release-note {
+    animation: rise-in 600ms cubic-bezier(.16, 1, .3, 1) backwards;
+  }
+  .hero-copy { animation-delay: 90ms; }
+  .hero-actions { animation-delay: 170ms; }
+  .release-note { animation-delay: 240ms; }
+
+  .button, .button-quiet, .nav-links a {
+    transition: opacity 120ms ease-out, color 120ms ease-out, transform 120ms ease-out;
+  }
+  .button-primary:active { transform: scale(.98); }
+
+  @supports (animation-timeline: view()) {
+    /* No `backwards` fill here: if the view timeline is inactive (page fits
+       the scrollport — tall monitors, print, fullPage capture), a backwards
+       fill would freeze sections at opacity 0. Without it they simply
+       render visible and the reveal only plays when scrolling happens. */
+    .product picture img,
+    .facts > div,
+    .preview-row figure,
+    .install pre,
+    .privacy h2 {
+      animation: rise-in linear;
+      animation-timeline: view();
+      animation-range: entry 5% entry 45%;
+    }
+    .facts > div:nth-child(2) { animation-range: entry 10% entry 50%; }
+    .facts > div:nth-child(3) { animation-range: entry 15% entry 55%; }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

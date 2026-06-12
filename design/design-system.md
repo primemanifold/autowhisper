@@ -93,6 +93,25 @@ Still needed:
 - local-first proof panel backed by actual diagnostics
 - benchmark and latency readout components
 
+## Motion
+
+Researched per platform in `design/research/2026-06-12-motion-platform-research.md`.
+
+- Tokens: `--aw-dur-1` 120ms (hover/press), `--aw-dur-2` 180ms (state
+  changes), `--aw-dur-3` 320ms (entrances); `--aw-ease-out` default,
+  `--aw-ease-spring` reserved for Android spatial moves (M3 physics).
+- Settings UI animates state changes only (pane switch, status arrival,
+  press feedback) — never idle chrome, per Apple HIG "avoid motion on
+  frequent interactions".
+- Landing: one-time hero entrance + scroll-driven reveals via
+  `animation-timeline: view()` inside `@supports`. Scroll reveals must not
+  use `backwards` fill: an inactive view timeline (page fits the viewport)
+  would freeze content invisible.
+- Mobile/watch comps: a breathing record affordance and a live caret —
+  status cues, not decoration. Watch gets the slowest loop (3.6s).
+- Every surface ships a `prefers-reduced-motion: reduce` block that
+  disables all animation; stills must read perfectly without motion.
+
 ## Accessibility requirements
 
 - All controls must be keyboard reachable.

@@ -18,8 +18,18 @@
             padding: 22px 18px 18px; gap: 12px;
             box-shadow: 0 22px 60px oklch(0 0 0 / .22); }
   .app { font-size: 13px; font-weight: 650; color: oklch(0.95 0 0); letter-spacing: -.01em; }
+  /* Motion: status-only cues per platform research (breathing record
+     affordance + live caret). Stills must read perfectly without it. */
   .mic { width: 78px; height: 78px; border-radius: 50%; flex-shrink: 0; margin-top: 6px;
-         background: oklch(0.640 0.205 28); display: grid; place-items: center; }
+         background: oklch(0.640 0.205 28); display: grid; place-items: center; position: relative; }
+  .mic::after { content: ""; position: absolute; inset: -7px; border-radius: 50%;
+               border: 2px solid oklch(0.640 0.205 28 / .4);
+               animation: breathe 3.6s ease-in-out infinite; }
+  @keyframes breathe { 0%, 100% { transform: scale(1); opacity: .85; }
+                       50% { transform: scale(1.1); opacity: .2; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; }
+  }
   .mic svg { width: 32px; height: 32px; fill: white; }
   .hint { font-size: 11px; color: oklch(0.60 0 0); }
   .note { margin-top: auto; width: 100%; font-size: 11px; line-height: 1.35;
