@@ -98,7 +98,7 @@ void setup_cli(CLI::App& app) {
     auto* demo_seconds = new int(14);
     auto* demo_character = new std::string("echo");
     avatar_demo->add_option("--seconds", *demo_seconds, "How long to run");
-    avatar_demo->add_option("--character", *demo_character, "echo|hermes|mnemosyne");
+    avatar_demo->add_option("--character", *demo_character, "echo|hermes|mnemosyne|kalliope|morpheus");
     avatar_demo->callback([demo_seconds, demo_character]() {
         exit(cmd_avatar_demo(*demo_character, *demo_seconds));
     });

@@ -742,3 +742,26 @@ Next:
   record action per the system's own color rule.
 - CI run #88 (the design refactor push) went green across the full matrix
   on the first attempt.
+
+## Run 2026-06-13 — companion design review + the pantheon of five
+
+- Deep overlay/agent design review (design/2026-06-13-companion-design-
+  review.md): surveyed OpenPets (pack manifests, agent reaction
+  vocabulary, speech-bubble redaction rules), Shimeji (silhouette-first
+  identity), the Clippy revival (behavioral failure mode), against the
+  current shells. Verified strengths (shared rasterizer, latch rules,
+  truthful mic halo, non-activating windows); logged the open gotchas
+  (off-screen stranding on monitor unplug, manual DPI, fullscreen
+  behavior, idle tick rate) and the redaction rule for the future M4
+  speech-bubble layer.
+- Pantheon 3 -> 5: AvatarCharacter gains a `signature` (ink-drawn
+  geometric tell: Hermes wings, Mnemosyne inner ring, Kalliope crown of
+  muse-stars, Morpheus dream motes) so spirits are distinct in
+  silhouette, not just accent. New forms: kalliope (violet, 0.95),
+  morpheus (teal, 1.35). Flowed through avatar.h/avatar_core.cpp,
+  schema enum, config.h/config.toml comments, CLI help, README, design
+  docs; settings UI picks the enum up schema-driven.
+- Gates: 180/180 ctest (new: pairwise-distinct idle silhouettes at t=0,
+  caption strip stays clean across spirits), morpheus demo under Xvfb,
+  pantheon sheet (5x6 states, light+dark) rendered from the production
+  rasterizer.

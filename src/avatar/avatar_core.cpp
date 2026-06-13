@@ -10,12 +10,22 @@ namespace autowhisper {
 namespace { constexpr double kTau = 6.283185307179586; }
 
 // ---- The pantheon ----------------------------------------------------------
-// Echo: repeats your words — the default scribe-spirit. Hermes: the herald,
-// quick, message-blue. Mnemosyne: memory, unhurried amber.
+// Five spirits, one species (the sigil). Each carries a signature — a quiet
+// ink tell readable in silhouette — plus an accent and a tempo. Echo: repeats
+// your words, the default scribe-spirit. Hermes: the herald, quick, winged.
+// Mnemosyne: memory, unhurried, a ring within the ring. Kalliope: the muse
+// of eloquence, crowned. Morpheus: dreams, slowest, trailing motes.
 const AvatarCharacter AVATAR_CHARACTERS[] = {
-    {"echo",      "Echo",      "the one who answers", 0.86f, 0.26f, 0.20f, 1.00f},
-    {"hermes",    "Hermes",    "the swift herald",    0.25f, 0.47f, 0.95f, 0.85f},
-    {"mnemosyne", "Mnemosyne", "keeper of memory",    0.83f, 0.58f, 0.18f, 1.20f},
+    {"echo",      "Echo",      "the one who answers",  0.86f, 0.26f, 0.20f, 1.00f,
+     AvatarSignature::None},
+    {"hermes",    "Hermes",    "the swift herald",     0.25f, 0.47f, 0.95f, 0.85f,
+     AvatarSignature::Wings},
+    {"mnemosyne", "Mnemosyne", "keeper of memory",     0.83f, 0.58f, 0.18f, 1.20f,
+     AvatarSignature::InnerRing},
+    {"kalliope",  "Kalliope",  "the beautiful-voiced", 0.62f, 0.32f, 0.88f, 0.95f,
+     AvatarSignature::Crown},
+    {"morpheus",  "Morpheus",  "the shape of dreams",  0.18f, 0.60f, 0.58f, 1.35f,
+     AvatarSignature::Motes},
 };
 const int AVATAR_CHARACTER_COUNT =
     sizeof(AVATAR_CHARACTERS) / sizeof(AVATAR_CHARACTERS[0]);
@@ -291,6 +301,57 @@ void avatar_rasterize(uint32_t* buf, int size, const AvatarCharacter& ch,
     capsule(buf, size, cx + gap, cy, cx + gap + dash, cy, dw * 2.2f, kRim, .45f);
     capsule(buf, size, cx - gap - dash, cy, cx - gap, cy, dw, kInk, .95f);
     capsule(buf, size, cx + gap, cy, cx + gap + dash, cy, dw, kInk, .95f);
+
+    // --- the signature: each spirit's quiet ink tell, rim-backed like the
+    // dashes so it reads on any wallpaper. Drawn in ink, never accent —
+    // identity lives in silhouette, color keeps carrying meaning. ---
+    switch (ch.signature) {
+        case AvatarSignature::Wings: {
+            // Two strokes sweeping up and out from above the side dashes.
+            float ax = R * 1.30f, bx = R * 1.80f;
+            float ay = cy - R * .50f, by = cy - R * 1.05f;
+            for (float sgn : {-1.f, 1.f}) {
+                capsule(buf, size, cx + sgn * ax, ay, cx + sgn * bx, by,
+                        dw * 2.0f, kRim, .40f);
+                capsule(buf, size, cx + sgn * ax, ay, cx + sgn * bx, by,
+                        dw * .9f, kInk, .90f);
+            }
+            break;
+        }
+        case AvatarSignature::InnerRing: {
+            ring(buf, size, cx, cy, R * .55f, W * 1.5f, kRim, .35f);
+            ring(buf, size, cx, cy, R * .55f, W * .8f, kInk, .80f);
+            break;
+        }
+        case AvatarSignature::Crown: {
+            // Three muse-stars arced above the ring.
+            for (int i = -1; i <= 1; i++) {
+                float ang = float(kTau * .25f) + i * .42f;
+                float sx = cx + std::cos(ang) * R * 1.55f;
+                float sy = cy - std::sin(ang) * R * 1.55f;
+                float r = (i == 0) ? S * .024f : S * .018f;
+                disc(buf, size, sx, sy, r + S * .010f, kRim, .40f);
+                disc(buf, size, sx, sy, r, kInk, .90f);
+            }
+            break;
+        }
+        case AvatarSignature::Motes: {
+            // Dream motes drifting up and away, each on its own slow bob.
+            const float mx[3] = {R * .90f, R * 1.30f, R * 1.62f};
+            const float my[3] = {R * 1.00f, R * 1.32f, R * 1.60f};
+            const float mr[3] = {S * .022f, S * .015f, S * .010f};
+            const float ma[3] = {.85f, .60f, .42f};
+            for (int i = 0; i < 3; i++) {
+                float oy = float(std::sin(tt * kTau / 2.8 + i * 2.1)) * S * .012f;
+                disc(buf, size, cx + mx[i], cy - my[i] + oy, mr[i] + S * .008f,
+                     kRim, .35f);
+                disc(buf, size, cx + mx[i], cy - my[i] + oy, mr[i], kInk, ma[i]);
+            }
+            break;
+        }
+        case AvatarSignature::None:
+            break;
+    }
 
     // --- per-state actors ---
     if (state == AvatarState::Listening) {

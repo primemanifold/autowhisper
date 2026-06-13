@@ -28,10 +28,12 @@ std::vector<uint32_t> render(AvatarState s, double t, double phase, float level,
 // ---- pantheon ----
 
 TEST_CASE("character registry resolves ids and falls back to Echo", "[avatar]") {
-    REQUIRE(AVATAR_CHARACTER_COUNT == 3);
+    REQUIRE(AVATAR_CHARACTER_COUNT == 5);
     CHECK(std::string(find_character("echo")->name) == "Echo");
     CHECK(std::string(find_character("hermes")->name) == "Hermes");
     CHECK(std::string(find_character("mnemosyne")->name) == "Mnemosyne");
+    CHECK(std::string(find_character("kalliope")->name) == "Kalliope");
+    CHECK(std::string(find_character("morpheus")->name) == "Morpheus");
     CHECK(std::string(find_character("zeus")->name) == "Echo");
     CHECK(std::string(find_character("")->name) == "Echo");
 }
@@ -130,6 +132,35 @@ TEST_CASE("characters render with visibly different accents", "[avatar]") {
     auto echo = render(AvatarState::Listening, 2.0, 1.0, 0.8f, "echo");
     auto hermes = render(AvatarState::Listening, 2.0, 1.0, 0.8f, "hermes");
     CHECK(echo != hermes);
+}
+
+TEST_CASE("every spirit is distinct in silhouette, not just hue", "[avatar]") {
+    // At t=0 the shared bob and aura are identical for all tempos, so any
+    // difference between idle renders must come from the signature geometry.
+    std::vector<std::vector<uint32_t>> idles;
+    for (int i = 0; i < AVATAR_CHARACTER_COUNT; i++) {
+        idles.push_back(render(AvatarState::Idle, 0.0, 0.0, 0.f,
+                               AVATAR_CHARACTERS[i].id));
+    }
+    for (size_t a = 0; a < idles.size(); a++)
+        for (size_t b = a + 1; b < idles.size(); b++)
+            CHECK(idles[a] != idles[b]);
+}
+
+TEST_CASE("signatures stay clear of the caption strip", "[avatar]") {
+    // Signature geometry lives above/inside the orb; the bottom caption rows
+    // must stay identical across spirits so labels render on a clean plate.
+    const int size = 96;
+    auto bottom = [&](const char* who) {
+        auto buf = render(AvatarState::Idle, 0.0, 0.0, 0.f, who, size);
+        uint64_t sum = 0;
+        for (int y = 82; y < size; y++)
+            for (int x = 0; x < size; x++) sum += buf[y * size + x] >> 24;
+        return sum;
+    };
+    const uint64_t echo = bottom("echo");
+    for (int i = 1; i < AVATAR_CHARACTER_COUNT; i++)
+        CHECK(bottom(AVATAR_CHARACTERS[i].id) == echo);
 }
 
 TEST_CASE("renderer respects arbitrary sizes", "[avatar]") {

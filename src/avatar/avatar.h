@@ -28,8 +28,19 @@ enum class AvatarState {
     Error,
 };
 
-// A mythological form: accent hue and tempo. The shape is shared — the
-// spirit changes character, not species.
+// A character's signature: one quiet ink-drawn geometric tell, so every
+// spirit is recognizable by silhouette alone (at 64px, in greyscale), not
+// only by accent hue. The species stays the AutoWhisper sigil.
+enum class AvatarSignature {
+    None,       // Echo — the pure sigil
+    Wings,      // Hermes — two slanted strokes sweeping up from the dashes
+    InnerRing,  // Mnemosyne — a second, smaller ring held within the ring
+    Crown,      // Kalliope — three muse-stars arced above the ring
+    Motes,      // Morpheus — dream motes drifting up and away
+};
+
+// A mythological form: signature silhouette, accent hue, and tempo. The
+// species is shared — the spirit changes character, not species.
 struct AvatarCharacter {
     const char* id;
     const char* name;
@@ -38,6 +49,7 @@ struct AvatarCharacter {
     float accent_r, accent_g, accent_b;
     // Multiplier on every animation period (>1 = calmer).
     float tempo;
+    AvatarSignature signature;
 };
 
 const AvatarCharacter* find_character(const std::string& id);

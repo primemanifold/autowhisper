@@ -13,16 +13,23 @@ product's status made visible, never a decoration layer.
 The product's whole job is mythological already: you speak, something
 unseen repeats you faithfully. **Echo** — the nymph cursed to only repeat
 the words of others — is the exact archetype of a transcriber, so she is
-the default form. Two more forms ship, chosen from the same register:
+the default form. Four more forms ship, chosen from the same register:
 
-| id | form | epithet | accent | tempo |
-|---|---|---|---|---|
-| `echo` | Echo | the one who answers | record red | 1.00 |
-| `hermes` | Hermes | the swift herald | message blue | 0.85 (quicker) |
-| `mnemosyne` | Mnemosyne | keeper of memory | amber | 1.20 (calmer) |
+| id | form | epithet | signature | accent | tempo |
+|---|---|---|---|---|---|
+| `echo` | Echo | the one who answers | none — the pure sigil | record red | 1.00 |
+| `hermes` | Hermes | the swift herald | wings above the dashes | message blue | 0.85 (quicker) |
+| `mnemosyne` | Mnemosyne | keeper of memory | a ring within the ring | amber | 1.20 (calmer) |
+| `kalliope` | Kalliope | the beautiful-voiced | a crown of three muse-stars | violet | 0.95 |
+| `morpheus` | Morpheus | the shape of dreams | dream motes drifting away | teal | 1.35 (slowest) |
 
 The body is the AutoWhisper sigil itself — the ring with two side dashes —
-so the companion, the menu bar, and the brand are one mark.
+so the companion, the menu bar, and the brand are one mark. Each spirit
+adds one **signature**: a quiet ink-drawn tell, so every form is
+recognizable in silhouette alone (64px, greyscale), not just by hue.
+Signatures are never accent-colored — identity lives in shape; color
+keeps carrying meaning only. The full review and the overlay gotcha
+inventory live in `design/2026-06-13-companion-design-review.md`.
 
 ## States (wired to the daemon)
 

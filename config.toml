@@ -68,6 +68,7 @@ enabled = true
 [avatar]
 # The floating companion. Glows while listening, writes while inserting.
 enabled = false
-# character: echo (answers), hermes (swift, blue), mnemosyne (memory, amber)
+# character: echo (answers), hermes (swift, winged), mnemosyne (memory),
+#            kalliope (the muse, crowned), morpheus (dreams, motes)
 character = 'echo'
 size = 96
