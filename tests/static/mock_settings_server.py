@@ -31,6 +31,11 @@ SCHEMA = {
     "tray": [
         {"key": "enabled", "type": "bool", "enum_values": [], "min_numeric": None, "max_numeric": None, "description": "Show the system tray icon."},
     ],
+    "avatar": [
+        {"key": "enabled", "type": "bool", "enum_values": [], "min_numeric": None, "max_numeric": None, "description": "Show the floating companion that glows while listening and writes while inserting."},
+        {"key": "character", "type": "enum", "enum_values": ["echo", "hermes", "mnemosyne", "kalliope", "morpheus"], "min_numeric": None, "max_numeric": None, "description": "Which spirit accompanies you."},
+        {"key": "size", "type": "int", "enum_values": [], "min_numeric": 64, "max_numeric": 192, "description": "Companion size in pixels."},
+    ],
 }
 CONFIG = {
     "model": {"size": "tiny.en", "device": "cpu", "num_threads": 8},
@@ -40,6 +45,7 @@ CONFIG = {
     "feedback": {"enabled": True},
     "daemon": {"log_level": "info"},
     "tray": {"enabled": True},
+    "avatar": {"enabled": False, "character": "echo", "size": 112},
 }
 PLATFORM = {
     "platform": "linux",

@@ -765,3 +765,24 @@ Next:
   caption strip stays clean across spirits), morpheus demo under Xvfb,
   pantheon sheet (5x6 states, light+dark) rendered from the production
   rasterizer.
+
+## Run 2026-06-13 (cont.) — settings UX level-up: the cast picker + save-path bug
+
+- The cast: avatar.character renders as radio cards (silhouette glyph per
+  spirit — the same geometry the rasterizer draws — accent dot, name,
+  epithet) instead of a raw id dropdown. Schema-driven: unknown enum
+  values fall back to the plain select. Radio support threaded through
+  collect/setInput/syncMatchingInputs with pane-prefixed group names;
+  dirty tracking keys off data-config-key (radios' name is per-pane).
+- Found and fixed a LATENT PRODUCTION BUG while end-to-end-testing save:
+  renderRow puts data-config-key on the row div, which precedes the
+  control in document order, so collect() read `.value` off divs — the
+  PUT body was empty/undefined since the rewrite. No test had ever
+  exercised the full JS save path (C++ tests hit the API directly).
+  Control selectors now target input/select only; verified by asserting
+  the actual PUT body (typed ints, arrays, bools, the chosen character).
+- Quality-of-life: Ctrl/Cmd+S saves; beforeunload guards unsaved edits;
+  dirty rows carry an amber inset matching the unsaved pill.
+- Mock server gained the [avatar] section so the dev harness exercises
+  the picker. Gates: 180/180 ctest, 29/29 static, gotcha audit 0
+  findings (cast cards included), save round-trip asserted in Chromium.

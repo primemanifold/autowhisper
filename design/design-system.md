@@ -115,6 +115,11 @@ Implemented in the first slice:
 - advisory note
 - responsive mobile layout
 - appearance switcher (Auto / Light / Dark / Dev)
+- the cast: companion character picker (radio cards with silhouette
+  glyphs, accent dots, epithets; schema-driven, falls back to a plain
+  select for unknown values)
+- dirty-row markers (amber inset, matching the unsaved pill)
+- Ctrl/Cmd+S saves; closing with unsaved changes warns
 
 Still needed:
 

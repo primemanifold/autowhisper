@@ -102,6 +102,18 @@
     },
   ];
 
+  // The cast: presentation metadata for the companion's character picker.
+  // The schema enum stays the source of truth — unknown values fall back to
+  // the plain select, so a new spirit degrades gracefully.
+  const CHARACTER_META = {
+    echo:      { title: "Echo",      epithet: "the one who answers",  accent: "#db4233", sig: "none" },
+    hermes:    { title: "Hermes",    epithet: "the swift herald",     accent: "#4078f2", sig: "wings" },
+    mnemosyne: { title: "Mnemosyne", epithet: "keeper of memory",     accent: "#d4942e", sig: "inner" },
+    kalliope:  { title: "Kalliope",  epithet: "the beautiful-voiced", accent: "#9e52e0", sig: "crown" },
+    morpheus:  { title: "Morpheus",  epithet: "the shape of dreams",  accent: "#2e9994", sig: "motes" },
+  };
+
+
   const dirtyKeys = new Set();
   let schema;
   let config;
@@ -167,6 +179,20 @@
       setStatus("Could not save: " + e.message, "err");
     } finally {
       setBusy(false);
+    }
+  });
+
+  // Save from anywhere with the keyboard; never lose edits to a stray close.
+  window.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+      event.preventDefault();
+      if (!saveBtn.disabled) saveBtn.click();
+    }
+  });
+  window.addEventListener("beforeunload", (event) => {
+    if (dirtyKeys.size > 0) {
+      event.preventDefault();
+      event.returnValue = "";
     }
   });
 
@@ -341,9 +367,78 @@
     return row;
   }
 
+  // The sigil (ring + side dashes) plus each spirit's signature, as a small
+  // inline SVG — the same silhouettes the C++ rasterizer draws.
+  function characterGlyph(sig) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", "0 0 48 48");
+    svg.setAttribute("class", "aw-cast-glyph");
+    svg.setAttribute("aria-hidden", "true");
+    const add = (tag, attrs) => {
+      const el = document.createElementNS(svgNS, tag);
+      for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+      svg.appendChild(el);
+    };
+    const stroke = { fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round" };
+    add("circle", { cx: 24, cy: 26, r: 8.5, ...stroke });
+    add("line", { x1: 9, y1: 26, x2: 13, y2: 26, ...stroke });
+    add("line", { x1: 35, y1: 26, x2: 39, y2: 26, ...stroke });
+    if (sig === "wings") {
+      add("line", { x1: 11, y1: 19, x2: 7, y2: 14, ...stroke });
+      add("line", { x1: 37, y1: 19, x2: 41, y2: 14, ...stroke });
+    } else if (sig === "inner") {
+      add("circle", { cx: 24, cy: 26, r: 4, ...stroke, "stroke-width": "1.6" });
+    } else if (sig === "crown") {
+      add("circle", { cx: 17, cy: 13, r: 1.6, fill: "currentColor" });
+      add("circle", { cx: 24, cy: 11, r: 2.1, fill: "currentColor" });
+      add("circle", { cx: 31, cy: 13, r: 1.6, fill: "currentColor" });
+    } else if (sig === "motes") {
+      add("circle", { cx: 33, cy: 14, r: 2.1, fill: "currentColor" });
+      add("circle", { cx: 37, cy: 10, r: 1.5, fill: "currentColor" });
+      add("circle", { cx: 40, cy: 6.5, r: 1.0, fill: "currentColor" });
+    }
+    return svg;
+  }
+
+  function renderCharacterPicker(paneId, section, keyDef, value) {
+    const name = `${section}.${keyDef.key}`;
+    const cast = document.createElement("fieldset");
+    cast.className = "aw-cast";
+    cast.setAttribute("aria-label", "Companion character");
+    for (const v of keyDef.enum_values || []) {
+      const meta = CHARACTER_META[v];
+      const card = document.createElement("label");
+      card.className = "aw-cast-card";
+      const radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = `${paneId}:${name}`;
+      radio.value = v;
+      radio.id = `${inputId(paneId, section, keyDef.key)}-${v}`;
+      radio.setAttribute("data-config-key", name);
+      radio.checked = v === value;
+      const head = document.createElement("span");
+      head.className = "aw-cast-name";
+      const dot = document.createElement("span");
+      dot.className = "aw-cast-dot";
+      dot.style.background = meta?.accent || "currentColor";
+      head.append(dot, document.createTextNode(meta?.title || v));
+      const epithet = document.createElement("span");
+      epithet.className = "aw-cast-epithet";
+      epithet.textContent = meta?.epithet || "";
+      card.append(radio, characterGlyph(meta?.sig), head, epithet);
+      cast.appendChild(card);
+    }
+    return cast;
+  }
+
   function renderInput(paneId, section, keyDef, value) {
     const id = inputId(paneId, section, keyDef.key);
     const name = `${section}.${keyDef.key}`;
+    if (keyDef.type === "enum" && name === "avatar.character" &&
+        (keyDef.enum_values || []).every((v) => CHARACTER_META[v])) {
+      return renderCharacterPicker(paneId, section, keyDef, value);
+    }
     if (keyDef.type === "enum") {
       const sel = document.createElement("select");
       sel.id = id;
@@ -431,15 +526,20 @@
   function markDirtyFromEvent(event) {
     const input = event.target.closest("input, select");
     if (!input?.name) return;
-    dirtyKeys.add(input.name);
-    clearIssues(input.name);
+    // Radios carry a pane-prefixed group name; the config key is canonical.
+    const key = input.dataset.configKey || input.name;
+    dirtyKeys.add(key);
+    clearIssues(key);
     syncMatchingInputs(input);
     updateDirtyState();
   }
 
   function setInput(section, keyDef, value) {
     document.querySelectorAll(`[data-config-key="${section}.${keyDef.key}"]`).forEach((el) => {
-      if (el.type === "checkbox") {
+      if (!el.type) return; // the row div carries the key too — controls only
+      if (el.type === "radio") {
+        el.checked = el.value === value;
+      } else if (el.type === "checkbox") {
         el.checked = !!value;
         const label = el.parentElement?.querySelector("span");
         if (label) label.textContent = el.checked ? "Enabled" : "Disabled";
@@ -456,9 +556,14 @@
     for (const section of sections) {
       out[section] = {};
       for (const keyDef of schema[section]) {
-        const el = document.querySelector(`[data-config-key="${section}.${keyDef.key}"]`);
+        const el = document.querySelector(
+          `input[data-config-key="${section}.${keyDef.key}"], select[data-config-key="${section}.${keyDef.key}"]`);
         if (!el) continue;
-        if (el.type === "checkbox") out[section][keyDef.key] = el.checked;
+        if (el.type === "radio") {
+          const checked = document.querySelector(`input[data-config-key="${section}.${keyDef.key}"]:checked`);
+          out[section][keyDef.key] = checked ? checked.value : el.value;
+        }
+        else if (el.type === "checkbox") out[section][keyDef.key] = el.checked;
         else if (el.type === "number") out[section][keyDef.key] = keyDef.type === "int" ? parseInt(el.value, 10) : parseFloat(el.value);
         else if (keyDef.type === "string_array") out[section][keyDef.key] = el.value.split(",").map((s) => s.trim()).filter(Boolean);
         else out[section][keyDef.key] = el.value;
@@ -468,9 +573,12 @@
   }
 
   function syncMatchingInputs(source) {
-    document.querySelectorAll(`[data-config-key="${source.name}"]`).forEach((target) => {
-      if (target === source) return;
-      if (target.type === "checkbox") {
+    const key = source.dataset.configKey || source.name;
+    document.querySelectorAll(`[data-config-key="${key}"]`).forEach((target) => {
+      if (target === source || !target.type) return;
+      if (target.type === "radio") {
+        target.checked = target.value === source.value;
+      } else if (target.type === "checkbox") {
         target.checked = source.checked;
         const label = target.parentElement?.querySelector("span");
         if (label) label.textContent = target.checked ? "Enabled" : "Disabled";
@@ -524,11 +632,15 @@
   }
 
   function controlsForConfigKey(configKey) {
-    return Array.from(document.querySelectorAll("[data-config-key]")).filter((control) => control.dataset.configKey === configKey);
+    return Array.from(document.querySelectorAll("input[data-config-key], select[data-config-key]"))
+      .filter((control) => control.dataset.configKey === configKey);
   }
 
   function updateDirtyState() {
     const count = dirtyKeys.size;
+    document.querySelectorAll(".aw-field[data-config-key]").forEach((row) => {
+      row.classList.toggle("is-dirty", dirtyKeys.has(row.dataset.configKey));
+    });
     saveBtn.disabled = count === 0;
     dirtyPill.textContent = count === 0 ? "saved" : `unsaved · ${count}`;
     dirtyPill.className = count === 0 ? "aw-pill aw-pill-ok" : "aw-pill aw-pill-warn";
