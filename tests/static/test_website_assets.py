@@ -59,6 +59,7 @@ class WebsiteAssetsTest(unittest.TestCase):
             "settings-desktop-dark.png",
             "settings-output.png",
             "settings-mobile.png",
+            "settings-companion.png",
             "concept-ios.png",
             "concept-android.png",
             "concept-watchos.png",
@@ -82,6 +83,64 @@ class WebsiteAssetsTest(unittest.TestCase):
         # Every image needs alt text.
         for img in re.findall(r"<img\b[^>]*>", html):
             self.assertIn("alt=", img)
+
+    def test_landing_page_serves_direct_downloads_with_checksums(self):
+        html = (SITE / "index.html").read_text(encoding="utf-8")
+        downloads = SITE / "downloads"
+        for name in [
+            "autowhisper-0.8.0-linux-x86_64.tar.gz",
+            "autowhisper-0.8.0-windows-x86_64.zip",
+            "SHA256SUMS",
+        ]:
+            self.assertTrue((downloads / name).exists(), f"missing direct-download asset: {name}")
+            self.assertIn(f"downloads/{name}", html, f"landing page must link {name}")
+        # Download artifacts must match the canonical dist/ checksums exactly.
+        sums = (ROOT / "dist" / "SHA256SUMS").read_text(encoding="utf-8")
+        self.assertEqual(sums, (downloads / "SHA256SUMS").read_text(encoding="utf-8"))
+        import hashlib
+        for line in sums.strip().splitlines():
+            digest, name = line.split()
+            actual = hashlib.sha256((downloads / name).read_bytes()).hexdigest()
+            self.assertEqual(actual, digest, f"checksum drift for {name}")
+        # Honest maturity labels for the desktop matrix.
+        self.assertIn("beta", html)
+        self.assertIn("Notarized Developer ID", html)
+
+    def test_landing_page_answers_faqs_honestly(self):
+        html = (SITE / "index.html").read_text(encoding="utf-8")
+        self.assertIn('id="faq"', html)
+        self.assertGreaterEqual(html.count("<details>"), 5, "FAQ should ship several disclosure items")
+        for claim in [
+            "Transcription runs locally",
+            "design previews, not yet shipping",
+            "X11 today",
+            "off by default",
+        ]:
+            self.assertIn(claim, html)
+
+    def test_landing_page_routes_feedback_to_github_and_claude(self):
+        html = (SITE / "index.html").read_text(encoding="utf-8")
+        self.assertIn('id="feedback"', html)
+        self.assertIn("issues/new?template=bug_report.yml", html)
+        self.assertIn("issues/new?template=feature_request.yml", html)
+        # The Claude concierge link: prefilled prompt that drafts the issue,
+        # files it (or hands back a prefilled issues/new link), then helps the
+        # user star the repo and follow releases. Static link, no scripts.
+        self.assertIn("https://claude.ai/new?q=", html)
+        claude_href = re.search(r'href="(https://claude\.ai/new\?q=[^"]+)"', html)
+        self.assertIsNotNone(claude_href)
+        from urllib.parse import unquote
+        prompt = unquote(claude_href.group(1))
+        for needle in [
+            "github.com/primemanifold/autowhisper",
+            "bug report or a feature request",
+            "autowhisper doctor",
+            "duplicates",
+            "issues/new",
+            "star the repository",
+        ]:
+            self.assertIn(needle, prompt)
+        self.assertIn("Star the repo", html)
 
     def test_readme_references_screenshots(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")

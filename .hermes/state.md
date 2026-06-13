@@ -786,3 +786,25 @@ Next:
 - Mock server gained the [avatar] section so the dev harness exercises
   the picker. Gates: 180/180 ctest, 29/29 static, gotcha audit 0
   findings (cast cards included), save round-trip asserted in Chromium.
+
+## Run 2026-06-13 (cont. 2) — website: downloads, FAQ, feedback concierge
+
+- Landing page gains: a Download section serving the 0.8.0 Linux/Windows
+  artifacts directly from the site (site/downloads/, byte-verified
+  against dist/SHA256SUMS by a static test) alongside the notarized
+  macOS v0.7.1 release asset, with honest maturity labels; a script-free
+  FAQ (details/summary) whose claims are test-pinned to stay honest
+  (X11 today, previews not yet shipping, companion off by default); a
+  feedback section linking both issue templates plus a prefilled
+  claude.ai/new?q= concierge prompt that interviews the reporter,
+  checks duplicates, drafts to the template, files the issue (or hands
+  back a prefilled issues/new link), then helps star the repo and
+  follow releases; a companion section with the cast screenshot.
+- Marketing screenshots regenerated from the real settings UI (the old
+  captures predated the design refactor): desktop light/dark, output
+  pane, mobile width, and the new settings-companion.png.
+- The site stays static and script-free (test-enforced); nav wraps at
+  320px (caught by the gotcha audit, which is back to 0 findings).
+- 32/32 static tests (3 new: direct downloads + checksum drift guard,
+  honest FAQ claims, feedback routing incl. the Claude prompt contract).
+- Note: pages.yml deploys from core — the site updates go live on merge.
