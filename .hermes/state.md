@@ -808,3 +808,23 @@ Next:
 - 32/32 static tests (3 new: direct downloads + checksum drift guard,
   honest FAQ claims, feedback routing incl. the Claude prompt contract).
 - Note: pages.yml deploys from core — the site updates go live on merge.
+
+## Run 2026-06-13 (cont. 3) — v0.9.0 release prep
+
+- Version bumped 0.8.0 -> 0.9.0 across CMakeLists + debian/changelog
+  (ppa workflow consistency rule) with a full CHANGELOG.md section.
+  Note: v0.8.0 was never tagged/released; 0.9.0 spans both bodies of
+  work and supersedes it.
+- dist/ + site/downloads rebuilt at 0.9.0: Linux tarball from the local
+  release build (--version verified, 180/180 ctest, kalliope demo under
+  Xvfb), Windows exe cross-built with MinGW (PE32+, self-contained:
+  system DLLs only via objdump; caught and fixed a configure race that
+  had baked 0.8.0 into the first exe). SHA256SUMS regenerated; the
+  static suite byte-verifies site downloads against dist.
+- AGENTS.md documents the CI-economy convention: [skip ci] only for
+  trees already proven green (merge commits of green branches,
+  locally-validated docs-only changes); never for release prep.
+- Release plan: branch CI validates this commit -> PR -> merge to core
+  with [skip ci] on the merge commit (identical tree) -> tag v0.9.0 ->
+  ppa-release workflow verifies versions, builds the signed source
+  package, uploads to Launchpad, and creates the GitHub release.

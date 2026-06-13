@@ -88,8 +88,8 @@ class WebsiteAssetsTest(unittest.TestCase):
         html = (SITE / "index.html").read_text(encoding="utf-8")
         downloads = SITE / "downloads"
         for name in [
-            "autowhisper-0.8.0-linux-x86_64.tar.gz",
-            "autowhisper-0.8.0-windows-x86_64.zip",
+            "autowhisper-0.9.0-linux-x86_64.tar.gz",
+            "autowhisper-0.9.0-windows-x86_64.zip",
             "SHA256SUMS",
         ]:
             self.assertTrue((downloads / name).exists(), f"missing direct-download asset: {name}")

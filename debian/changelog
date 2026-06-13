@@ -1,3 +1,20 @@
+autowhisper (0.9.0-1) noble; urgency=medium
+
+  * Design system 2.0, the pantheon of five, and the website refresh.
+    - Settings UI: single light-dark() token source with an appearance
+      switcher (Auto / Light / Dark / Dev phosphor-terminal theme);
+      WCAG AA contrast across all themes after a three-pass audit
+    - Companion: five spirits with signature silhouettes (echo, hermes,
+      mnemosyne, kalliope, morpheus); visual character picker in settings
+    - Fixed: settings save path sent undefined values (collect() read
+      the row div instead of the control); Ctrl/Cmd+S saves; unsaved
+      changes warn before close; dirty rows are marked
+    - Tray icons redrawn as geometric state glyphs
+    - Website: direct downloads with checksums, FAQ, and a Claude
+      feedback concierge that drafts GitHub issues to the templates
+
+ -- AutoWhisper Maintainers <maintainers@autowhisper.dev>  Sat, 13 Jun 2026 01:30:00 +0000
+
 autowhisper (0.8.0-1) noble; urgency=medium
 
   * Truth & foundations release (production plan M1) plus the companion.
