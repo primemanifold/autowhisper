@@ -73,7 +73,7 @@ struct TrayConfig {
 
 struct AvatarConfig {
     bool enabled = false;          // opt-in companion
-    std::string character = "echo"; // echo, hermes, mnemosyne
+    std::string character = "echo"; // echo, hermes, mnemosyne, kalliope, morpheus
     int size = 96;                  // window size in pixels
 };
 

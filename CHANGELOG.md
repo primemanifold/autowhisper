@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.9.0 — 2026-06-13
+
+Design system 2.0, the pantheon of five, and the website refresh.
+
+### Added
+- Appearance switcher in the settings UI (Auto / Light / Dark / Dev): one `light-dark()` token source so light and dark cannot drift, persisted per browser, applied before first paint. Dev is an opt-in phosphor-terminal theme (CRT green, mono type, square corners, scanlines) implemented purely as a token-override layer.
+- The pantheon of five: each companion spirit now carries a signature silhouette readable at 64px in greyscale — Echo (the pure sigil), Hermes (wings), Mnemosyne (a ring within the ring), Kalliope (a crown of muse-stars, new), Morpheus (dream motes, new). Tests pin pairwise-distinct silhouettes and caption-strip cleanliness.
+- The cast: a visual character picker in settings (silhouette glyph, accent dot, epithet per spirit) replacing the raw id dropdown; schema-driven with graceful fallback.
+- Ctrl/Cmd+S saves from anywhere; closing the settings tab with unsaved edits warns; rows with unsaved values are marked.
+- Website: a Download section serving the Linux and Windows artifacts directly (checksum-verified against dist/SHA256SUMS by a static test), a script-free FAQ with test-pinned honest claims, and a feedback section with issue-template links plus a prefilled Claude prompt that drafts issues to the repo's templates, checks duplicates, and helps star/follow the project.
+- Companion design review (design/2026-06-13-companion-design-review.md) with an overlay gotcha inventory and a binding redaction rule for any future speech-bubble layer.
+
+### Changed
+- Tray icons redrawn as geometric state glyphs in token-derived colors (grey ring idle, red disc recording, amber arc processing, red ring + bang error), replacing fragile SVG-text masks.
+- WCAG AA contrast across every surface and theme after a three-pass Playwright + axe-core audit (141 findings -> 0): muted-text tokens retuned, 24px hit targets, long-token overflow hardening, label-wrapped checkbox rows.
+- Checkboxes use ink, not signal red — red stays reserved for the record action.
+
+### Fixed
+- Settings save path: `collect()` read values off the row `div` (which also carried `data-config-key` and precedes the control in document order), so saves sent undefined values. Control selectors now target inputs/selects only; verified by asserting the PUT body end-to-end in Chromium.
+- Settings UI mock server lacked `/api/platform`, rendering the failure state in the dev harness.
+
+### Validation
+- 180/180 C++ tests, 32/32 static tests, five-for-five first-attempt CI matrix runs on the branch; UI/UX gotcha audit at 0 findings; morpheus full state script under Xvfb; pantheon sheet rendered from the production rasterizer.
+
+
 ## 0.8.0 — 2026-06-12
 
 Truth & foundations (production plan M1), the intelligence layer's first

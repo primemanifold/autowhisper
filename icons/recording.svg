@@ -1,9 +1,5 @@
+<!-- Tray: recording. Solid signal-red disc, the record metaphor; red is
+     reserved for the record action (aw-signal token, sRGB approximation). -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <defs>
-    <mask id="m">
-      <circle cx="64" cy="64" r="56" fill="white"/>
-      <text x="64" y="84" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="black" text-anchor="middle">A</text>
-    </mask>
-  </defs>
-  <circle cx="64" cy="64" r="56" fill="#f87171" mask="url(#m)"/>
+  <circle cx="64" cy="64" r="52" fill="#cf3d2a"/>
 </svg>

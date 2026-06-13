@@ -702,3 +702,129 @@ Next:
 - Gates: 178/178 ctest, static suites, MinGW self-contained build, binary
   --version = 0.8.0. Post-merge: tag v0.8.0 on core, publish release with
   CI artifacts (mac signing/notarization on a Mac per docs/MACOS.md).
+
+## Run 2026-06-12 (night) — design system pass 2: one token source, appearance themes, dev mode
+
+- Settings UI tokens collapsed to a single block via `light-dark()` —
+  light and dark resolve from one source of truth through `color-scheme`,
+  so the schemes can no longer drift. Radius/shadow promoted to themable
+  tokens (`--aw-radius-pill`, `--aw-shadow-1`).
+- New appearance switcher in the sidebar (Auto / Light / Dark / Dev),
+  persisted in localStorage (`aw-theme`), applied pre-paint by an inline
+  head script (no theme flash). "Dev" is a phosphor-terminal theme — CRT
+  green palette, mono type, square corners, hard offset shadows, static
+  scanlines — implemented purely as a token-override layer on
+  `html[data-theme="dev"]`; zero component or layout changes.
+- Numbered-navigation remnants removed (hidden nav spans, kicker numbers),
+  finishing the earlier refactor's stated intent.
+- Landing site css renamed onto the `--aw-` vocabulary (same light-dark()
+  pattern); mobile comps now use `--aw-ink/line/signal` tokens with the
+  halo derived from `--aw-signal` via color-mix.
+- Tray icons redrawn as geometric state glyphs (grey ring idle, red disc
+  recording, amber open arc processing, red ring + bang error) in
+  token-approximate sRGB; replaces Tailwind-palette circles with
+  SVG-text masks that tray renderers could rasterize wrong.
+- design/design-system.md documents the token architecture and themes.
+
+## Run 2026-06-12 (night, part 2) — UI/UX gotcha audit, 3 passes to zero
+
+- Built a Playwright + axe-core audit (contrast via canvas-resolved colors,
+  WCAG 2.5.8 targets with the inline-link exemption, horizontal overflow,
+  focus-ring paintability, long-token stress, reduced-motion) over
+  settings (3 themes x 6 widths x all panes), landing (2 schemes x 4
+  widths), and the mobile comps.
+- Pass 1: 141 findings -> fixes (ink-3 retuned for AA both schemes,
+  config-key off decorative ink-4, overflow-wrap on status/issue/desc,
+  label-wrapped checkbox rows, landing 24px link targets + header wrap +
+  URL wrapping, mock muted text). Pass 2: 4 (light ok/warn badges on soft
+  tints) -> light functional colors darkened. Pass 3: 0 findings.
+- Checkbox accent moved from signal red to ink: red is reserved for the
+  record action per the system's own color rule.
+- CI run #88 (the design refactor push) went green across the full matrix
+  on the first attempt.
+
+## Run 2026-06-13 — companion design review + the pantheon of five
+
+- Deep overlay/agent design review (design/2026-06-13-companion-design-
+  review.md): surveyed OpenPets (pack manifests, agent reaction
+  vocabulary, speech-bubble redaction rules), Shimeji (silhouette-first
+  identity), the Clippy revival (behavioral failure mode), against the
+  current shells. Verified strengths (shared rasterizer, latch rules,
+  truthful mic halo, non-activating windows); logged the open gotchas
+  (off-screen stranding on monitor unplug, manual DPI, fullscreen
+  behavior, idle tick rate) and the redaction rule for the future M4
+  speech-bubble layer.
+- Pantheon 3 -> 5: AvatarCharacter gains a `signature` (ink-drawn
+  geometric tell: Hermes wings, Mnemosyne inner ring, Kalliope crown of
+  muse-stars, Morpheus dream motes) so spirits are distinct in
+  silhouette, not just accent. New forms: kalliope (violet, 0.95),
+  morpheus (teal, 1.35). Flowed through avatar.h/avatar_core.cpp,
+  schema enum, config.h/config.toml comments, CLI help, README, design
+  docs; settings UI picks the enum up schema-driven.
+- Gates: 180/180 ctest (new: pairwise-distinct idle silhouettes at t=0,
+  caption strip stays clean across spirits), morpheus demo under Xvfb,
+  pantheon sheet (5x6 states, light+dark) rendered from the production
+  rasterizer.
+
+## Run 2026-06-13 (cont.) — settings UX level-up: the cast picker + save-path bug
+
+- The cast: avatar.character renders as radio cards (silhouette glyph per
+  spirit — the same geometry the rasterizer draws — accent dot, name,
+  epithet) instead of a raw id dropdown. Schema-driven: unknown enum
+  values fall back to the plain select. Radio support threaded through
+  collect/setInput/syncMatchingInputs with pane-prefixed group names;
+  dirty tracking keys off data-config-key (radios' name is per-pane).
+- Found and fixed a LATENT PRODUCTION BUG while end-to-end-testing save:
+  renderRow puts data-config-key on the row div, which precedes the
+  control in document order, so collect() read `.value` off divs — the
+  PUT body was empty/undefined since the rewrite. No test had ever
+  exercised the full JS save path (C++ tests hit the API directly).
+  Control selectors now target input/select only; verified by asserting
+  the actual PUT body (typed ints, arrays, bools, the chosen character).
+- Quality-of-life: Ctrl/Cmd+S saves; beforeunload guards unsaved edits;
+  dirty rows carry an amber inset matching the unsaved pill.
+- Mock server gained the [avatar] section so the dev harness exercises
+  the picker. Gates: 180/180 ctest, 29/29 static, gotcha audit 0
+  findings (cast cards included), save round-trip asserted in Chromium.
+
+## Run 2026-06-13 (cont. 2) — website: downloads, FAQ, feedback concierge
+
+- Landing page gains: a Download section serving the 0.8.0 Linux/Windows
+  artifacts directly from the site (site/downloads/, byte-verified
+  against dist/SHA256SUMS by a static test) alongside the notarized
+  macOS v0.7.1 release asset, with honest maturity labels; a script-free
+  FAQ (details/summary) whose claims are test-pinned to stay honest
+  (X11 today, previews not yet shipping, companion off by default); a
+  feedback section linking both issue templates plus a prefilled
+  claude.ai/new?q= concierge prompt that interviews the reporter,
+  checks duplicates, drafts to the template, files the issue (or hands
+  back a prefilled issues/new link), then helps star the repo and
+  follow releases; a companion section with the cast screenshot.
+- Marketing screenshots regenerated from the real settings UI (the old
+  captures predated the design refactor): desktop light/dark, output
+  pane, mobile width, and the new settings-companion.png.
+- The site stays static and script-free (test-enforced); nav wraps at
+  320px (caught by the gotcha audit, which is back to 0 findings).
+- 32/32 static tests (3 new: direct downloads + checksum drift guard,
+  honest FAQ claims, feedback routing incl. the Claude prompt contract).
+- Note: pages.yml deploys from core — the site updates go live on merge.
+
+## Run 2026-06-13 (cont. 3) — v0.9.0 release prep
+
+- Version bumped 0.8.0 -> 0.9.0 across CMakeLists + debian/changelog
+  (ppa workflow consistency rule) with a full CHANGELOG.md section.
+  Note: v0.8.0 was never tagged/released; 0.9.0 spans both bodies of
+  work and supersedes it.
+- dist/ + site/downloads rebuilt at 0.9.0: Linux tarball from the local
+  release build (--version verified, 180/180 ctest, kalliope demo under
+  Xvfb), Windows exe cross-built with MinGW (PE32+, self-contained:
+  system DLLs only via objdump; caught and fixed a configure race that
+  had baked 0.8.0 into the first exe). SHA256SUMS regenerated; the
+  static suite byte-verifies site downloads against dist.
+- AGENTS.md documents the CI-economy convention: [skip ci] only for
+  trees already proven green (merge commits of green branches,
+  locally-validated docs-only changes); never for release prep.
+- Release plan: branch CI validates this commit -> PR -> merge to core
+  with [skip ci] on the merge commit (identical tree) -> tag v0.9.0 ->
+  ppa-release workflow verifies versions, builds the signed source
+  package, uploads to Launchpad, and creates the GitHub release.

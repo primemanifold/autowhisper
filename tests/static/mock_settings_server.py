@@ -31,6 +31,11 @@ SCHEMA = {
     "tray": [
         {"key": "enabled", "type": "bool", "enum_values": [], "min_numeric": None, "max_numeric": None, "description": "Show the system tray icon."},
     ],
+    "avatar": [
+        {"key": "enabled", "type": "bool", "enum_values": [], "min_numeric": None, "max_numeric": None, "description": "Show the floating companion that glows while listening and writes while inserting."},
+        {"key": "character", "type": "enum", "enum_values": ["echo", "hermes", "mnemosyne", "kalliope", "morpheus"], "min_numeric": None, "max_numeric": None, "description": "Which spirit accompanies you."},
+        {"key": "size", "type": "int", "enum_values": [], "min_numeric": 64, "max_numeric": 192, "description": "Companion size in pixels."},
+    ],
 }
 CONFIG = {
     "model": {"size": "tiny.en", "device": "cpu", "num_threads": 8},
@@ -40,6 +45,18 @@ CONFIG = {
     "feedback": {"enabled": True},
     "daemon": {"log_level": "info"},
     "tray": {"enabled": True},
+    "avatar": {"enabled": False, "character": "echo", "size": 112},
+}
+PLATFORM = {
+    "platform": "linux",
+    "build_target": "linux",
+    "summary": "Mock platform readiness for settings UI development.",
+    "features": [
+        {"id": "hotkeys", "name": "Global hotkeys", "state": "ready", "detail": "X11 push-to-talk verified."},
+        {"id": "output", "name": "Text insertion", "state": "ready", "detail": "XTest injection with clipboard fallback."},
+        {"id": "tray", "name": "Tray icon", "state": "partial", "detail": "AppIndicator when available."},
+        {"id": "wayland", "name": "Wayland", "state": "unsupported", "detail": "X11 only for now."},
+    ],
 }
 
 class Handler(SimpleHTTPRequestHandler):
@@ -51,6 +68,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(SCHEMA)
         if self.path in ("/api/config", "/api/defaults"):
             return self.send_json(CONFIG)
+        if self.path == "/api/platform":
+            return self.send_json(PLATFORM)
         return super().do_GET()
 
     def do_PUT(self):

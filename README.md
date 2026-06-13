@@ -43,7 +43,7 @@ Echo — the nymph who can only repeat your words — is an opt-in floating butt
 
 ```toml
 [avatar]
-enabled = true      # forms: echo, hermes, mnemosyne
+enabled = true      # forms: echo, hermes, mnemosyne, kalliope, morpheus
 ```
 
 ## What it does

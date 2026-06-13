@@ -131,10 +131,12 @@ const std::vector<KeyDef>& table() {
             "Show the floating companion (Echo) that glows while listening "
             "and writes while inserting."},
         {"avatar", "character", Type::Enum,
-            V{"echo", "hermes", "mnemosyne"},
+            V{"echo", "hermes", "mnemosyne", "kalliope", "morpheus"},
             std::nullopt, std::nullopt,
-            "Which spirit accompanies you: Echo (answers), Hermes (swift, "
-            "blue), Mnemosyne (memory, amber)."},
+            "Which spirit accompanies you: Echo (answers, red), Hermes "
+            "(swift, winged, blue), Mnemosyne (memory, inner ring, amber), "
+            "Kalliope (the muse, crowned, violet), Morpheus (dreams, "
+            "drifting motes, teal)."},
         {"avatar", "size", Type::Int, V{}, 64.0, 192.0,
             "Companion size in pixels."},
 

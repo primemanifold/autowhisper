@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(autowhisper VERSION 0.8.0 LANGUAGES CXX)
+project(autowhisper VERSION 0.9.0 LANGUAGES CXX)
 
 # macOS: Objective-C++ for .mm files, ARC, minimum target, universal binary.
 if(APPLE)

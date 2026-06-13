@@ -18,36 +18,35 @@
   .screen { width: 300px; height: 640px; border-radius: 26px; overflow: hidden;
             display: flex; flex-direction: column; padding: 26px 22px 30px;
             box-shadow: 0 24px 70px oklch(0 0 0 / .16); }
-  .light { background: oklch(0.985 0 0); --ink: oklch(0.205 0 0); --ink-2: oklch(0.50 0 0);
-           --ink-3: oklch(0.65 0 0); --hair: oklch(0.91 0 0); }
-  .dark  { background: oklch(0.150 0 0); --ink: oklch(0.95 0 0); --ink-2: oklch(0.66 0 0);
-           --ink-3: oklch(0.50 0 0); --hair: oklch(0.27 0 0); }
+  .light { background: oklch(0.985 0 0); --aw-ink-0: oklch(0.205 0 0); --aw-ink-2: oklch(0.50 0 0);
+           --aw-ink-3: oklch(0.55 0 0); --aw-line: oklch(0.91 0 0); --aw-signal: oklch(0.585 0.215 28); }
+  .dark  { background: oklch(0.150 0 0); --aw-ink-0: oklch(0.95 0 0); --aw-ink-2: oklch(0.66 0 0);
+           --aw-ink-3: oklch(0.62 0 0); --aw-line: oklch(0.27 0 0); --aw-signal: oklch(0.640 0.205 28); }
   .top { display: flex; justify-content: space-between; align-items: center; }
-  .app { font-size: 15px; font-weight: 650; letter-spacing: -.01em; color: var(--ink); }
-  .model { font-size: 11px; color: var(--ink-3); }
+  .app { font-size: 15px; font-weight: 650; letter-spacing: -.01em; color: var(--aw-ink-0); }
+  .model { font-size: 11px; color: var(--aw-ink-3); }
   .t { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 14px; }
-  .lang { font-size: 11px; color: var(--ink-3); }
+  .lang { font-size: 11px; color: var(--aw-ink-3); }
   .t p { font-size: 24px; line-height: 1.32; letter-spacing: -.012em; font-weight: 500;
-         color: var(--ink); }
-  .actions { display: flex; gap: 22px; font-size: 14px; font-weight: 550; color: var(--ink-2); }
-  .ime { font-size: 12px; color: var(--ink-3); padding: 12px 0; border-top: 1px solid var(--hair); }
+         color: var(--aw-ink-0); }
+  .actions { display: flex; gap: 22px; font-size: 14px; font-weight: 550; color: var(--aw-ink-2); }
+  .ime { font-size: 12px; color: var(--aw-ink-3); padding: 12px 0; border-top: 1px solid var(--aw-line); }
   .bottom { display: flex; flex-direction: column; align-items: center; gap: 12px; padding-top: 18px;
-            border-top: 1px solid var(--hair); }
+            border-top: 1px solid var(--aw-line); }
   /* Motion: status-only cues per platform research (breathing record
      affordance + live caret). Stills must read perfectly without it. */
-  .mic { width: 74px; height: 74px; border-radius: 50%; background: oklch(0.585 0.215 28);
+  .mic { width: 74px; height: 74px; border-radius: 50%; background: var(--aw-signal);
          display: grid; place-items: center; position: relative; }
   .mic::after { content: ""; position: absolute; inset: -7px; border-radius: 50%;
-               border: 2px solid oklch(0.585 0.215 28 / .35);
+               border: 2px solid color-mix(in oklch, var(--aw-signal) 35%, transparent);
                animation: breathe 2.8s ease-in-out infinite; }
   @keyframes breathe { 0%, 100% { transform: scale(1); opacity: .9; }
                        50% { transform: scale(1.12); opacity: .25; } }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; }
   }
-  .dark .mic { background: oklch(0.640 0.205 28); }
   .mic svg { width: 30px; height: 30px; fill: white; }
-  .hint { font-size: 12px; color: var(--ink-3); }
+  .hint { font-size: 12px; color: var(--aw-ink-3); }
   .caption { color: oklch(0.45 0 0); font-size: 12px; letter-spacing: .02em; }
 </style>
 </head>

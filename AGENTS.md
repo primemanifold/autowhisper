@@ -58,6 +58,15 @@ runtime behavior, and marketing claims are three different things.
 - Honest capability reporting lives in `src/platform/capabilities.cpp`;
   update it (and its test) when a platform feature changes state.
 
+## CI economy
+
+GitHub honors `[skip ci]` in the head commit message of a push. Use it
+only when the exact tree being pushed has already been proven green:
+the merge commit of a branch whose tip just passed the full matrix, or
+a docs/site-only change validated by the full local loop above. Never
+use it on code changes that haven't run the matrix, and never on
+release-prep commits — releases always get a full CI run.
+
 ## Releases
 
 1. Bump `project(autowhisper VERSION x.y.z)` in `CMakeLists.txt`, add a

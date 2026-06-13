@@ -13,7 +13,8 @@
     <a class="brand" href="./" aria-label="AutoWhisper home">AutoWhisper</a>
     <nav class="nav-links" aria-label="Site links">
       <a href="#download">Download</a>
-      <a href="#privacy">Privacy</a>
+      <a href="#faq">FAQ</a>
+      <a href="#feedback">Feedback</a>
       <a href="https://github.com/primemanifold/autowhisper">GitHub</a>
     </nav>
   </header>
@@ -25,12 +26,12 @@
         Hold a key and talk. AutoWhisper turns speech into text at your cursor —
         offline, local-first, open source.
       </p>
-      <div class="hero-actions" id="download">
+      <div class="hero-actions">
         <a class="button button-primary" href="https://github.com/primemanifold/autowhisper/releases/download/v0.7.1/AutoWhisper-macOS-v0.7.1.zip">
           Download for macOS
         </a>
-        <a class="button-quiet" href="https://github.com/primemanifold/autowhisper/releases/latest">
-          View latest release
+        <a class="button-quiet" href="#download">
+          All downloads
         </a>
       </div>
       <p class="release-note">
@@ -62,6 +63,19 @@
       </div>
     </section>
 
+    <section class="product companion" aria-labelledby="companion-title">
+      <h2 id="companion-title">A companion, if you want one.</h2>
+      <p class="section-copy">
+        Echo is an opt-in floating spirit that glows while you speak and visibly
+        writes as your words land. Click it to dictate without a hotkey. Five
+        characters ship — Echo, Hermes, Mnemosyne, Kalliope, and Morpheus — each
+        with its own silhouette and tempo.
+      </p>
+      <img src="assets/screenshots/settings-companion.png" width="1440" height="900"
+           alt="AutoWhisper settings — real product UI showing the companion character picker with five spirits">
+      <p class="img-note">Real product UI — the character picker in Feedback &amp; tray.</p>
+    </section>
+
     <section class="product mobile-previews" aria-labelledby="mobile-title">
       <h2 id="mobile-title">Mobile is next.</h2>
       <p class="section-copy">
@@ -87,11 +101,97 @@
       </div>
     </section>
 
-    <section class="install" aria-labelledby="linux-title">
-      <h2 id="linux-title">Linux, where it started.</h2>
+    <section class="install" id="download" aria-labelledby="download-title">
+      <h2 id="download-title">Download for your desktop.</h2>
+      <div class="download-grid">
+        <div class="download-card">
+          <h3>macOS</h3>
+          <p>Signed and notarized app bundle. Apple Silicon and Intel.</p>
+          <a class="button button-primary" href="https://github.com/primemanifold/autowhisper/releases/download/v0.7.1/AutoWhisper-macOS-v0.7.1.zip">AutoWhisper-macOS-v0.7.1.zip</a>
+          <p class="download-meta">v0.7.1 · Notarized Developer ID</p>
+        </div>
+        <div class="download-card">
+          <h3>Linux x86_64</h3>
+          <p>Where AutoWhisper started. Self-contained binary, X11.</p>
+          <a class="button button-primary" href="downloads/autowhisper-0.9.0-linux-x86_64.tar.gz" download>autowhisper-0.9.0-linux-x86_64.tar.gz</a>
+          <p class="download-meta">v0.9.0 · or use the PPA below</p>
+        </div>
+        <div class="download-card">
+          <h3>Windows x86_64</h3>
+          <p>Self-contained exe, no installer. Beta — feedback welcome.</p>
+          <a class="button button-primary" href="downloads/autowhisper-0.9.0-windows-x86_64.zip" download>autowhisper-0.9.0-windows-x86_64.zip</a>
+          <p class="download-meta">v0.9.0 · beta</p>
+        </div>
+      </div>
+      <p class="download-meta">
+        Verify downloads against <a href="downloads/SHA256SUMS">SHA256SUMS</a> ·
+        all releases on <a href="https://github.com/primemanifold/autowhisper/releases/latest">GitHub</a>
+      </p>
+      <h3 class="install-sub" id="linux-title">Ubuntu, via the PPA</h3>
       <pre aria-label="Linux install commands"><code>sudo add-apt-repository ppa:primemanifold/autowhisper
 sudo apt update
 sudo apt install autowhisper</code></pre>
+    </section>
+
+    <section class="faq" id="faq" aria-labelledby="faq-title">
+      <h2 id="faq-title">FAQ</h2>
+      <details>
+        <summary>Does my voice ever leave my machine?</summary>
+        <p>No. Transcription runs locally through whisper.cpp on your hardware.
+        The current build has no telemetry and no cloud endpoints — the settings
+        app exposes every configurable key, so you can check.</p>
+      </details>
+      <details>
+        <summary>Which platforms are supported?</summary>
+        <p>Linux (X11) is where AutoWhisper is most mature. macOS ships as a
+        signed, notarized app. Windows is in beta as a self-contained exe.
+        The mobile and watch screens above are design previews, not yet shipping.</p>
+      </details>
+      <details>
+        <summary>Where do the speech models come from?</summary>
+        <p>On first run AutoWhisper downloads a local Whisper model — you pick the
+        size in settings; smaller is faster, larger is more accurate. After that,
+        dictation works fully offline.</p>
+      </details>
+      <details>
+        <summary>What is the floating companion?</summary>
+        <p>An opt-in floating button with a personality: it glows while listening,
+        a mote orbits while it thinks, and it visibly writes as text lands. Click
+        it to start or stop dictation without a hotkey. Choose between five
+        characters in settings, or keep it disabled — it is off by default.</p>
+      </details>
+      <details>
+        <summary>Does it work on Wayland?</summary>
+        <p>Not yet — Linux support is X11 today. The settings app's Diagnostics
+        pane reports honestly what your build can and cannot do on your desktop.</p>
+      </details>
+      <details>
+        <summary>How do I change the hotkey or the model?</summary>
+        <p>Open Settings from the tray icon. AutoWhisper serves a small local
+        settings app in your browser — light, dark, and a phosphor-green dev
+        theme included. Edits are validated and written to your config.toml.</p>
+      </details>
+    </section>
+
+    <section class="feedback" id="feedback" aria-labelledby="feedback-title">
+      <h2 id="feedback-title">Found a bug? Want a feature?</h2>
+      <p class="section-copy">
+        Requests and reports live on GitHub. Use a template directly, or let
+        Claude interview you, check for duplicates, draft the issue to the
+        repo's template, and file it — then help you star the repo and follow
+        releases while you're there.
+      </p>
+      <div class="feedback-actions">
+        <a class="button button-primary" href="https://claude.ai/new?q=I%20want%20to%20give%20feedback%20on%20AutoWhisper%2C%20the%20offline%2C%20local-first%20dictation%20app%20%28https%3A%2F%2Fgithub.com%2Fprimemanifold%2Fautowhisper%29.%20Please%20act%20as%20its%20feedback%20concierge%3A%201%29%20Interview%20me%20briefly%20to%20learn%20whether%20this%20is%20a%20bug%20report%20or%20a%20feature%20request%2C%20and%20collect%20what%20the%20repo%27s%20issue%20templates%20need%20-%20my%20OS%20and%20AutoWhisper%20version%2C%20what%20I%20did%2C%20what%20happened%2C%20what%20I%20expected%2C%20and%20for%20bugs%20the%20output%20of%20%27autowhisper%20doctor%27.%202%29%20Search%20the%20repo%27s%20existing%20issues%20for%20duplicates%20and%20tell%20me%20if%20one%20already%20covers%20it.%203%29%20Draft%20the%20issue%20in%20the%20template%27s%20structure%20and%20show%20it%20to%20me%20for%20approval.%204%29%20If%20you%20have%20GitHub%20access%2C%20create%20the%20issue%20in%20primemanifold%2Fautowhisper%20after%20I%20approve%3B%20otherwise%20give%20me%20a%20prefilled%20link%20of%20the%20form%20https%3A%2F%2Fgithub.com%2Fprimemanifold%2Fautowhisper%2Fissues%2Fnew%20with%20title%20and%20body%20query%20parameters%20that%20I%20can%20click%20to%20submit%20it%20myself.%205%29%20Afterwards%2C%20help%20me%20star%20the%20repository%20and%20subscribe%20to%20releases%20so%20I%20can%20follow%20the%20project.">
+          Draft it with Claude
+        </a>
+        <a class="button-quiet" href="https://github.com/primemanifold/autowhisper/issues/new?template=bug_report.yml">Report a bug</a>
+        <a class="button-quiet" href="https://github.com/primemanifold/autowhisper/issues/new?template=feature_request.yml">Request a feature</a>
+      </div>
+      <p class="download-meta">
+        Like it? <a href="https://github.com/primemanifold/autowhisper">Star the repo</a> and
+        <a href="https://github.com/primemanifold/autowhisper/releases/latest">follow releases</a>.
+      </p>
     </section>
 
     <section class="privacy" id="privacy" aria-labelledby="privacy-title">
@@ -105,6 +205,7 @@ sudo apt install autowhisper</code></pre>
 
   <footer class="site-footer">
     <span>AutoWhisper</span>
+    <a href="#privacy">Privacy</a>
     <a href="https://github.com/primemanifold/autowhisper/releases/latest">Releases</a>
   </footer>
 </body>
