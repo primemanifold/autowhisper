@@ -22,6 +22,51 @@ bool aw_macos_is_app_bundle_launch() {
     return executable_path.find(".app/Contents/MacOS/") != std::string::npos;
 }
 
+std::string aw_macos_permissions_status_json() {
+    // Hand-built JSON (no nlohmann import in this AppKit TU). Each item
+    // mirrors the /api/platform shape: id/name/state/required/detail/deep_link.
+    auto bdj = [](const std::string& s) {
+        std::string out;
+        for (char c : s) {
+            if (c == '"' || c == '\\') out += '\\';
+            out += c;
+        }
+        return out;
+    };
+    auto item = [&](const char* id, const char* name, const char* state,
+                    const char* detail, const char* link) {
+        return std::string("{\"id\":\"") + id + "\",\"name\":\"" + name +
+               "\",\"state\":\"" + state + "\",\"required\":true,\"detail\":\"" +
+               bdj(detail) + "\",\"deep_link\":\"" + link + "\"}";
+    };
+
+    const char* sec = "x-apple.systempreferences:com.apple.preference.security";
+
+    const char* mic_state = "unknown";
+    switch ([AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio]) {
+        case AVAuthorizationStatusAuthorized:    mic_state = "granted"; break;
+        case AVAuthorizationStatusDenied:        mic_state = "denied"; break;
+        case AVAuthorizationStatusRestricted:    mic_state = "restricted"; break;
+        case AVAuthorizationStatusNotDetermined: mic_state = "not_determined"; break;
+    }
+    const char* listen_state = CGPreflightListenEventAccess() ? "granted" : "denied";
+    const char* post_state = CGPreflightPostEventAccess() ? "granted" : "denied";
+
+    std::string json = "{\"applicable\":true,\"platform\":\"macos\",\"permissions\":[";
+    json += item("microphone", "Microphone", mic_state,
+                 "Required to capture your voice.",
+                 (std::string(sec) + "?Privacy_Microphone").c_str());
+    json += "," + item("input_monitoring", "Input Monitoring", listen_state,
+                       "Required for the global push-to-talk hotkey (the event tap). "
+                       "If denied, no shortcut fires.",
+                       (std::string(sec) + "?Privacy_ListenEvent").c_str());
+    json += "," + item("accessibility", "Accessibility", post_state,
+                       "Required to type the transcribed text into other apps.",
+                       (std::string(sec) + "?Privacy_Accessibility").c_str());
+    json += "]}";
+    return json;
+}
+
 void aw_macos_prompt_required_permissions() {
     // Input Monitoring: required for the global push-to-talk event tap.
     if (!CGPreflightListenEventAccess()) {

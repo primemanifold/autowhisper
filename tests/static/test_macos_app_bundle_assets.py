@@ -75,33 +75,24 @@ class MacOSAppBundleAssetsTest(unittest.TestCase):
             "A double-clicked app has no repo cwd, so config lookup must fall back to the bundled default after user config",
         )
 
-    def test_open_settings_uses_native_swiftui_helper_not_browser_ui(self):
+    def test_open_settings_opens_web_ui_hybrid(self):
+        # Hybrid (2026-06-14): the tray "Open Settings" opens the cross-platform
+        # web settings UI by re-execing `config ui` — so macOS gets the themes,
+        # the cast, working navigation, the model availability card, the hotkey
+        # capture widget, and the permissions pane, instead of the limited
+        # native helper. The SwiftUI helper stays only for first-run/onboarding
+        # (still built and codesigned in the bundle).
         cmake = BUNDLE_CMAKE.read_text(encoding="utf-8")
         tray = TRAY_MACOS.read_text(encoding="utf-8")
-        self.assertTrue(SWIFT_SETTINGS.exists(), "Open Settings should launch a native SwiftUI helper window, not a browser tab")
-        swift = SWIFT_SETTINGS.read_text(encoding="utf-8")
-        for snippet in [
-            "import SwiftUI",
-            "AutoWhisperSettingsApp",
-            "SettingsView",
-            "ConfigStore",
-            "--config",
-        ]:
-            self.assertIn(snippet, swift)
-        self.assertNotIn("WebView", swift)
-        self.assertNotIn("WKWebView", swift)
+        self.assertIn("onOpenSettings", tray)
+        self.assertIn('@"config", @"ui"', tray, "macOS Open Settings should launch the web settings UI via `config ui`")
+        self.assertIn('@"--config"', tray)
+        # The native first-run/onboarding helper is still part of the bundle.
+        self.assertTrue(SWIFT_SETTINGS.exists())
         self.assertIn("AUTOWHISPER_SETTINGS_HELPER", cmake)
-        self.assertIn("AUTOWHISPER_SWIFT_TARGET", cmake)
-        self.assertIn('-target "${AUTOWHISPER_SWIFT_TARGET}"', cmake)
         self.assertIn("swiftc", cmake)
         self.assertIn("AutoWhisperSettings", cmake)
-        self.assertIn('"${AUTOWHISPER_MACOS_DIR}/AutoWhisperSettings"', cmake)
-        self.assertIn("codesign --force", cmake)
         self.assertRegex(cmake, r"codesign --force[\s\S]+AutoWhisperSettings")
-        self.assertIn("AutoWhisperSettings", tray)
-        self.assertIn('@"--config"', tray)
-        self.assertNotIn('@"config", @"ui"', tray)
-        self.assertNotIn("Grid(", swift)
 
     def test_app_bundle_launch_opens_setup_instead_of_silent_exit_when_not_ready(self):
         main = MAIN_CPP.read_text(encoding="utf-8")

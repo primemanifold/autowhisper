@@ -828,3 +828,54 @@ Next:
   with [skip ci] on the merge commit (identical tree) -> tag v0.9.0 ->
   ppa-release workflow verifies versions, builds the signed source
   package, uploads to Launchpad, and creates the GitHub release.
+
+## Run 2026-06-14 — macOS bug triage + hybrid settings (Phase 1)
+
+- User tested the real Mac app and reported: push-to-talk dead ("shift and
+  super"), model card shows "download recommended" AND "model is ready" at
+  once, sidebar does nothing (placeholder), no themes. Root cause found via
+  3 sub-agents: macOS opens a separate native SwiftUI settings app
+  (platform/macos/SettingsApp.swift) that none of the web design work
+  touches. Hotkey parser + CGEventTap matching are correct (tests pass);
+  the real push-to-talk causes are the system-reserved shift+super default
+  and silent Input-Monitoring permission failure.
+- Decision (user): HYBRID — native shell for permissions/first-run, embed
+  the web settings UI for everything else, so themes/cast/sidebar/schema
+  config arrive on Mac in one move.
+- Shipped this turn:
+  - fix(macos): display_key renders ⌘/⌥/⌃/⇧ glyphs under __APPLE__ (was the
+    Linux "Super"); tests branch on __APPLE__.
+  - feat: /api/models endpoint (handlers::models_json) — the catalog with a
+    single on-disk `downloaded` truth; +1 ctest.
+  - feat(web): Model availability card — headline + per-model badges both
+    derive from `downloaded`, structurally preventing the macOS
+    contradiction. Re-evaluates on model-select change. Verified in
+    Chromium (light/dark), +1 static test, mock server gained /api/models.
+- Gates: 181/181 ctest, 33/33 static, node --check, Playwright.
+- Left: Phase 2 hotkey capture widget (web, verifiable here); Phase 3 the
+  WKWebView native shell + live permissions panel (Swift, CI-compiled,
+  Mac-runtime by user); Phase 4 macOS default trigger + permission
+  surfacing. Release still gated on user: push v0.9.0 tag + enable Pages.
+
+## Run 2026-06-14 (cont.) — hybrid Phases 2-4
+
+- Phase 2: hotkey capture widget (web) — Record button captures a real chord
+  (mod+key and modifier-only), maps metaKey->super, Escape cancels; the
+  schema-backed input stays so collect/setInput are unchanged. Verified in
+  Chromium.
+- Phase 3a: /api/permissions (handlers::permissions_json; macOS via new
+  aw_macos_permissions_status_json in onboarding.mm using CGPreflight*/
+  AVCaptureDevice, applicable=false elsewhere) + web Permissions pane with
+  status dots and System Settings deep links. A denied Input Monitoring (the
+  silent push-to-talk cause) is now visible + one click from fixed. CMake:
+  onboarding.mm + AppKit/AVFoundation/Foundation linked into the test binary.
+- Phase 3b: tray_macos.mm "Open Settings" now re-execs `config ui` (the
+  shared sidecar+browser path) instead of the limited native helper — so
+  macOS gets the whole web UI (themes/cast/nav/model card/hotkey capture/
+  permissions). The SwiftUI helper stays for first-run/onboarding. Updated
+  the macOS bundle static test to the new (hybrid) intent.
+- Phase 4: permission surfacing delivered via the pane. Default-trigger
+  change deliberately deferred — unverifiable on Linux CI, and the capture
+  widget supersedes it as the fix.
+- Gates: 182/182 ctest, 35/35 static, gotcha audit 0 findings, node --check.
+  macOS .mm paths (onboarding/tray) compile-verified by CI.

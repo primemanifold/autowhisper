@@ -112,7 +112,14 @@ void TrayManager::start() {
             if (quit_cb) quit_cb();
         };
         impl->target.onOpenSettings = ^{
-            // Launch the settings UI via the same binary.
+            // Open the same web settings UI the other desktops use, by
+            // re-execing this binary's `config ui` command (it starts the
+            // local sidecar server and opens the browser to the tokenized
+            // URL — the macOS `open` branch already exists). This is the
+            // hybrid: the web UI is the cross-platform settings surface, so
+            // macOS gets the themes, the cast, the working navigation, the
+            // model card, the hotkey capture, and the permissions pane —
+            // instead of the limited native helper.
             NSString* exe = [[NSBundle mainBundle] executablePath];
             if (!exe) {
                 char buf[1024]; uint32_t sz = sizeof(buf);
@@ -121,10 +128,9 @@ void TrayManager::start() {
                 }
             }
             if (exe) {
-                NSString* helper = [[exe stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"AutoWhisperSettings"];
                 NSTask* task = [[NSTask alloc] init];
-                task.executableURL = [NSURL fileURLWithPath:helper];
-                NSMutableArray* args = [NSMutableArray array];
+                task.executableURL = [NSURL fileURLWithPath:exe];
+                NSMutableArray* args = [NSMutableArray arrayWithObjects:@"config", @"ui", nil];
                 if (!config_path.empty()) {
                     [args addObject:@"--config"];
                     [args addObject:[NSString stringWithUTF8String:config_path.c_str()]];
@@ -132,7 +138,7 @@ void TrayManager::start() {
                 task.arguments = args;
                 NSError* err = nil;
                 [task launchAndReturnError:&err];
-                if (err) spdlog::warn("Tray: failed to launch native settings: {}",
+                if (err) spdlog::warn("Tray: failed to open settings UI: {}",
                                       err.localizedDescription.UTF8String);
             }
         };

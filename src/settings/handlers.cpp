@@ -1,5 +1,10 @@
 #include "settings/handlers.h"
 #include "config/config.h"
+#include "models/models.h"
+
+#ifdef __APPLE__
+#include "platform/macos/onboarding.h"
+#endif
 
 #include <nlohmann/json.hpp>
 
@@ -191,6 +196,38 @@ nlohmann::json get_config_json(const std::string& path) {
 
 nlohmann::json defaults_json() {
     return config_to_json(Config::default_config());
+}
+
+nlohmann::json models_json() {
+    nlohmann::json models = nlohmann::json::array();
+    for (int i = 0; i < MODEL_COUNT; ++i) {
+        const ModelInfo& m = MODELS[i];
+        models.push_back({
+            {"name", m.name},
+            {"description", m.description},
+            {"size", m.size},
+            {"speed", m.speed},
+            {"english_only", m.english_only},
+            // The one truth both the prompt and the ready badge must use.
+            {"downloaded", is_model_downloaded(m.name)},
+        });
+    }
+    return {
+        {"cache_dir", get_cache_dir()},
+        {"models", std::move(models)},
+    };
+}
+
+nlohmann::json permissions_json() {
+#ifdef __APPLE__
+    return nlohmann::json::parse(aw_macos_permissions_status_json());
+#else
+    // No per-app TCC model on Linux/Windows; the UI hides the pane.
+    return {
+        {"applicable", false},
+        {"permissions", nlohmann::json::array()},
+    };
+#endif
 }
 
 ValidationResult validate_json(const nlohmann::json& j) {

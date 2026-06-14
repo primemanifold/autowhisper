@@ -105,6 +105,35 @@ class SettingsDesignAssetsTest(unittest.TestCase):
         ]:
             self.assertIn(snippet, self.css)
 
+    def test_model_availability_card_uses_single_readiness_truth(self):
+        # The model card must derive both the headline and the row badges from
+        # the one `downloaded` flag in /api/models — never two independent
+        # states (the macOS "download recommended" + "model ready" bug).
+        self.assertIn("/api/models", self.js)
+        self.assertIn("renderModelCard", self.js)
+        self.assertIn("m.downloaded", self.js)
+        self.assertIn("aw-model-card", self.js + self.css)
+        self.assertIn(".aw-model-headline.ready", self.css)
+        self.assertIn(".aw-model-headline.absent", self.css)
+        self.assertIn("aw-model-badge", self.css)
+
+    def test_hotkey_capture_widget_records_chords(self):
+        # The trigger field keeps its editable input (collect/setInput stay
+        # the same) and adds a Record button that captures a real key chord.
+        self.assertIn("renderHotkeyCapture", self.js)
+        self.assertIn('name === "hotkeys.trigger"', self.js)
+        self.assertIn("aw-hotkey-record", self.js + self.css)
+        self.assertIn('"metaKey", "super"', self.js)  # Command -> super token
+
+    def test_permissions_pane_surfaces_os_grants(self):
+        # macOS TCC status with a deep link per denied grant — the fix for the
+        # silently-blocked push-to-talk.
+        self.assertIn("/api/permissions", self.js)
+        self.assertIn("renderPermissions", self.js)
+        self.assertIn("deep_link", self.js)
+        self.assertIn("aw-perm-row", self.css)
+        self.assertIn(".aw-perm-row.err .aw-perm-dot", self.css)
+
     def test_platform_diagnostics_surface_desktop_port_readiness(self):
         for snippet in [
             "platformDiagnostics",

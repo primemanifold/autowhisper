@@ -30,4 +30,15 @@ void save_config_json(const std::string& path, const nlohmann::json& j);
 
 nlohmann::json defaults_json();
 
+// The model catalog with live on-disk availability. This is the single
+// source of truth for "is this model ready?" — the UI must derive both the
+// download prompt and the ready badge from `downloaded`, never from two
+// independent flags (the macOS bug where both showed at once).
+nlohmann::json models_json();
+
+// Live OS permission status. On macOS this reports the three TCC grants
+// (Microphone, Input Monitoring, Accessibility) so a silently-blocked
+// push-to-talk becomes visible; elsewhere it reports applicable=false.
+nlohmann::json permissions_json();
+
 }  // namespace autowhisper::settings

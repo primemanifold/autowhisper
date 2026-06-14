@@ -6,10 +6,20 @@
 namespace autowhisper {
 
 std::string display_key(const std::string& keyname) {
+    // Modifier names are platform-localized: macOS users read ⌘/⌥/⌃/⇧, not
+    // the Linux "Super". The canonical config token stays "super" everywhere;
+    // only the human-facing label changes.
+#ifdef __APPLE__
+    if (keyname == "shift") return "⇧";        // ⇧
+    if (keyname == "ctrl") return "⌃";         // ⌃
+    if (keyname == "alt") return "⌥";          // ⌥
+    if (keyname == "super") return "⌘";        // ⌘
+#else
     if (keyname == "shift") return "Shift";
     if (keyname == "ctrl") return "Ctrl";
     if (keyname == "alt") return "Alt";
     if (keyname == "super") return "Super";
+#endif
     if (keyname == "esc") return "Esc";
     if (keyname == "enter") return "Enter";
     if (keyname == "space") return "Space";
@@ -41,7 +51,11 @@ std::string display_hotkey(const std::string& hotkey) {
     std::istringstream iss(hotkey);
     std::string part;
     while (std::getline(iss, part, '+')) {
+#ifndef __APPLE__
+        // macOS renders chords as adjacent glyphs (⇧⌘) with no separator,
+        // matching the system menu convention; other platforms join with "+".
         if (!result.empty()) result += "+";
+#endif
         result += display_key(part);
     }
     return result;
