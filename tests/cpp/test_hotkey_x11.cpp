@@ -199,6 +199,66 @@ TEST_CASE("X11 push-to-talk delivers START/STOP and stop() is bounded",
     CHECK(elapsed < 5s);
 }
 
+TEST_CASE("X11 set_config swaps the live trigger without a restart",
+          "[hotkey_x11][integration]") {
+    if (!xvfb_available()) SKIP("Xvfb not installed");
+
+    XvfbServer xvfb;
+    REQUIRE(xvfb.launch());
+
+    EventSink sink;
+    // Start on ctrl+shift, then live-swap to ctrl+alt — the daemon's
+    // config-reload path. The new chord must fire; the old must not.
+    HotkeyManager mgr(push_to_talk_config(), [&](HotkeyEvent e) { sink.push(e); });
+    mgr.start();
+
+    Display* client = nullptr;
+    for (int i = 0; i < 50 && !client; i++) {
+        client = XOpenDisplay(nullptr);
+        if (!client) std::this_thread::sleep_for(100ms);
+    }
+    REQUIRE(client != nullptr);
+    int b1, b2, mj, mn;
+    REQUIRE(XTestQueryExtension(client, &b1, &b2, &mj, &mn));
+
+    HotkeyConfig updated;
+    updated.mode = "push_to_talk";
+    updated.trigger = {"ctrl+alt"};
+    updated.cancel = {};
+    updated.escape_to_cancel = false;
+    mgr.set_config(updated);
+
+    // The new chord (ctrl+alt) fires START, then STOP on release.
+    bool started = false;
+    for (int attempt = 0; attempt < 10 && !started; attempt++) {
+        std::this_thread::sleep_for(200ms);
+        fake_key(client, XK_Control_L, true);
+        fake_key(client, XK_Alt_L, true);
+        started = sink.wait_for_count(1, 500ms);
+        if (!started) {
+            fake_key(client, XK_Alt_L, false);
+            fake_key(client, XK_Control_L, false);
+        }
+    }
+    REQUIRE(started);
+    CHECK(sink.snapshot().front() == HotkeyEvent::START);
+    fake_key(client, XK_Alt_L, false);
+    REQUIRE(sink.wait_for_count(2, 2000ms));
+    CHECK(sink.snapshot()[1] == HotkeyEvent::STOP);
+
+    // The old chord (ctrl+shift) must no longer do anything.
+    const size_t count_before = sink.snapshot().size();
+    fake_key(client, XK_Control_L, true);
+    fake_key(client, XK_Shift_L, true);
+    std::this_thread::sleep_for(400ms);
+    fake_key(client, XK_Shift_L, false);
+    fake_key(client, XK_Control_L, false);
+    CHECK(sink.snapshot().size() == count_before);
+
+    XCloseDisplay(client);
+    mgr.stop();
+}
+
 TEST_CASE("X11 listener start/stop cycles never hang (resume-deadlock regression)",
           "[hotkey_x11][integration]") {
     if (!xvfb_available()) SKIP("Xvfb not installed");

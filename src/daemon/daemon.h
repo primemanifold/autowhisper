@@ -13,8 +13,10 @@
 
 #include <atomic>
 #include <condition_variable>
+#include <filesystem>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <string>
 
@@ -43,6 +45,13 @@ private:
     Config config_;
     std::string config_path_;
     std::atomic<DaemonState> state_{DaemonState::IDLE};
+
+    // Live config reload: the settings UI writes config.toml from a separate
+    // process, so the daemon polls the file's mtime and re-applies hotkey
+    // changes to the running listener (a saved shortcut must work without a
+    // restart). std::nullopt until the first poll captures the baseline.
+    std::optional<std::filesystem::file_time_type> config_mtime_;
+    void maybe_reload_config();
 
     // Event queue
     std::queue<HotkeyEvent> event_queue_;
