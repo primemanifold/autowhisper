@@ -856,3 +856,26 @@ Next:
   WKWebView native shell + live permissions panel (Swift, CI-compiled,
   Mac-runtime by user); Phase 4 macOS default trigger + permission
   surfacing. Release still gated on user: push v0.9.0 tag + enable Pages.
+
+## Run 2026-06-14 (cont.) — hybrid Phases 2-4
+
+- Phase 2: hotkey capture widget (web) — Record button captures a real chord
+  (mod+key and modifier-only), maps metaKey->super, Escape cancels; the
+  schema-backed input stays so collect/setInput are unchanged. Verified in
+  Chromium.
+- Phase 3a: /api/permissions (handlers::permissions_json; macOS via new
+  aw_macos_permissions_status_json in onboarding.mm using CGPreflight*/
+  AVCaptureDevice, applicable=false elsewhere) + web Permissions pane with
+  status dots and System Settings deep links. A denied Input Monitoring (the
+  silent push-to-talk cause) is now visible + one click from fixed. CMake:
+  onboarding.mm + AppKit/AVFoundation/Foundation linked into the test binary.
+- Phase 3b: tray_macos.mm "Open Settings" now re-execs `config ui` (the
+  shared sidecar+browser path) instead of the limited native helper — so
+  macOS gets the whole web UI (themes/cast/nav/model card/hotkey capture/
+  permissions). The SwiftUI helper stays for first-run/onboarding. Updated
+  the macOS bundle static test to the new (hybrid) intent.
+- Phase 4: permission surfacing delivered via the pane. Default-trigger
+  change deliberately deferred — unverifiable on Linux CI, and the capture
+  widget supersedes it as the fix.
+- Gates: 182/182 ctest, 35/35 static, gotcha audit 0 findings, node --check.
+  macOS .mm paths (onboarding/tray) compile-verified by CI.
