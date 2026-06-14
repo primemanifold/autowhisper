@@ -129,6 +129,9 @@ void attach_api_routes(httplib::Server& srv,
         res.set_content(platform_capabilities_json(current_platform_capabilities()).dump(),
                         "application/json");
     });
+    srv.Get("/api/models", [](const httplib::Request&, httplib::Response& res) {
+        res.set_content(models_json().dump(), "application/json");
+    });
     srv.Get("/api/config", [config_path](const httplib::Request&, httplib::Response& res) {
         try {
             res.set_content(get_config_json(config_path).dump(), "application/json");

@@ -170,3 +170,28 @@ TEST_CASE("save_config_json writes file and creates parents", "[handlers]") {
     auto loaded = Config::load(path);
     CHECK(loaded.model.size == "tiny.en");
 }
+
+TEST_CASE("models_json reports the catalog with on-disk availability", "[handlers]") {
+    auto j = settings::models_json();
+    REQUIRE(j.contains("models"));
+    REQUIRE(j.contains("cache_dir"));
+    REQUIRE(j["models"].is_array());
+    REQUIRE(!j["models"].empty());
+
+    for (const auto& m : j["models"]) {
+        // Every entry must carry the fields the UI renders, and a single
+        // boolean readiness flag — never a separate "ready" string.
+        CHECK(m.contains("name"));
+        CHECK(m.contains("description"));
+        CHECK(m.contains("size"));
+        CHECK(m.contains("english_only"));
+        CHECK(m["downloaded"].is_boolean());
+    }
+
+    // The catalog names match the model module's source of truth.
+    bool found_recommended = false;
+    for (const auto& m : j["models"]) {
+        if (m["name"] == "distil-small.en") found_recommended = true;
+    }
+    CHECK(found_recommended);
+}

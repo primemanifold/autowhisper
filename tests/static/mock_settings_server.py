@@ -58,6 +58,15 @@ PLATFORM = {
         {"id": "wayland", "name": "Wayland", "state": "unsupported", "detail": "X11 only for now."},
     ],
 }
+MODELS = {
+    "cache_dir": "/home/user/.cache/whisper",
+    "models": [
+        {"name": "tiny.en", "description": "Fastest, good accuracy", "size": "~78MB", "speed": "78ms", "english_only": True, "downloaded": False},
+        {"name": "distil-small.en", "description": "Optimized small (recommended)", "size": "~336MB", "speed": "198ms", "english_only": True, "downloaded": True},
+        {"name": "distil-large-v3", "description": "Best English accuracy", "size": "~1.5GB", "speed": "448ms", "english_only": True, "downloaded": False},
+        {"name": "large-v3-turbo", "description": "Best multilingual speed/accuracy", "size": "~1.6GB", "speed": "\u2014", "english_only": False, "downloaded": False},
+    ],
+}
 
 class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
@@ -70,6 +79,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(CONFIG)
         if self.path == "/api/platform":
             return self.send_json(PLATFORM)
+        if self.path == "/api/models":
+            return self.send_json(MODELS)
         return super().do_GET()
 
     def do_PUT(self):

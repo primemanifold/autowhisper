@@ -105,6 +105,18 @@ class SettingsDesignAssetsTest(unittest.TestCase):
         ]:
             self.assertIn(snippet, self.css)
 
+    def test_model_availability_card_uses_single_readiness_truth(self):
+        # The model card must derive both the headline and the row badges from
+        # the one `downloaded` flag in /api/models — never two independent
+        # states (the macOS "download recommended" + "model ready" bug).
+        self.assertIn("/api/models", self.js)
+        self.assertIn("renderModelCard", self.js)
+        self.assertIn("m.downloaded", self.js)
+        self.assertIn("aw-model-card", self.js + self.css)
+        self.assertIn(".aw-model-headline.ready", self.css)
+        self.assertIn(".aw-model-headline.absent", self.css)
+        self.assertIn("aw-model-badge", self.css)
+
     def test_platform_diagnostics_surface_desktop_port_readiness(self):
         for snippet in [
             "platformDiagnostics",

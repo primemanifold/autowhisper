@@ -451,6 +451,54 @@ p { margin: 0; }
 .aw-platform-feature.unsupported .aw-platform-state { color: var(--aw-err); background: var(--aw-err-soft); }
 .aw-empty { padding: 18px 16px; color: var(--aw-ink-2); }
 
+/* Model availability — one readiness truth drives the headline and badges. */
+.aw-model-headline {
+  margin: 12px 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--aw-line);
+  border-radius: var(--aw-radius-2);
+  background: var(--aw-paper-0);
+  color: var(--aw-ink-1);
+  font-size: 13px;
+}
+.aw-model-headline.ready { color: var(--aw-ok); background: var(--aw-ok-soft); border-color: color-mix(in oklch, var(--aw-ok) 40%, transparent); }
+.aw-model-headline.absent { color: var(--aw-warn); background: var(--aw-warn-soft); border-color: color-mix(in oklch, var(--aw-warn) 40%, transparent); }
+.aw-model-headline code {
+  font-family: var(--aw-font-mono);
+  font-size: 12px;
+  background: color-mix(in oklch, var(--aw-ink-0) 8%, transparent);
+  padding: 1px 5px;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+.aw-model-grid { padding: 0 16px 12px; }
+.aw-model-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--aw-line-2);
+}
+.aw-model-row:last-child { border-bottom: 0; }
+.aw-model-row.is-current { background: var(--aw-paper-2); border-radius: var(--aw-radius-1); }
+.aw-model-name { font-weight: 590; font-family: var(--aw-font-mono); font-size: 13px; }
+.aw-model-desc { color: var(--aw-ink-2); font-size: 12px; }
+.aw-model-badge {
+  justify-self: end;
+  font-family: var(--aw-font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: var(--aw-radius-pill);
+}
+.aw-model-badge.ready { color: var(--aw-ok); background: var(--aw-ok-soft); }
+.aw-model-badge.absent { color: var(--aw-ink-3); background: var(--aw-paper-2); }
+@media (max-width: 820px) {
+  .aw-model-row { grid-template-columns: 1fr auto; }
+  .aw-model-desc { grid-column: 1 / -1; }
+}
+
 /* Dev theme chrome: static scanlines, a faint phosphor glow on the page
    title and brand, inverted selection. Layout and hierarchy unchanged. */
 :root[data-theme="dev"] body::after {

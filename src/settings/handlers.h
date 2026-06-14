@@ -30,4 +30,10 @@ void save_config_json(const std::string& path, const nlohmann::json& j);
 
 nlohmann::json defaults_json();
 
+// The model catalog with live on-disk availability. This is the single
+// source of truth for "is this model ready?" — the UI must derive both the
+// download prompt and the ready badge from `downloaded`, never from two
+// independent flags (the macOS bug where both showed at once).
+nlohmann::json models_json();
+
 }  // namespace autowhisper::settings

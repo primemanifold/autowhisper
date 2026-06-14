@@ -119,15 +119,17 @@
   let config;
   let defaults;
   let platformDiagnostics;
+  let modelCatalog;
   let sections = [];
 
   setBusy(true, "Loading local settings...");
   try {
-    [schema, config, defaults, platformDiagnostics] = await Promise.all([
+    [schema, config, defaults, platformDiagnostics, modelCatalog] = await Promise.all([
       loadJson("/api/schema"),
       loadJson("/api/config"),
       loadJson("/api/defaults"),
       loadJson("/api/platform"),
+      loadJson("/api/models").catch(() => null),
     ]);
     sections = Object.keys(schema);
   } catch (e) {
@@ -250,6 +252,10 @@
         article.appendChild(renderPlatformDiagnostics(platformDiagnostics));
       }
 
+      if (pane.id === "model" && modelCatalog?.models?.length) {
+        article.appendChild(renderModelCard(modelCatalog));
+      }
+
       const paneSections = pane.sections === "all" ? sections : pane.sections;
       if (paneSections.length === 0 && !pane.note) {
         const empty = document.createElement("div");
@@ -305,6 +311,81 @@
       grid.appendChild(item);
     }
     card.appendChild(grid);
+    return card;
+  }
+
+  // The model availability card. Both the headline state and every row badge
+  // derive from one boolean — `downloaded` from /api/models (an on-disk
+  // check) — so the UI can never show "download recommended" and "ready" at
+  // once (the macOS bug). It re-evaluates when the model select changes.
+  function renderModelCard(catalog) {
+    const card = document.createElement("section");
+    card.className = "aw-card aw-model-card";
+    card.setAttribute("aria-label", "Model availability");
+
+    const header = document.createElement("div");
+    header.className = "aw-card-header";
+    const title = document.createElement("div");
+    title.className = "aw-card-title";
+    title.textContent = "Model availability";
+    const meta = document.createElement("div");
+    meta.className = "aw-card-meta";
+    meta.textContent = `${catalog.models.length} models`;
+    header.append(title, meta);
+    card.appendChild(header);
+
+    const headline = document.createElement("div");
+    headline.className = "aw-model-headline";
+    card.appendChild(headline);
+
+    const grid = document.createElement("div");
+    grid.className = "aw-model-grid";
+    for (const m of catalog.models) {
+      const row = document.createElement("div");
+      row.className = "aw-model-row" + (m.downloaded ? " is-ready" : "");
+      row.dataset.model = m.name;
+      const name = document.createElement("div");
+      name.className = "aw-model-name";
+      name.textContent = m.name;
+      const desc = document.createElement("div");
+      desc.className = "aw-model-desc";
+      desc.textContent = `${m.description} · ${m.size}${m.english_only ? " · English" : " · multilingual"}`;
+      const badge = document.createElement("span");
+      badge.className = "aw-model-badge " + (m.downloaded ? "ready" : "absent");
+      badge.textContent = m.downloaded ? "Downloaded" : "Not downloaded";
+      row.append(name, desc, badge);
+      grid.appendChild(row);
+    }
+    card.appendChild(grid);
+
+    const byName = Object.fromEntries(catalog.models.map((m) => [m.name, m]));
+    function refresh(selected) {
+      const current = byName[selected];
+      grid.querySelectorAll(".aw-model-row").forEach((r) =>
+        r.classList.toggle("is-current", r.dataset.model === selected));
+      if (!current) {
+        headline.className = "aw-model-headline";
+        headline.textContent = `Selected model "${selected}" is not in the catalog.`;
+        return;
+      }
+      if (current.downloaded) {
+        headline.className = "aw-model-headline ready";
+        headline.textContent = `${current.name} is downloaded and ready.`;
+      } else {
+        headline.className = "aw-model-headline absent";
+        const text = document.createElement("span");
+        text.textContent = `${current.name} is not downloaded yet. Fetch it with `;
+        const code = document.createElement("code");
+        code.textContent = `autowhisper model download ${current.name}`;
+        headline.replaceChildren(text, code);
+      }
+    }
+    refresh(config.model?.size);
+    // Keep the headline honest as the user picks a different model.
+    document.addEventListener("change", (event) => {
+      const el = event.target;
+      if (el?.dataset?.configKey === "model.size") refresh(el.value);
+    });
     return card;
   }
 

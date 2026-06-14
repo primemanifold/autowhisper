@@ -828,3 +828,31 @@ Next:
   with [skip ci] on the merge commit (identical tree) -> tag v0.9.0 ->
   ppa-release workflow verifies versions, builds the signed source
   package, uploads to Launchpad, and creates the GitHub release.
+
+## Run 2026-06-14 — macOS bug triage + hybrid settings (Phase 1)
+
+- User tested the real Mac app and reported: push-to-talk dead ("shift and
+  super"), model card shows "download recommended" AND "model is ready" at
+  once, sidebar does nothing (placeholder), no themes. Root cause found via
+  3 sub-agents: macOS opens a separate native SwiftUI settings app
+  (platform/macos/SettingsApp.swift) that none of the web design work
+  touches. Hotkey parser + CGEventTap matching are correct (tests pass);
+  the real push-to-talk causes are the system-reserved shift+super default
+  and silent Input-Monitoring permission failure.
+- Decision (user): HYBRID — native shell for permissions/first-run, embed
+  the web settings UI for everything else, so themes/cast/sidebar/schema
+  config arrive on Mac in one move.
+- Shipped this turn:
+  - fix(macos): display_key renders ⌘/⌥/⌃/⇧ glyphs under __APPLE__ (was the
+    Linux "Super"); tests branch on __APPLE__.
+  - feat: /api/models endpoint (handlers::models_json) — the catalog with a
+    single on-disk `downloaded` truth; +1 ctest.
+  - feat(web): Model availability card — headline + per-model badges both
+    derive from `downloaded`, structurally preventing the macOS
+    contradiction. Re-evaluates on model-select change. Verified in
+    Chromium (light/dark), +1 static test, mock server gained /api/models.
+- Gates: 181/181 ctest, 33/33 static, node --check, Playwright.
+- Left: Phase 2 hotkey capture widget (web, verifiable here); Phase 3 the
+  WKWebView native shell + live permissions panel (Swift, CI-compiled,
+  Mac-runtime by user); Phase 4 macOS default trigger + permission
+  surfacing. Release still gated on user: push v0.9.0 tag + enable Pages.
