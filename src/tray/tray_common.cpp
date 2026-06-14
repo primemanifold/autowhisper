@@ -51,7 +51,11 @@ std::string display_hotkey(const std::string& hotkey) {
     std::istringstream iss(hotkey);
     std::string part;
     while (std::getline(iss, part, '+')) {
+#ifndef __APPLE__
+        // macOS renders chords as adjacent glyphs (⇧⌘) with no separator,
+        // matching the system menu convention; other platforms join with "+".
         if (!result.empty()) result += "+";
+#endif
         result += display_key(part);
     }
     return result;

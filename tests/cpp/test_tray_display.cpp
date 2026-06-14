@@ -56,9 +56,16 @@ TEST_CASE("display_key capitalizes first letter of unknown keys", "[tray][displa
 // ============================================================
 
 TEST_CASE("display_hotkey formats compound hotkeys", "[tray][display]") {
+#ifdef __APPLE__
+    // Adjacent glyphs, no separator: ⌃⇧Space, ⇧⌘, ⌥F4.
+    CHECK(display_hotkey("ctrl+shift+space") == "\xE2\x8C\x83\xE2\x87\xA7Space");
+    CHECK(display_hotkey("shift+super") == "\xE2\x87\xA7\xE2\x8C\x98");
+    CHECK(display_hotkey("alt+f4") == "\xE2\x8C\xA5""F4");
+#else
     CHECK(display_hotkey("ctrl+shift+space") == "Ctrl+Shift+Space");
     CHECK(display_hotkey("shift+super") == "Shift+Super");
     CHECK(display_hotkey("alt+f4") == "Alt+F4");
+#endif
     CHECK(display_hotkey("esc") == "Esc");
     CHECK(display_hotkey("") == "");
 }
@@ -69,6 +76,12 @@ TEST_CASE("display_hotkey formats compound hotkeys", "[tray][display]") {
 
 TEST_CASE("format_hotkeys formats vector of hotkeys", "[tray][display]") {
     CHECK(format_hotkeys({}) == "(none)");
+#ifdef __APPLE__
+    CHECK(format_hotkeys({"shift+super"}) == "\xE2\x87\xA7\xE2\x8C\x98");
+    CHECK(format_hotkeys({"shift+super", "ctrl+space"}) ==
+          "\xE2\x87\xA7\xE2\x8C\x98, \xE2\x8C\x83Space");
+#else
     CHECK(format_hotkeys({"shift+super"}) == "Shift+Super");
     CHECK(format_hotkeys({"shift+super", "ctrl+space"}) == "Shift+Super, Ctrl+Space");
+#endif
 }
