@@ -2,6 +2,10 @@
 #include "config/config.h"
 #include "models/models.h"
 
+#ifdef __APPLE__
+#include "platform/macos/onboarding.h"
+#endif
+
 #include <nlohmann/json.hpp>
 
 #include <cerrno>
@@ -212,6 +216,18 @@ nlohmann::json models_json() {
         {"cache_dir", get_cache_dir()},
         {"models", std::move(models)},
     };
+}
+
+nlohmann::json permissions_json() {
+#ifdef __APPLE__
+    return nlohmann::json::parse(aw_macos_permissions_status_json());
+#else
+    // No per-app TCC model on Linux/Windows; the UI hides the pane.
+    return {
+        {"applicable", false},
+        {"permissions", nlohmann::json::array()},
+    };
+#endif
 }
 
 ValidationResult validate_json(const nlohmann::json& j) {

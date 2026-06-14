@@ -67,6 +67,23 @@ MODELS = {
         {"name": "large-v3-turbo", "description": "Best multilingual speed/accuracy", "size": "~1.6GB", "speed": "\u2014", "english_only": False, "downloaded": False},
     ],
 }
+# Simulates macOS (the platform that uses the web UI via the hybrid shell):
+# input monitoring denied is exactly the silent push-to-talk failure.
+PERMISSIONS = {
+    "applicable": True,
+    "platform": "macos",
+    "permissions": [
+        {"id": "microphone", "name": "Microphone", "state": "granted", "required": True,
+         "detail": "Required to capture your voice.",
+         "deep_link": "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"},
+        {"id": "input_monitoring", "name": "Input Monitoring", "state": "denied", "required": True,
+         "detail": "Required for the global push-to-talk hotkey. If denied, no shortcut fires.",
+         "deep_link": "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"},
+        {"id": "accessibility", "name": "Accessibility", "state": "granted", "required": True,
+         "detail": "Required to type the transcribed text into other apps.",
+         "deep_link": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"},
+    ],
+}
 
 class Handler(SimpleHTTPRequestHandler):
     def translate_path(self, path):
@@ -81,6 +98,8 @@ class Handler(SimpleHTTPRequestHandler):
             return self.send_json(PLATFORM)
         if self.path == "/api/models":
             return self.send_json(MODELS)
+        if self.path == "/api/permissions":
+            return self.send_json(PERMISSIONS)
         return super().do_GET()
 
     def do_PUT(self):

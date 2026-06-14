@@ -120,16 +120,18 @@
   let defaults;
   let platformDiagnostics;
   let modelCatalog;
+  let permissions;
   let sections = [];
 
   setBusy(true, "Loading local settings...");
   try {
-    [schema, config, defaults, platformDiagnostics, modelCatalog] = await Promise.all([
+    [schema, config, defaults, platformDiagnostics, modelCatalog, permissions] = await Promise.all([
       loadJson("/api/schema"),
       loadJson("/api/config"),
       loadJson("/api/defaults"),
       loadJson("/api/platform"),
       loadJson("/api/models").catch(() => null),
+      loadJson("/api/permissions").catch(() => null),
     ]);
     sections = Object.keys(schema);
   } catch (e) {
@@ -254,6 +256,10 @@
 
       if (pane.id === "model" && modelCatalog?.models?.length) {
         article.appendChild(renderModelCard(modelCatalog));
+      }
+
+      if (pane.id === "privacy" && permissions?.applicable && permissions.permissions?.length) {
+        article.appendChild(renderPermissions(permissions));
       }
 
       const paneSections = pane.sections === "all" ? sections : pane.sections;
@@ -389,6 +395,64 @@
     return card;
   }
 
+  // OS permission status (macOS TCC). A denied "Input Monitoring" is exactly
+  // why push-to-talk died silently for the tester — so we surface each grant
+  // with a status dot and a button that deep-links to the right System
+  // Settings pane.
+  function renderPermissions(info) {
+    const card = document.createElement("section");
+    card.className = "aw-card aw-perms-card";
+    card.setAttribute("aria-label", "System permissions");
+
+    const header = document.createElement("div");
+    header.className = "aw-card-header";
+    const title = document.createElement("div");
+    title.className = "aw-card-title";
+    title.textContent = "System permissions";
+    const meta = document.createElement("div");
+    meta.className = "aw-card-meta";
+    meta.textContent = info.platform || "macOS";
+    header.append(title, meta);
+    card.appendChild(header);
+
+    const lede = document.createElement("p");
+    lede.className = "aw-platform-summary";
+    lede.textContent = "AutoWhisper needs these grants to listen and to type. " +
+      "If a required one is denied, the matching feature stays silent.";
+    card.appendChild(lede);
+
+    const list = document.createElement("div");
+    list.className = "aw-perms-list";
+    const GRANTED = new Set(["granted", "not_applicable"]);
+    for (const p of info.permissions) {
+      const row = document.createElement("div");
+      const ok = GRANTED.has(p.state);
+      const denied = p.state === "denied" || p.state === "restricted";
+      row.className = "aw-perm-row " + (ok ? "ok" : denied ? "err" : "warn");
+      const dot = document.createElement("span");
+      dot.className = "aw-perm-dot";
+      const body = document.createElement("div");
+      const name = document.createElement("div");
+      name.className = "aw-perm-name";
+      name.textContent = `${p.name} — ${humanize(p.state)}`;
+      const detail = document.createElement("div");
+      detail.className = "aw-perm-detail";
+      detail.textContent = p.detail || "";
+      body.append(name, detail);
+      row.append(dot, body);
+      if (p.deep_link && !ok) {
+        const open = document.createElement("a");
+        open.className = "aw-button aw-perm-open";
+        open.href = p.deep_link;
+        open.textContent = "Open settings";
+        row.appendChild(open);
+      }
+      list.appendChild(row);
+    }
+    card.appendChild(list);
+    return card;
+  }
+
   function renderSectionCard(section, keys, paneId, showSectionPrefix) {
     const card = document.createElement("section");
     card.className = "aw-card";
@@ -520,6 +584,9 @@
         (keyDef.enum_values || []).every((v) => CHARACTER_META[v])) {
       return renderCharacterPicker(paneId, section, keyDef, value);
     }
+    if (name === "hotkeys.trigger") {
+      return renderHotkeyCapture(paneId, section, keyDef, value);
+    }
     if (keyDef.type === "enum") {
       const sel = document.createElement("select");
       sel.id = id;
@@ -561,6 +628,87 @@
     if (keyDef.max_numeric !== null) inp.max = keyDef.max_numeric;
     inp.value = keyDef.type === "string_array" && Array.isArray(value) ? value.join(", ") : (value ?? "");
     return inp;
+  }
+
+  // Hotkey trigger: the schema field is a comma-separated string_array, but
+  // typing "shift+super" is exactly what confused the Mac tester. This keeps
+  // the editable field (collect/setInput stay unchanged) and adds a Record
+  // button that captures a real key chord and writes the canonical token.
+  function renderHotkeyCapture(paneId, section, keyDef, value) {
+    const wrap = document.createElement("div");
+    wrap.className = "aw-hotkey";
+
+    const inp = document.createElement("input");
+    inp.id = inputId(paneId, section, keyDef.key);
+    inp.name = `${section}.${keyDef.key}`;
+    inp.type = "text";
+    inp.setAttribute("data-config-key", inp.name);
+    inp.placeholder = "e.g. ctrl+alt+space (comma-separated for more)";
+    inp.value = Array.isArray(value) ? value.join(", ") : (value ?? "");
+
+    const record = document.createElement("button");
+    record.type = "button";
+    record.className = "aw-button aw-hotkey-record";
+    record.textContent = "Record shortcut";
+
+    // JS modifiers/keys -> the C++ KeyCombo grammar (super = Command/Win).
+    const MODS = [["ctrlKey", "ctrl"], ["altKey", "alt"], ["shiftKey", "shift"], ["metaKey", "super"]];
+    const BARE = { " ": "space", "spacebar": "space", "escape": "esc", "enter": "enter",
+                   "return": "enter", "tab": "tab", "backspace": "backspace", "delete": "delete" };
+    function baseKey(e) {
+      const k = e.key;
+      if (["Control", "Alt", "Shift", "Meta", "OS"].includes(k)) return "";
+      const low = k.toLowerCase();
+      if (BARE[low]) return BARE[low];
+      if (low.length === 1) return low;          // letters, digits, punctuation
+      if (/^f\d{1,2}$/.test(low)) return low;    // function keys
+      if (low.startsWith("arrow")) return low.slice(5);
+      return low;
+    }
+    function modsOf(e) { return MODS.filter(([p]) => e[p]).map(([, n]) => n); }
+
+    let capturing = false;
+    let maxMods = [];
+    function stop(commit) {
+      capturing = false;
+      window.removeEventListener("keydown", onDown, true);
+      window.removeEventListener("keyup", onUp, true);
+      record.textContent = "Record shortcut";
+      record.classList.remove("is-recording");
+      if (commit) {
+        inp.value = commit;
+        inp.dispatchEvent(new Event("input", { bubbles: true }));
+        inp.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
+    function onDown(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.key === "Escape" && modsOf(e).length === 0) { stop(null); return; }
+      const mods = modsOf(e);
+      maxMods = MODS.map(([, n]) => n).filter((n) => mods.includes(n) || maxMods.includes(n));
+      const key = baseKey(e);
+      if (key) stop([...mods, key].join("+"));   // modifier+key: commit at once
+    }
+    function onUp(e) {
+      e.preventDefault();
+      // Modifier-only chord: commit the held set once everything is released.
+      if (!e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && maxMods.length) {
+        stop(maxMods.join("+"));
+      }
+    }
+    record.addEventListener("click", () => {
+      if (capturing) { stop(null); return; }
+      capturing = true;
+      maxMods = [];
+      record.textContent = "Press keys… (Esc to cancel)";
+      record.classList.add("is-recording");
+      window.addEventListener("keydown", onDown, true);
+      window.addEventListener("keyup", onUp, true);
+    });
+
+    wrap.append(inp, record);
+    return wrap;
   }
 
   function bindNavigation() {

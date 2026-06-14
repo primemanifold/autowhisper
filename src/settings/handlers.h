@@ -36,4 +36,9 @@ nlohmann::json defaults_json();
 // independent flags (the macOS bug where both showed at once).
 nlohmann::json models_json();
 
+// Live OS permission status. On macOS this reports the three TCC grants
+// (Microphone, Input Monitoring, Accessibility) so a silently-blocked
+// push-to-talk becomes visible; elsewhere it reports applicable=false.
+nlohmann::json permissions_json();
+
 }  // namespace autowhisper::settings

@@ -320,14 +320,20 @@ if(AUTOWHISPER_ENABLE_TESTS)
         list(APPEND TEST_SOURCES
             tests/cpp/test_keycombo_platform.cpp
             src/hotkey/platform/hotkey_macos.mm
+            # The settings core lib references the macOS permission status
+            # helper (/api/permissions); link it into the test binary too.
+            src/platform/macos/onboarding.mm
         )
     endif()
     add_executable(autowhisper_tests ${TEST_SOURCES})
     if(APPLE)
         target_link_libraries(autowhisper_tests PRIVATE
             "-framework ApplicationServices"
+            "-framework AppKit"
+            "-framework AVFoundation"
             "-framework Carbon"
             "-framework CoreGraphics"
+            "-framework Foundation"
         )
     endif()
     target_link_libraries(autowhisper_tests PRIVATE

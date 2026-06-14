@@ -195,3 +195,23 @@ TEST_CASE("models_json reports the catalog with on-disk availability", "[handler
     }
     CHECK(found_recommended);
 }
+
+TEST_CASE("permissions_json reports applicability for the platform", "[handlers]") {
+    auto j = settings::permissions_json();
+    REQUIRE(j.contains("applicable"));
+    REQUIRE(j.contains("permissions"));
+    REQUIRE(j["permissions"].is_array());
+#ifdef __APPLE__
+    CHECK(j["applicable"] == true);
+    CHECK(j["permissions"].size() == 3);
+    for (const auto& p : j["permissions"]) {
+        CHECK(p.contains("id"));
+        CHECK(p.contains("state"));
+        CHECK(p.contains("deep_link"));
+    }
+#else
+    // No per-app permission model off macOS; the UI hides the pane.
+    CHECK(j["applicable"] == false);
+    CHECK(j["permissions"].empty());
+#endif
+}

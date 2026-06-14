@@ -117,6 +117,23 @@ class SettingsDesignAssetsTest(unittest.TestCase):
         self.assertIn(".aw-model-headline.absent", self.css)
         self.assertIn("aw-model-badge", self.css)
 
+    def test_hotkey_capture_widget_records_chords(self):
+        # The trigger field keeps its editable input (collect/setInput stay
+        # the same) and adds a Record button that captures a real key chord.
+        self.assertIn("renderHotkeyCapture", self.js)
+        self.assertIn('name === "hotkeys.trigger"', self.js)
+        self.assertIn("aw-hotkey-record", self.js + self.css)
+        self.assertIn('"metaKey", "super"', self.js)  # Command -> super token
+
+    def test_permissions_pane_surfaces_os_grants(self):
+        # macOS TCC status with a deep link per denied grant — the fix for the
+        # silently-blocked push-to-talk.
+        self.assertIn("/api/permissions", self.js)
+        self.assertIn("renderPermissions", self.js)
+        self.assertIn("deep_link", self.js)
+        self.assertIn("aw-perm-row", self.css)
+        self.assertIn(".aw-perm-row.err .aw-perm-dot", self.css)
+
     def test_platform_diagnostics_surface_desktop_port_readiness(self):
         for snippet in [
             "platformDiagnostics",

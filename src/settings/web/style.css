@@ -355,6 +355,15 @@ p { margin: 0; }
   color: var(--aw-ink-0);
 }
 .aw-check { display: flex; align-items: center; gap: 10px; min-height: 36px; cursor: pointer; }
+/* Hotkey capture: editable field + a Record button that captures a chord. */
+.aw-hotkey { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.aw-hotkey input { flex: 1 1 200px; }
+.aw-hotkey-record { flex: 0 0 auto; white-space: nowrap; }
+.aw-hotkey-record.is-recording {
+  background: var(--aw-signal-soft);
+  border-color: var(--aw-signal);
+  color: var(--aw-signal-ink);
+}
 /* The cast — the companion character picker. Radio cards; the input is
    visually hidden but stays focusable, focus and selection paint the card. */
 .aw-cast {
@@ -450,6 +459,29 @@ p { margin: 0; }
 .aw-platform-feature.placeholder .aw-platform-state { color: var(--aw-warn); background: var(--aw-warn-soft); }
 .aw-platform-feature.unsupported .aw-platform-state { color: var(--aw-err); background: var(--aw-err-soft); }
 .aw-empty { padding: 18px 16px; color: var(--aw-ink-2); }
+
+/* System permissions (macOS TCC) — status dot + deep link per grant. */
+.aw-perms-list { padding: 4px 16px 14px; }
+.aw-perm-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--aw-line-2);
+}
+.aw-perm-row:last-child { border-bottom: 0; }
+.aw-perm-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--aw-ink-3); }
+.aw-perm-row.ok .aw-perm-dot { background: var(--aw-ok); }
+.aw-perm-row.warn .aw-perm-dot { background: var(--aw-warn); }
+.aw-perm-row.err .aw-perm-dot { background: var(--aw-err); }
+.aw-perm-name { font-weight: 590; }
+.aw-perm-detail { color: var(--aw-ink-2); font-size: 12px; margin-top: 2px; }
+.aw-perm-open { flex: 0 0 auto; min-height: 30px; padding: 5px 12px; font-size: 13px; white-space: nowrap; }
+@media (max-width: 820px) {
+  .aw-perm-row { grid-template-columns: auto 1fr; }
+  .aw-perm-open { grid-column: 2; justify-self: start; }
+}
 
 /* Model availability — one readiness truth drives the headline and badges. */
 .aw-model-headline {
