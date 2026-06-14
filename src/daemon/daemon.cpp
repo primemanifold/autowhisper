@@ -152,7 +152,40 @@ void AutoWhisperDaemon::run() {
     cleanup();
 }
 
+void AutoWhisperDaemon::maybe_reload_config() {
+    std::error_code ec;
+    auto mtime = std::filesystem::last_write_time(config_path_, ec);
+    if (ec) return;  // file gone/unreadable this tick; try again next time
+    if (!config_mtime_) { config_mtime_ = mtime; return; }  // baseline
+    if (mtime == *config_mtime_) return;
+    config_mtime_ = mtime;
+
+    Config fresh;
+    try {
+        fresh = Config::load(config_path_);
+    } catch (const std::exception& e) {
+        spdlog::warn("Config changed but failed to reload: {}", e.what());
+        return;
+    }
+
+    // Hotkeys are applied to the live listener (no restart). Other settings
+    // (model, audio, output) still take effect on the next run.
+    if (fresh.hotkeys.trigger != config_.hotkeys.trigger ||
+        fresh.hotkeys.cancel != config_.hotkeys.cancel ||
+        fresh.hotkeys.mode != config_.hotkeys.mode ||
+        fresh.hotkeys.escape_to_cancel != config_.hotkeys.escape_to_cancel) {
+        spdlog::info("Config changed: applying new hotkeys to the running listener");
+        config_.hotkeys = fresh.hotkeys;
+        if (hotkey_) hotkey_->set_config(config_.hotkeys);
+    }
+}
+
 void AutoWhisperDaemon::process_events() {
+    // Checked before taking the queue lock: maybe_reload_config -> hotkey
+    // set_config locks the hotkey mutex, and the hotkey callback locks the
+    // queue mutex, so this must never run while holding queue_mutex_.
+    maybe_reload_config();
+
     std::unique_lock<std::mutex> lock(queue_mutex_);
 
     queue_cv_.wait_for(lock, std::chrono::milliseconds(100), [this]() {

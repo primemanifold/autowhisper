@@ -6,6 +6,7 @@
 #import <Carbon/Carbon.h>
 
 #include <atomic>
+#include <chrono>
 #include <string>
 #include <thread>
 
@@ -180,12 +181,15 @@ void HotkeyManager::start() {
     }
 
     if (!CGPreflightListenEventAccess()) {
-        spdlog::error("Input Monitoring permission denied. Hotkeys disabled.");
+        spdlog::error("Input Monitoring not granted yet. Push-to-talk will start "
+                      "the moment you grant it (no restart needed).");
         spdlog::error("  Fix: System Settings \u2192 Privacy & Security \u2192 "
                       "Input Monitoring \u2192 add AutoWhisper");
         // Best-effort: trigger the system prompt so the user sees it.
         CGRequestListenEventAccess();
-        return;
+        // Do NOT return: the listener thread below polls for the grant and
+        // creates the tap when it lands, so a mid-session grant takes effect
+        // without restarting the app (the old one-shot gate never retried).
     }
 
     running_.store(true);
@@ -196,6 +200,26 @@ void HotkeyManager::start() {
     // run_loop but BEFORE entering the loop — so a fast stop() caught
     // between those two points still exits cleanly.
     impl_->listener = std::thread([this]() {
+        // Wait for Input Monitoring if it is not granted yet. Polling (rather
+        // than a one-shot check) is what lets a grant made while the app is
+        // already running create the tap with no restart. Short sleeps keep
+        // stop() responsive (it flips running_ to false).
+        bool announced_wait = false;
+        while (running_.load() && !CGPreflightListenEventAccess()) {
+            if (!announced_wait) {
+                spdlog::info("CGEventTap: waiting for Input Monitoring permission");
+                announced_wait = true;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+        if (!running_.load()) {
+            spdlog::info("CGEventTap: stop signaled before permission was granted");
+            return;
+        }
+        if (announced_wait) {
+            spdlog::info("CGEventTap: Input Monitoring granted — creating tap");
+        }
+
         const CGEventMask mask =
             CGEventMaskBit(kCGEventKeyDown) |
             CGEventMaskBit(kCGEventKeyUp)   |

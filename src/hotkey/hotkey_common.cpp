@@ -73,6 +73,40 @@ KeyCombo KeyCombo::parse(const std::string& combo_str) {
     return result;
 }
 
+void HotkeyManager::set_config(const HotkeyConfig& config) {
+    // Parse outside the lock (KeyCombo::parse can throw); a bad combo is
+    // skipped rather than crashing the live listener. The settings UI
+    // validates before save, so this is defensive.
+    std::vector<KeyCombo> triggers;
+    std::vector<KeyCombo> cancels;
+    for (const auto& t : config.trigger) {
+        try {
+            triggers.push_back(KeyCombo::parse(t));
+        } catch (const std::exception& e) {
+            spdlog::warn("Hotkey: ignoring invalid trigger '{}': {}", t, e.what());
+        }
+    }
+    for (const auto& c : config.cancel) {
+        try {
+            cancels.push_back(KeyCombo::parse(c));
+        } catch (const std::exception& e) {
+            spdlog::warn("Hotkey: ignoring invalid cancel '{}': {}", c, e.what());
+        }
+    }
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    config_ = config;
+    trigger_combos_ = std::move(triggers);
+    cancel_combos_ = std::move(cancels);
+    // A live re-config invalidates any in-flight press: drop cached state so a
+    // half-held old chord cannot strand the trigger.
+    pressed_modifiers_.clear();
+    trigger_pressed_ = false;
+    active_trigger_.reset();
+    spdlog::info("Hotkey: config applied live ({} trigger(s), mode {})",
+                 trigger_combos_.size(), config_.mode);
+}
+
 void HotkeyManager::send_event(HotkeyEvent event) {
     spdlog::debug("Hotkey event: {}",
                   event == HotkeyEvent::START ? "START" :
@@ -83,6 +117,7 @@ void HotkeyManager::send_event(HotkeyEvent event) {
 }
 
 void HotkeyManager::reset_input_state() {
+    std::lock_guard<std::mutex> lock(mutex_);
     spdlog::debug("Hotkey: resetting cached input state (modifier resync)");
     pressed_modifiers_.clear();
     trigger_pressed_ = false;
@@ -132,6 +167,7 @@ bool HotkeyManager::check_combo(const KeyCombo& combo, const std::string& key_na
 
 void HotkeyManager::on_modifier_press(const std::string& modifier) {
     if (!running_.load()) return;
+    std::lock_guard<std::mutex> lock(mutex_);
 
     pressed_modifiers_.insert(modifier);
     spdlog::debug("Mod down: {}, pressed: {}", modifier, pressed_modifiers_.size());
@@ -148,6 +184,7 @@ void HotkeyManager::on_modifier_press(const std::string& modifier) {
 
 void HotkeyManager::on_modifier_release(const std::string& modifier) {
     if (!running_.load()) return;
+    std::lock_guard<std::mutex> lock(mutex_);
 
     pressed_modifiers_.erase(modifier);
     spdlog::debug("Mod up: {}", modifier);
@@ -165,6 +202,7 @@ void HotkeyManager::on_modifier_release(const std::string& modifier) {
 
 void HotkeyManager::on_key_press(const std::string& key_name) {
     if (!running_.load()) return;
+    std::lock_guard<std::mutex> lock(mutex_);
 
     spdlog::debug("Key pressed: {}", key_name);
 
@@ -209,6 +247,7 @@ void HotkeyManager::on_key_press(const std::string& key_name) {
 
 void HotkeyManager::on_key_release(const std::string& key_name) {
     if (!running_.load()) return;
+    std::lock_guard<std::mutex> lock(mutex_);
 
     // Push-to-talk: stop on release for non-modifier-only combos
     if (active_trigger_ && !active_trigger_->is_modifier_only &&

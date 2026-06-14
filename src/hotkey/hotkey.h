@@ -5,6 +5,7 @@
 #include <atomic>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <string>
@@ -40,6 +41,12 @@ public:
     void stop();
     void signal_stop();  // Non-blocking: signal thread to exit without joining
 
+    // Re-apply hotkey config on a running listener (live, no restart). The
+    // platform event source keeps running; only the combos it matches and the
+    // mode are swapped, under a lock shared with the matching path. This is
+    // what makes a saved hotkey take effect without restarting the daemon.
+    void set_config(const HotkeyConfig& config);
+
     // Called by platform impl when the event source has been disabled and
     // re-enabled (e.g., macOS tap timeout / user-input disable). The
     // modifier state cached in this manager may no longer reflect reality,
@@ -47,6 +54,12 @@ public:
     void reset_input_state();
 
 private:
+    // Guards config_, trigger_combos_, cancel_combos_, and the per-key match
+    // state below — written by set_config() (daemon thread) and read/updated
+    // by the on_* handlers (platform listener thread). Held briefly; never
+    // across a blocking call. Lock order is always this mutex before the
+    // daemon's event-queue mutex (the callback enqueues), never the reverse.
+    mutable std::mutex mutex_;
     HotkeyConfig config_;
     EventCallback callback_;
     std::vector<KeyCombo> trigger_combos_;

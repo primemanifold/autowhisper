@@ -879,3 +879,30 @@ Next:
   widget supersedes it as the fix.
 - Gates: 182/182 ctest, 35/35 static, gotcha audit 0 findings, node --check.
   macOS .mm paths (onboarding/tray) compile-verified by CI.
+
+## Run 2026-06-14 (cont. 2) — push-to-talk actually fixed: live config reload + mac permission retry
+
+- User: on macOS, saving a new hotkey did nothing. Two sub-agents found two
+  compounding bugs:
+  1. The daemon read config ONCE at startup; the hotkey listener was built
+     once and never updated. Saving wrote config.toml but the live listener
+     kept the old trigger. (Cross-platform; the real "saved and nothing".)
+  2. macOS start() checked Input Monitoring once; if denied it returned with
+     no event tap and never retried, so a later grant did nothing until
+     restart. Worsened by the unsigned build's unstable TCC.
+- Fixes:
+  - HotkeyManager::set_config(): live, mutex-guarded swap of the parsed
+    trigger/cancel combos + mode on the RUNNING listener (no tap teardown).
+    A new mutex guards the combos/config/per-key state, taken at the on_*
+    handler entry points and in set_config. Lock order is hotkey-mutex
+    before the daemon queue-mutex (never reverse).
+  - Daemon polls config.toml mtime in its existing 100ms process_events loop
+    (before taking queue_mutex_, to keep lock order) and calls
+    hotkey_->set_config on hotkey changes. Other settings still apply next run.
+  - macOS: the permission gate is now a poll loop in the listener thread —
+    it waits for Input Monitoring and creates the tap when granted, so a
+    mid-session grant works with no restart.
+- Verified: new Xvfb test "X11 set_config swaps the live trigger without a
+  restart" (new chord fires, old chord goes dead). 183/183 ctest, 35/35
+  static. macOS .mm retry is CI-compiled; runtime needs a Mac. Unsigned-build
+  TCC remains a caveat (de-quarantine / build-from-source / notarize).
