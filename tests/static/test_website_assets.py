@@ -90,6 +90,7 @@ class WebsiteAssetsTest(unittest.TestCase):
         for name in [
             "autowhisper-0.9.0-linux-x86_64.tar.gz",
             "autowhisper-0.9.0-windows-x86_64.zip",
+            "autowhisper-0.9.0-macos-universal-unsigned.zip",
             "SHA256SUMS",
         ]:
             self.assertTrue((downloads / name).exists(), f"missing direct-download asset: {name}")
@@ -102,8 +103,12 @@ class WebsiteAssetsTest(unittest.TestCase):
             digest, name = line.split()
             actual = hashlib.sha256((downloads / name).read_bytes()).hexdigest()
             self.assertEqual(actual, digest, f"checksum drift for {name}")
-        # Honest maturity labels for the desktop matrix.
+        # Honest maturity labels for the desktop matrix: the macOS download is
+        # the current v0.9.0 universal build but unsigned, with the notarized
+        # (older) v0.7.1 still offered as the zero-friction alternative.
         self.assertIn("beta", html)
+        self.assertIn("unsigned", html)
+        self.assertIn("right-click", html.lower().replace("&rsquo;", "'"))
         self.assertIn("Notarized Developer ID", html)
 
     def test_landing_page_answers_faqs_honestly(self):
