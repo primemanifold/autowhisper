@@ -9,10 +9,18 @@ using namespace autowhisper;
 // ============================================================
 
 TEST_CASE("display_key converts modifier names", "[tray][display]") {
+    // macOS shows the standard glyphs; other platforms show words.
+#ifdef __APPLE__
+    CHECK(display_key("shift") == "\xE2\x87\xA7");  // ⇧
+    CHECK(display_key("ctrl") == "\xE2\x8C\x83");   // ⌃
+    CHECK(display_key("alt") == "\xE2\x8C\xA5");    // ⌥
+    CHECK(display_key("super") == "\xE2\x8C\x98");  // ⌘
+#else
     CHECK(display_key("shift") == "Shift");
     CHECK(display_key("ctrl") == "Ctrl");
     CHECK(display_key("alt") == "Alt");
     CHECK(display_key("super") == "Super");
+#endif
 }
 
 TEST_CASE("display_key converts special keys", "[tray][display]") {

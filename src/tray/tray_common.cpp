@@ -6,10 +6,20 @@
 namespace autowhisper {
 
 std::string display_key(const std::string& keyname) {
+    // Modifier names are platform-localized: macOS users read ⌘/⌥/⌃/⇧, not
+    // the Linux "Super". The canonical config token stays "super" everywhere;
+    // only the human-facing label changes.
+#ifdef __APPLE__
+    if (keyname == "shift") return "⇧";        // ⇧
+    if (keyname == "ctrl") return "⌃";         // ⌃
+    if (keyname == "alt") return "⌥";          // ⌥
+    if (keyname == "super") return "⌘";        // ⌘
+#else
     if (keyname == "shift") return "Shift";
     if (keyname == "ctrl") return "Ctrl";
     if (keyname == "alt") return "Alt";
     if (keyname == "super") return "Super";
+#endif
     if (keyname == "esc") return "Esc";
     if (keyname == "enter") return "Enter";
     if (keyname == "space") return "Space";
