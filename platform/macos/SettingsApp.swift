@@ -1,6 +1,7 @@
 import AppKit
 import AVFoundation
 import SwiftUI
+import WebKit
 
 struct ConfigDraft {
     var hotkeyMode = "push_to_talk"
@@ -409,6 +410,28 @@ final class AutoWhisperSettingsApp: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let args = CommandLine.arguments
+
+        // --url mode: host the full web settings UI (themes, the cast, hotkey
+        // capture, the permissions pane, the model card) in a real, front-most
+        // app window — not a buried browser tab. This is the macOS settings
+        // surface; the SwiftUI form below is only the first-run setup helper.
+        if let index = args.firstIndex(of: "--url"), args.indices.contains(index + 1),
+           let url = URL(string: args[index + 1]) {
+            let webView = WKWebView(frame: NSRect(x: 0, y: 0, width: 1040, height: 760))
+            webView.load(URLRequest(url: url))
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1040, height: 760),
+                                  styleMask: [.titled, .closable, .miniaturizable, .resizable],
+                                  backing: .buffered,
+                                  defer: false)
+            window.title = "AutoWhisper Settings"
+            window.contentView = webView
+            window.center()
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            self.window = window
+            return
+        }
+
         let configPath: String
         let setupError: String?
         if let index = args.firstIndex(of: "--config"), args.indices.contains(index + 1) {

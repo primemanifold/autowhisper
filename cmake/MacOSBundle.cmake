@@ -47,6 +47,7 @@ add_custom_command(
             -target "${AUTOWHISPER_SWIFT_TARGET}"
             -framework SwiftUI
             -framework AppKit
+            -framework WebKit
             "${AUTOWHISPER_SETTINGS_SWIFT}"
             -o "${AUTOWHISPER_SETTINGS_HELPER}"
     DEPENDS "${AUTOWHISPER_SETTINGS_SWIFT}"

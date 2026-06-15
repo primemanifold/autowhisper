@@ -30,5 +30,12 @@
     <string>AutoWhisper uses your microphone to transcribe speech locally. Audio never leaves this device.</string>
     <key>NSAppleEventsUsageDescription</key>
     <string>AutoWhisper may use Apple Events to open settings, logs, or hand off text safely when macOS requires explicit permission.</string>
+    <!-- The settings window is a WKWebView loading the local settings server
+         over http://127.0.0.1; allow local networking so ATS does not block it. -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsLocalNetworking</key>
+        <true/>
+    </dict>
 </dict>
 </plist>
