@@ -19,6 +19,11 @@
 #include <unistd.h>
 #endif
 
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#include <sys/stat.h>
+#endif
+
 #include <cerrno>
 #include <chrono>
 #include <csignal>
@@ -89,10 +94,34 @@ void shutdown_signal_handler(int /*signo*/) {
     }
 }
 
+#if defined(__APPLE__)
+// The bundled AutoWhisperSettings helper, beside this executable in
+// Contents/MacOS. Empty when we are not inside an .app bundle (plain CLI).
+std::string settings_helper_path() {
+    uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);
+    if (size == 0) return "";
+    std::string buf(size, '\0');
+    if (_NSGetExecutablePath(buf.data(), &size) != 0) return "";
+    buf.resize(std::strlen(buf.c_str()));
+    const auto slash = buf.find_last_of('/');
+    if (slash == std::string::npos) return "";
+    std::string helper = buf.substr(0, slash + 1) + "AutoWhisperSettings";
+    struct stat st{};
+    if (::stat(helper.c_str(), &st) != 0) return "";
+    return helper;
+}
+#endif
+
 void launch_browser(const std::string& url) {
+#if defined(__APPLE__)
+    // Resolve the native settings window helper before forking (the child
+    // inherits the string via copy-on-write).
+    const std::string helper = settings_helper_path();
+#endif
     pid_t pid = ::fork();
     if (pid < 0) {
-        spdlog::warn("fork failed; cannot launch browser");
+        spdlog::warn("fork failed; cannot open settings");
         return;
     }
     if (pid == 0) {
@@ -104,7 +133,13 @@ void launch_browser(const std::string& url) {
                 if (devnull > 2) ::close(devnull);
             }
 #if defined(__APPLE__)
-            // macOS: `open` delegates to LaunchServices (default browser).
+            // Prefer the bundled WKWebView window so settings appear as a real,
+            // front-most app window rather than a browser tab that gets buried.
+            // Fall back to the default browser when run as a plain CLI.
+            if (!helper.empty()) {
+                ::execlp(helper.c_str(), helper.c_str(), "--url", url.c_str(),
+                         (char*)nullptr);
+            }
             ::execlp("open", "open", url.c_str(), (char*)nullptr);
 #else
             ::execlp("xdg-open", "xdg-open", url.c_str(), (char*)nullptr);

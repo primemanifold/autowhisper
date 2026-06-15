@@ -94,6 +94,31 @@ class MacOSAppBundleAssetsTest(unittest.TestCase):
         self.assertIn("AutoWhisperSettings", cmake)
         self.assertRegex(cmake, r"codesign --force[\s\S]+AutoWhisperSettings")
 
+    def test_macos_settings_open_in_a_native_webview_window(self):
+        # The macOS settings UI is the web UI hosted in a real, front-most
+        # WKWebView app window (NSWindow), not a browser tab that gets buried.
+        # cmd_config_ui launches the bundled helper with --url; the helper
+        # opens the window and brings it to front.
+        swift = SWIFT_SETTINGS.read_text(encoding="utf-8")
+        self.assertIn("import WebKit", swift)
+        self.assertIn("WKWebView", swift)
+        self.assertIn('firstIndex(of: "--url")', swift)
+        self.assertIn("makeKeyAndOrderFront", swift)
+        self.assertIn("NSApp.activate(ignoringOtherApps: true)", swift)
+
+        cli = (ROOT / "src" / "cli" / "cli_settings_ui.cpp").read_text(encoding="utf-8")
+        self.assertIn("settings_helper_path", cli)
+        self.assertIn("AutoWhisperSettings", cli)
+        self.assertIn('"--url"', cli)
+
+        cmake = BUNDLE_CMAKE.read_text(encoding="utf-8")
+        self.assertIn("-framework WebKit", cmake)
+
+        # WKWebView must be allowed to load the local http settings server.
+        plist = INFO_PLIST.read_text(encoding="utf-8")
+        self.assertIn("NSAppTransportSecurity", plist)
+        self.assertIn("NSAllowsLocalNetworking", plist)
+
     def test_app_bundle_launch_opens_setup_instead_of_silent_exit_when_not_ready(self):
         main = MAIN_CPP.read_text(encoding="utf-8")
         config_cpp = CONFIG_CPP.read_text(encoding="utf-8")

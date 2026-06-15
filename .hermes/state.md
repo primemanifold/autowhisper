@@ -906,3 +906,26 @@ Next:
   restart" (new chord fires, old chord goes dead). 183/183 ctest, 35/35
   static. macOS .mm retry is CI-compiled; runtime needs a Mac. Unsigned-build
   TCC remains a caveat (de-quarantine / build-from-source / notarize).
+
+## Run 2026-06-15 — macOS settings as a native WKWebView window (not a buried tab)
+
+- User: the Mac settings "gets hidden" and should be an editable window/modal.
+  Cause: the hybrid (#16) opened the web UI in the default browser as a TAB,
+  which gets lost among other tabs.
+- Fix: host the web settings UI in a real, front-most native window.
+  - SettingsApp.swift gains a `--url` mode: a WKWebView in an NSWindow
+    (titled/closable/resizable), center + makeKeyAndOrderFront +
+    NSApp.activate. The SwiftUI form stays for first-run/onboarding only.
+  - cmd_config_ui (cli_settings_ui.cpp) on macOS now launches the bundled
+    AutoWhisperSettings helper with `--url <tokenized URL>` instead of
+    `open` (browser); falls back to `open` when not in a bundle (plain CLI).
+    New settings_helper_path() resolves the sibling helper via
+    _NSGetExecutablePath.
+  - MacOSBundle.cmake links -framework WebKit; Info.plist.in adds
+    NSAppTransportSecurity/NSAllowsLocalNetworking so WKWebView can load the
+    local http://127.0.0.1 settings server.
+- Tests: new test_macos_settings_open_in_a_native_webview_window pins the
+  WKWebView window + --url launch + WebKit framework + ATS exception. Tray
+  still launches `config ui` (unchanged). 183/183 ctest, 36/36 static; Linux
+  build clean (the .swift/.mm/ATS paths are macOS-only, compile-verified by
+  CI; runtime needs a Mac).
