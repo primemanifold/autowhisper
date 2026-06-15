@@ -50,6 +50,7 @@ CONFIG = {
 PLATFORM = {
     "platform": "linux",
     "build_target": "linux",
+    "version": "0.9.0",
     "summary": "Mock platform readiness for settings UI development.",
     "features": [
         {"id": "hotkeys", "name": "Global hotkeys", "state": "ready", "detail": "X11 push-to-talk verified."},

@@ -72,6 +72,8 @@ TEST_CASE("platform capabilities serialize to stable JSON for settings diagnosti
     REQUIRE(json.at("display_name").is_string());
     REQUIRE(json.at("buildable").is_boolean());
     REQUIRE(json.at("summary").is_string());
+    REQUIRE(json.at("version").is_string());
+    CHECK(json.at("version") == std::string(AUTOWHISPER_VERSION));
     REQUIRE(json.at("features").is_array());
     REQUIRE_FALSE(json.at("features").empty());
 

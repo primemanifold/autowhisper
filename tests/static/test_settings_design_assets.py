@@ -105,6 +105,14 @@ class SettingsDesignAssetsTest(unittest.TestCase):
         ]:
             self.assertIn(snippet, self.css)
 
+    def test_settings_ui_surfaces_the_app_version(self):
+        # The user could not tell which version they were running; the UI now
+        # shows it (from /api/platform) in the sidebar and the window title.
+        self.assertIn("showVersion", self.js)
+        self.assertIn("platformDiagnostics?.version", self.js)
+        self.assertIn("aw-brand-note", self.js)
+        self.assertIn('document.title', self.js)
+
     def test_model_availability_card_uses_single_readiness_truth(self):
         # The model card must derive both the headline and the row badges from
         # the one `downloaded` flag in /api/models — never two independent

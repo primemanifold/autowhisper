@@ -94,6 +94,28 @@ class MacOSAppBundleAssetsTest(unittest.TestCase):
         self.assertIn("AutoWhisperSettings", cmake)
         self.assertRegex(cmake, r"codesign --force[\s\S]+AutoWhisperSettings")
 
+    def test_macos_bundle_has_an_app_icon(self):
+        # The app must have a real Dock/Finder/window icon (CFBundleIconFile),
+        # not the generic blank one. The committed .iconset is assembled into
+        # AppIcon.icns by iconutil at build time.
+        iconset = ROOT / "platform" / "macos" / "AutoWhisper.iconset"
+        self.assertTrue(iconset.is_dir(), "missing AutoWhisper.iconset")
+        for name in [
+            "icon_16x16.png", "icon_16x16@2x.png", "icon_32x32.png", "icon_32x32@2x.png",
+            "icon_128x128.png", "icon_128x128@2x.png", "icon_256x256.png",
+            "icon_256x256@2x.png", "icon_512x512.png", "icon_512x512@2x.png",
+        ]:
+            f = iconset / name
+            self.assertTrue(f.exists(), f"iconset missing {name}")
+            self.assertEqual(f.read_bytes()[:8], b"\x89PNG\r\n\x1a\n", f"{name} is not a PNG")
+        plist = INFO_PLIST.read_text(encoding="utf-8")
+        self.assertIn("CFBundleIconFile", plist)
+        self.assertIn("AppIcon.icns", plist)
+        cmake = BUNDLE_CMAKE.read_text(encoding="utf-8")
+        self.assertIn("iconutil", cmake)
+        self.assertIn("AutoWhisper.iconset", cmake)
+        self.assertIn("AppIcon.icns", cmake)
+
     def test_macos_settings_open_in_a_native_webview_window(self):
         # The macOS settings UI is the web UI hosted in a real, front-most
         # WKWebView app window (NSWindow), not a browser tab that gets buried.

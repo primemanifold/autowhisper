@@ -38,6 +38,7 @@ set(AUTOWHISPER_ENTITLEMENTS   "${CMAKE_SOURCE_DIR}/platform/macos/entitlements.
 set(AUTOWHISPER_SETTINGS_SWIFT "${CMAKE_SOURCE_DIR}/platform/macos/SettingsApp.swift")
 set(AUTOWHISPER_SETTINGS_HELPER "${CMAKE_BINARY_DIR}/AutoWhisperSettings")
 find_program(AUTOWHISPER_SWIFTC swiftc REQUIRED)
+find_program(AUTOWHISPER_ICONUTIL iconutil REQUIRED)
 set(AUTOWHISPER_SWIFT_TARGET "${CMAKE_SYSTEM_PROCESSOR}-apple-macos${CMAKE_OSX_DEPLOYMENT_TARGET}")
 
 add_custom_command(
@@ -65,6 +66,12 @@ add_custom_target(autowhisper_bundle ALL
             "${AUTOWHISPER_SETTINGS_HELPER}" "${AUTOWHISPER_MACOS_DIR}/AutoWhisperSettings"
     COMMAND ${CMAKE_COMMAND} -E copy
             "${CMAKE_SOURCE_DIR}/config.toml" "${AUTOWHISPER_RESOURCES_DIR}/config.toml"
+    # App icon: assemble the committed .iconset into AppIcon.icns so the Dock,
+    # Finder, and the settings window show the AutoWhisper mark (not the
+    # generic blank app icon). Must land before codesign so it's covered.
+    COMMAND "${AUTOWHISPER_ICONUTIL}" -c icns
+            "${CMAKE_SOURCE_DIR}/platform/macos/AutoWhisper.iconset"
+            -o "${AUTOWHISPER_RESOURCES_DIR}/AppIcon.icns"
     COMMAND ${CMAKE_COMMAND}
             -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
             -DPROJECT_VERSION=${PROJECT_VERSION}
