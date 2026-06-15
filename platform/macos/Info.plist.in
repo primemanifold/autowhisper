@@ -22,6 +22,9 @@
     <string>????</string>
     <key>LSMinimumSystemVersion</key>
     <string>@CMAKE_OSX_DEPLOYMENT_TARGET@</string>
+    <!-- Dock / Finder / settings-window app icon (Contents/Resources/AppIcon.icns). -->
+    <key>CFBundleIconFile</key>
+    <string>AppIcon.icns</string>
     <!-- Menu-bar app: no Dock icon, no menu-bar app name. -->
     <key>LSUIElement</key>
     <true/>

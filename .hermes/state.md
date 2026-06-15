@@ -929,3 +929,26 @@ Next:
   still launches `config ui` (unchanged). 183/183 ctest, 36/36 static; Linux
   build clean (the .swift/.mm/ATS paths are macOS-only, compile-verified by
   CI; runtime needs a Mac).
+
+## Run 2026-06-15 — app icon + visible version (and the Tauri verdict)
+
+- User: no app icon, can't tell the version, "feels like a webpage, thought
+  it was a rust/tauri app." Verdict on Tauri (sub-agent-checked): Tauri on
+  macOS renders in WKWebView — the SAME system webview the native helper
+  already uses — so it would not change the "webpage" feel; it'd be a full
+  C++->Rust rewrite, worse for testing (still can't run on the user's Mac,
+  and CI doesn't build Tauri), and against the repo's framework-free/C++
+  source-of-truth stance. Declined. Real gaps fixed instead:
+  - App icon: committed platform/macos/AutoWhisper.iconset (10 PNGs rendered
+    from the AutoWhisper mark — ink squircle, white ring + echo dashes,
+    record-red center). MacOSBundle.cmake assembles AppIcon.icns via iconutil
+    at build (before codesign); Info.plist.in adds CFBundleIconFile. Fixes
+    the generic Dock/Finder/window icon.
+  - Version: platform_capabilities_json adds {"version", AUTOWHISPER_VERSION}
+    (the define is PUBLIC on autowhisper_core, already visible). The web UI
+    shows it in the sidebar brand-note and the window title via /api/platform.
+    Favicon (the mark, inline data-URI) added to index.html.
+- Gates: 183/183 ctest (+version assert), 38/38 static (+icon +version),
+  gotcha audit 0 findings, Chromium-verified version display. The .icns
+  assembly + bundle icon are CI-compiled on macOS; runtime appearance needs
+  a Mac.

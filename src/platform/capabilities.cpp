@@ -38,6 +38,7 @@ nlohmann::json platform_capabilities_json(const PlatformCapabilities& capabiliti
         {"build_target", capabilities.display_name},
         {"buildable", capabilities.buildable},
         {"summary", capabilities.summary},
+        {"version", AUTOWHISPER_VERSION},
         {"features", std::move(features)},
     };
 }

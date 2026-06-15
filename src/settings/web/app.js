@@ -148,8 +148,19 @@
   window.addEventListener("hashchange", () => activatePane(paneIdFromHash()));
   bindFormDirtyTracking();
   updateDirtyState();
+  showVersion();
   setBusy(false);
   setStatus("Loaded from the local AutoWhisper settings server.", "ok");
+
+  // Surface the running version in the sidebar and the window title so it's
+  // obvious which build this is (it reported "I don't know what version").
+  function showVersion() {
+    const v = platformDiagnostics?.version;
+    if (!v) return;
+    const note = document.querySelector(".aw-brand-note");
+    if (note) note.textContent = `local dictation · v${v}`;
+    document.title = `AutoWhisper Settings · v${v}`;
+  }
 
   saveBtn.addEventListener("click", async () => {
     const body = collect();
