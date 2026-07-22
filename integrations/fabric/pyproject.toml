@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=77,<84"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "autowhisper-fabric"
+version = "0.1.0"
+description = "Warm local AutoWhisper transcription provider for Fabric"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+license = "Apache-2.0"
+authors = [{name = "Prime Manifold"}]
+dependencies = ["fabric-agent>=0.21.0,<0.22"]
+
+[project.entry-points."fabric_agent.plugins"]
+autowhisper = "autowhisper_fabric"
+
+[tool.setuptools.packages.find]
+where = ["src"]
