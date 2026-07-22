@@ -66,6 +66,7 @@ enabled = true      # forms: echo, hermes, mnemosyne, kalliope, morpheus
 - **Push-to-talk or toggle** dictation into any focused app, with a cancel key.
 - **Cleans transcripts as you speak**: filler words removed, personal dictionary (`"auto whisper => AutoWhisper"`), spoken "new line" / "new paragraph".
 - **Local settings app** served by the binary itself (`autowhisper config ui`) — token-protected, framework-free, light and dark.
+- **Fabric integration** through a standalone, warm-model transcription provider in [`integrations/fabric/`](integrations/fabric/).
 - **Measured, not claimed**: speed numbers come from the bundled benchmark harness (`bench/`). Reference: 11 s of audio in ~0.8 s on 4 CPU threads with `tiny.en`.
 
 Mobile (iOS / Android / watchOS) exists as a [design preview](design/mobile/) only — not shipping apps.

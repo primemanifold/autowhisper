@@ -973,3 +973,19 @@ Next:
 - The repository Docker smoke script's Linux compile passed but its filtered
   UI test stopped because the image does not install Xvfb. This is an existing
   script/image mismatch; the new Linux tests were rerun directly and passed.
+
+## Run 2026-07-22 — standalone Fabric transcription provider
+
+- Branched `feat/fabric-transcription-provider` from fetched `origin/core` at
+  `68302286b7097fe9041a453d7d7265a5a8a9e586`; this PR is intentionally
+  separate from the reusable runtime/local protocol PR.
+- Added the pip-installable `autowhisper-fabric` entry-point plugin under
+  `integrations/fabric/`. It registers Fabric's existing transcription ABC,
+  adds no model tool, and uses only non-secret `config.yaml` settings.
+- The provider owns a private stdio child, bounds protocol responses, drains
+  diagnostics, keeps one model warm, serializes calls, restarts on transport
+  failure or model/config changes, and performs bounded graceful shutdown.
+- Verification: 11/11 provider tests with ResourceWarning promoted to error;
+  Ruff clean; sdist/wheel build; installed-wheel discovery through Fabric's
+  real plugin manager; two exact real-speech transcriptions through one warm
+  model using the runtime from PR #24.
