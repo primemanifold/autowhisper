@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import atexit
+import contextlib
+import os
+import subprocess
+import tempfile
 import threading
 from dataclasses import replace
+from pathlib import Path
 from typing import Any, Mapping
 
 from agent.transcription_provider import TranscriptionProvider
@@ -36,6 +41,8 @@ _MODELS = [
     {"id": "large-v3-turbo", "display": "Large v3 Turbo"},
     {"id": "large-v3", "display": "Large v3"},
 ]
+
+_NATIVE_AUDIO_EXTENSIONS = frozenset({".wav", ".mp3", ".flac"})
 
 
 def _load_plugin_config() -> Mapping[str, Any]:
@@ -108,7 +115,8 @@ class AutoWhisperProvider(TranscriptionProvider):
             # and use. The child itself also serializes protocol requests.
             with self._lock:
                 client = self._client_for(settings)
-                result = client.transcribe_file(file_path, language=language)
+                with self._prepared_audio(file_path, settings) as prepared_path:
+                    result = client.transcribe_file(prepared_path, language=language)
             return self._fabric_result(result)
         except (
             ValueError,
@@ -143,6 +151,78 @@ class AutoWhisperProvider(TranscriptionProvider):
             stale.close()
         assert client is not None
         return client
+
+    @contextlib.contextmanager
+    def _prepared_audio(self, file_path: str, settings: ServiceSettings):
+        """Yield a native decoder input, normalizing browser/mobile formats."""
+        input_path = Path(file_path)
+        if input_path.suffix.lower() in _NATIVE_AUDIO_EXTENSIONS:
+            yield str(input_path)
+            return
+
+        ffmpeg = settings.resolve_ffmpeg_executable()
+        if ffmpeg is None:
+            raise AutoWhisperTransportError(
+                "This recording needs ffmpeg conversion, but the configured "
+                f"executable was not found: {settings.ffmpeg_executable}"
+            )
+
+        output_path = ""
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix="autowhisper-fabric-", suffix=".wav", delete=False
+            ) as output:
+                output_path = output.name
+            command = [
+                ffmpeg,
+                "-nostdin",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(input_path),
+                "-t",
+                "3600",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                "-f",
+                "wav",
+                output_path,
+            ]
+            try:
+                completed = subprocess.run(
+                    command,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.PIPE,
+                    timeout=settings.conversion_timeout_seconds,
+                    check=False,
+                )
+            except subprocess.TimeoutExpired as error:
+                raise AutoWhisperTransportError(
+                    "Audio conversion timed out after "
+                    f"{settings.conversion_timeout_seconds:g} seconds"
+                ) from error
+            if completed.returncode != 0:
+                detail = completed.stderr.decode("utf-8", errors="replace").strip()
+                suffix = f": {detail[:1000]}" if detail else ""
+                raise AutoWhisperTransportError(
+                    f"ffmpeg could not decode the recording{suffix}"
+                )
+            if not Path(output_path).is_file() or Path(output_path).stat().st_size == 0:
+                raise AutoWhisperTransportError(
+                    "ffmpeg completed without producing a recording"
+                )
+            yield output_path
+        finally:
+            if output_path:
+                try:
+                    os.unlink(output_path)
+                except OSError:
+                    pass
 
     def _fabric_result(self, result: dict[str, Any]) -> dict[str, Any]:
         status = result["status"]

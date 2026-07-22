@@ -45,11 +45,13 @@ class ServiceSettings:
     """Process and timeout settings loaded from Fabric config.yaml."""
 
     executable: str = "autowhisper"
+    ffmpeg_executable: str = "ffmpeg"
     config_path: str = ""
     device: str = "auto"
     model: str = "distil-small.en"
     startup_timeout_seconds: float = 180.0
     request_timeout_seconds: float = 600.0
+    conversion_timeout_seconds: float = 120.0
     shutdown_timeout_seconds: float = 2.0
 
     @classmethod
@@ -57,6 +59,9 @@ class ServiceSettings:
         config = value if isinstance(value, Mapping) else {}
         settings = cls(
             executable=_string(config, "executable", cls.executable),
+            ffmpeg_executable=_string(
+                config, "ffmpeg_executable", cls.ffmpeg_executable
+            ),
             config_path=_string(config, "config_path", cls.config_path),
             device=_string(config, "device", cls.device),
             model=_string(config, "model", cls.model),
@@ -74,6 +79,13 @@ class ServiceSettings:
                 1.0,
                 3600.0,
             ),
+            conversion_timeout_seconds=_bounded_seconds(
+                config,
+                "conversion_timeout_seconds",
+                cls.conversion_timeout_seconds,
+                1.0,
+                900.0,
+            ),
             shutdown_timeout_seconds=_bounded_seconds(
                 config,
                 "shutdown_timeout_seconds",
@@ -86,18 +98,15 @@ class ServiceSettings:
             raise ValueError("stt.autowhisper.device must be auto, cpu, or cuda")
         if not settings.executable.strip():
             raise ValueError("stt.autowhisper.executable must not be empty")
+        if not settings.ffmpeg_executable.strip():
+            raise ValueError("stt.autowhisper.ffmpeg_executable must not be empty")
         return settings
 
     def resolve_executable(self) -> str | None:
-        candidate = os.path.expanduser(self.executable)
-        if (
-            Path(candidate).is_absolute()
-            or os.sep in candidate
-            or (os.altsep and os.altsep in candidate)
-        ):
-            path = Path(candidate)
-            return str(path) if path.is_file() else None
-        return shutil.which(candidate)
+        return _resolve_executable(self.executable)
+
+    def resolve_ffmpeg_executable(self) -> str | None:
+        return _resolve_executable(self.ffmpeg_executable)
 
     def command(self) -> list[str]:
         executable = self.resolve_executable()
@@ -113,6 +122,18 @@ class ServiceSettings:
         if self.model:
             command.extend(["--model", self.model])
         return command
+
+
+def _resolve_executable(value: str) -> str | None:
+    candidate = os.path.expanduser(value)
+    if (
+        Path(candidate).is_absolute()
+        or os.sep in candidate
+        or (os.altsep and os.altsep in candidate)
+    ):
+        path = Path(candidate)
+        return str(path) if path.is_file() else None
+    return shutil.which(candidate)
 
 
 @dataclass(frozen=True)

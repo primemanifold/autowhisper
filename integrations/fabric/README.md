@@ -36,16 +36,22 @@ stt:
   provider: autowhisper
   autowhisper:
     executable: autowhisper
+    ffmpeg_executable: ffmpeg
     model: distil-small.en
     language: en
     device: auto
     startup_timeout_seconds: 180
     request_timeout_seconds: 600
+    conversion_timeout_seconds: 120
 ```
 
 Set `executable` to the full binary path when AutoWhisper is not on `PATH`, for
 example `/Applications/AutoWhisper.app/Contents/MacOS/autowhisper` on macOS.
 Use `config_path` to select a non-default AutoWhisper TOML configuration.
+Desktop and browser recorders commonly produce WebM/Opus or MP4/AAC. The
+provider invokes `ffmpeg` with an argument vector (never a shell) to normalize
+those formats into a 16-kHz mono temporary WAV, then removes the temporary
+file. WAV, MP3, and FLAC go directly to AutoWhisper.
 
 Changing the selected executable, config, device, or model replaces the child
 process on the next transcription. Normal calls reuse the same process and

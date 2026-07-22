@@ -985,7 +985,13 @@ Next:
 - The provider owns a private stdio child, bounds protocol responses, drains
   diagnostics, keeps one model warm, serializes calls, restarts on transport
   failure or model/config changes, and performs bounded graceful shutdown.
-- Verification: 11/11 provider tests with ResourceWarning promoted to error;
+- Verification: 13/13 provider tests with ResourceWarning promoted to error;
   Ruff clean; sdist/wheel build; installed-wheel discovery through Fabric's
   real plugin manager; two exact real-speech transcriptions through one warm
   model using the runtime from PR #24.
+- Follow-up audit caught the browser-format boundary before handoff: Fabric
+  Desktop records WebM/Opus first, while miniaudio accepts WAV/MP3/FLAC. The
+  provider now normalizes other formats through an explicitly resolved,
+  no-shell ffmpeg argument vector and always removes its temporary WAV.
+  A real WebM/Opus recording then transcribed successfully through the warm
+  runtime, matching Fabric Desktop's preferred MediaRecorder format.

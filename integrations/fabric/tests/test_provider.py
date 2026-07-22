@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from autowhisper_fabric.protocol import AutoWhisperServiceError, ServiceSettings
@@ -94,6 +97,47 @@ class ProviderTests(unittest.TestCase):
         self.assertFalse(response["success"])
         self.assertEqual(response["error_code"], "model_missing")
         self.assertEqual(response["error"], "Download the model")
+
+    def test_converts_webm_to_temporary_wav_and_removes_it(self) -> None:
+        provider = AutoWhisperProvider()
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "recording.webm"
+            source.write_bytes(b"fixture")
+
+            def fake_run(command, **kwargs):
+                self.assertEqual(command[0], "/usr/bin/ffmpeg")
+                self.assertNotIn("sh", command)
+                Path(command[-1]).write_bytes(b"RIFFfixture")
+                return subprocess.CompletedProcess(command, 0, b"", b"")
+
+            settings = ServiceSettings(ffmpeg_executable="/usr/bin/ffmpeg")
+            with (
+                patch.object(
+                    ServiceSettings,
+                    "resolve_ffmpeg_executable",
+                    return_value="/usr/bin/ffmpeg",
+                ),
+                patch(
+                    "autowhisper_fabric.provider.subprocess.run",
+                    side_effect=fake_run,
+                ),
+            ):
+                with provider._prepared_audio(str(source), settings) as prepared:
+                    prepared_path = Path(prepared)
+                    self.assertEqual(prepared_path.suffix, ".wav")
+                    self.assertTrue(prepared_path.exists())
+                self.assertFalse(prepared_path.exists())
+        provider.close()
+
+    def test_native_decoder_formats_skip_conversion(self) -> None:
+        provider = AutoWhisperProvider()
+        with patch("autowhisper_fabric.provider.subprocess.run") as run:
+            with provider._prepared_audio(
+                "/tmp/recording.flac", ServiceSettings()
+            ) as prepared:
+                self.assertEqual(prepared, "/tmp/recording.flac")
+        provider.close()
+        run.assert_not_called()
 
 
 if __name__ == "__main__":
