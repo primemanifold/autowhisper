@@ -7,11 +7,13 @@
 #include <toml++/toml.hpp>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -78,6 +80,22 @@ std::vector<std::string> get_string_array(const toml::table& tbl, const std::str
     return def;
 }
 
+std::vector<std::string> get_string_array_allow_empty(
+    const toml::table& tbl, const std::string& key,
+    const std::vector<std::string>& def) {
+    auto node = tbl[key];
+    if (!node) return def;
+    if (auto val = node.value<std::string>()) return {*val};
+    if (auto arr = node.as_array()) {
+        std::vector<std::string> result;
+        for (const auto& elem : *arr) {
+            if (auto val = elem.value<std::string>()) result.push_back(*val);
+        }
+        return result;
+    }
+    return def;
+}
+
 ValidationIssue make_issue(ValidationSeverity severity, std::string path,
                            std::string code, std::string message) {
     return ValidationIssue{severity, std::move(path), std::move(code), std::move(message)};
@@ -94,6 +112,56 @@ bool is_allowed_enum(std::string_view section, std::string_view key, const std::
     return std::any_of(d->enum_values.begin(), d->enum_values.end(), [&](auto allowed) {
         return value == allowed;
     });
+}
+
+struct CanonicalHotkey {
+    std::vector<std::string> modifiers;
+    std::string key;
+};
+
+CanonicalHotkey canonical_hotkey(std::string value) {
+    CanonicalHotkey result;
+    std::istringstream stream(value);
+    std::string token;
+    while (std::getline(stream, token, '+')) {
+        token.erase(std::remove_if(token.begin(), token.end(), [](unsigned char ch) {
+            return std::isspace(ch);
+        }), token.end());
+        std::transform(token.begin(), token.end(), token.begin(), [](unsigned char ch) {
+            return static_cast<char>(std::tolower(ch));
+        });
+        if (token == "control") token = "ctrl";
+        if (token == "option") token = "alt";
+        if (token == "win" || token == "cmd" || token == "meta") token = "super";
+        if (token == "ctrl" || token == "alt" || token == "shift" || token == "super") {
+            result.modifiers.push_back(token);
+        } else if (!token.empty()) {
+            result.key = token;
+        }
+    }
+    std::sort(result.modifiers.begin(), result.modifiers.end());
+    result.modifiers.erase(
+        std::unique(result.modifiers.begin(), result.modifiers.end()),
+        result.modifiers.end());
+    return result;
+}
+
+bool hotkeys_conflict(const std::string& first, const std::string& second) {
+    const CanonicalHotkey left = canonical_hotkey(first);
+    const CanonicalHotkey right = canonical_hotkey(second);
+    if (left.modifiers == right.modifiers && left.key == right.key) return true;
+
+    // A modifier-only chord fires as soon as its modifiers are held. If that
+    // set is contained in the other chord, it can start one mode before the
+    // other chord's final modifier/key arrives, making mode selection depend
+    // on key order. Reject that ambiguity at the settings boundary.
+    auto shadows = [](const CanonicalHotkey& modifier_only,
+                      const CanonicalHotkey& other) {
+        return modifier_only.key.empty() &&
+               std::includes(other.modifiers.begin(), other.modifiers.end(),
+                             modifier_only.modifiers.begin(), modifier_only.modifiers.end());
+    };
+    return shadows(left, right) || shadows(right, left);
 }
 
 std::string find_bundled_config_file() {
@@ -214,8 +282,18 @@ ConfigLoadResult Config::load_with_diagnostics(const std::string& path) {
     if (auto hotkeys = tbl["hotkeys"].as_table()) {
         config.hotkeys.mode = get_or(*hotkeys, "mode", config.hotkeys.mode);
         config.hotkeys.trigger = get_string_array(*hotkeys, "trigger", config.hotkeys.trigger);
+        config.hotkeys.ask_trigger = get_string_array_allow_empty(
+            *hotkeys, "ask_trigger", config.hotkeys.ask_trigger);
         config.hotkeys.cancel = get_string_array(*hotkeys, "cancel", config.hotkeys.cancel);
         config.hotkeys.escape_to_cancel = get_or(*hotkeys, "escape_to_cancel", config.hotkeys.escape_to_cancel);
+    }
+
+    // [fabric]
+    if (auto fabric = tbl["fabric"].as_table()) {
+        config.fabric.enabled = get_or(*fabric, "enabled", config.fabric.enabled);
+        config.fabric.executable = get_or(*fabric, "executable", config.fabric.executable);
+        config.fabric.timeout_seconds =
+            get_or(*fabric, "timeout_seconds", config.fabric.timeout_seconds);
     }
 
     // [output]
@@ -346,10 +424,45 @@ std::vector<ValidationIssue> Config::validate_all() const {
             add_error(issues, "hotkeys.trigger", "empty_entry", "Invalid hotkeys.trigger: empty key entry");
         }
     }
+    for (const auto& key : hotkeys.ask_trigger) {
+        if (key.empty()) {
+            add_error(issues, "hotkeys.ask_trigger", "empty_entry",
+                      "Invalid hotkeys.ask_trigger: empty key entry");
+        }
+        const auto overlaps_dictate = std::any_of(
+            hotkeys.trigger.begin(), hotkeys.trigger.end(), [&](const std::string& dictate) {
+                return hotkeys_conflict(dictate, key);
+            });
+        if (overlaps_dictate) {
+            add_error(issues, "hotkeys.ask_trigger", "overlapping_trigger",
+                      "Ask Fabric and Dictate hotkeys must not overlap or shadow each other");
+        }
+        const auto overlaps_cancel = std::any_of(
+            hotkeys.cancel.begin(), hotkeys.cancel.end(), [&](const std::string& cancel) {
+                return !key.empty() && !cancel.empty() && hotkeys_conflict(cancel, key);
+            });
+        if (overlaps_cancel) {
+            add_error(issues, "hotkeys.ask_trigger", "overlapping_cancel",
+                      "Ask Fabric and cancel hotkeys must not overlap");
+        }
+    }
     for (const auto& key : hotkeys.cancel) {
         if (key.empty()) {
             add_error(issues, "hotkeys.cancel", "empty_entry", "Invalid hotkeys.cancel: empty key entry");
         }
+    }
+
+    if (fabric.enabled && hotkeys.ask_trigger.empty()) {
+        add_error(issues, "hotkeys.ask_trigger", "missing_required",
+                  "Ask Fabric requires at least one hotkeys.ask_trigger");
+    }
+    if (fabric.executable.empty()) {
+        add_error(issues, "fabric.executable", "empty_value",
+                  "Invalid fabric.executable: cannot be empty");
+    }
+    if (fabric.timeout_seconds < 1 || fabric.timeout_seconds > 600) {
+        add_error(issues, "fabric.timeout_seconds", "out_of_range",
+                  "Invalid fabric.timeout_seconds: must be between 1 and 600");
     }
 
     if (!is_allowed_enum("output", "method", output.method)) {
@@ -475,13 +588,23 @@ void Config::save(const std::string& path) const {
     // [hotkeys]
     toml::array trigger_arr;
     for (const auto& t : hotkeys.trigger) trigger_arr.push_back(t);
+    toml::array ask_trigger_arr;
+    for (const auto& t : hotkeys.ask_trigger) ask_trigger_arr.push_back(t);
     toml::array cancel_arr;
     for (const auto& c : hotkeys.cancel) cancel_arr.push_back(c);
     tbl.insert("hotkeys", toml::table{
         {"mode", hotkeys.mode},
         {"trigger", std::move(trigger_arr)},
+        {"ask_trigger", std::move(ask_trigger_arr)},
         {"cancel", std::move(cancel_arr)},
         {"escape_to_cancel", hotkeys.escape_to_cancel},
+    });
+
+    // [fabric]
+    tbl.insert("fabric", toml::table{
+        {"enabled", fabric.enabled},
+        {"executable", fabric.executable},
+        {"timeout_seconds", static_cast<int64_t>(fabric.timeout_seconds)},
     });
 
     // [output]

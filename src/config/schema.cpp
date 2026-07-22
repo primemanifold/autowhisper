@@ -67,11 +67,21 @@ const std::vector<KeyDef>& table() {
             std::nullopt, std::nullopt,
             "Hotkey activation mode."},
         {"hotkeys", "trigger", Type::StringArray, V{}, std::nullopt, std::nullopt,
-            "One or more trigger hotkeys, e.g. ['shift+super']."},
+            "Dictate hotkeys. Transcripts are inserted locally and never sent to Fabric."},
+        {"hotkeys", "ask_trigger", Type::StringArray, V{}, std::nullopt, std::nullopt,
+            "Ask Fabric hotkeys. Active only when fabric.enabled is true."},
         {"hotkeys", "cancel", Type::StringArray, V{}, std::nullopt, std::nullopt,
             "Cancel hotkeys, e.g. ['esc']."},
         {"hotkeys", "escape_to_cancel", Type::Bool, V{}, std::nullopt, std::nullopt,
             "Treat Escape as cancel."},
+
+        // [fabric]
+        {"fabric", "enabled", Type::Bool, V{}, std::nullopt, std::nullopt,
+            "Opt in to Ask Fabric. Dictate mode remains local when this is enabled."},
+        {"fabric", "executable", Type::String, V{}, std::nullopt, std::nullopt,
+            "Fabric CLI executable name or absolute path."},
+        {"fabric", "timeout_seconds", Type::Int, V{}, 1.0, 600.0,
+            "Maximum time to wait for an Ask Fabric response."},
 
         // [output]
         {"output", "method", Type::Enum,

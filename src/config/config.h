@@ -31,8 +31,16 @@ struct AudioConfig {
 struct HotkeyConfig {
     std::string mode = "push_to_talk";
     std::vector<std::string> trigger = {"shift+super"};
+    std::vector<std::string> ask_trigger = {"ctrl+alt+space"};
     std::vector<std::string> cancel = {"esc"};
     bool escape_to_cancel = true;
+};
+
+struct FabricConfig {
+    // Explicit opt-in: normal dictation never invokes Fabric.
+    bool enabled = false;
+    std::string executable = "fabric";
+    int timeout_seconds = 120;
 };
 
 struct OutputConfig {
@@ -100,6 +108,7 @@ struct Config {
     ModelConfig model;
     AudioConfig audio;
     HotkeyConfig hotkeys;
+    FabricConfig fabric;
     OutputConfig output;
     FormattingConfig formatting;
     FeedbackConfig feedback;

@@ -9,6 +9,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <functional>
+#include <mutex>
+#include <thread>
 
 #ifndef _WIN32
 #include <errno.h>
@@ -68,9 +71,22 @@ inline bool wait_for_child_with_deadline(pid_t pid,
     }
 }
 
+inline void append_bounded(std::string& destination, const char* data,
+                           std::size_t size, std::size_t limit,
+                           std::size_t& captured, bool& truncated) {
+    const std::size_t remaining = captured < limit ? limit - captured : 0;
+    const std::size_t accepted = std::min(size, remaining);
+    if (accepted > 0) {
+        destination.append(data, accepted);
+        captured += accepted;
+    }
+    if (accepted < size) truncated = true;
+}
+
 }  // namespace
 
-ProcessResult run_command(const std::vector<std::string>& args, int timeout_seconds) {
+ProcessResult run_command(const std::vector<std::string>& args, int timeout_seconds,
+                          std::size_t max_output_bytes) {
     ProcessResult result;
     if (args.empty()) return result;
 
@@ -131,6 +147,7 @@ ProcessResult run_command(const std::vector<std::string>& args, int timeout_seco
 
     bool stdout_done = false;
     bool stderr_done = false;
+    std::size_t captured = 0;
 
     while (!stdout_done || !stderr_done) {
         auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -172,10 +189,13 @@ ProcessResult run_command(const std::vector<std::string>& args, int timeout_seco
             if (active_fds[i].revents & POLLIN) {
                 ssize_t n = read(active_fds[i].fd, buf.data(), buf.size());
                 if (n > 0) {
-                    if (active_fds[i].fd == stdout_pipe[0])
-                        result.stdout_str.append(buf.data(), n);
-                    else
-                        result.stderr_str.append(buf.data(), n);
+                    if (active_fds[i].fd == stdout_pipe[0]) {
+                        append_bounded(result.stdout_str, buf.data(), static_cast<std::size_t>(n),
+                                       max_output_bytes, captured, result.output_truncated);
+                    } else {
+                        append_bounded(result.stderr_str, buf.data(), static_cast<std::size_t>(n),
+                                       max_output_bytes, captured, result.output_truncated);
+                    }
                 } else {
                     if (active_fds[i].fd == stdout_pipe[0]) stdout_done = true;
                     else stderr_done = true;
@@ -185,10 +205,13 @@ ProcessResult run_command(const std::vector<std::string>& args, int timeout_seco
                 // Read remaining data
                 ssize_t n;
                 while ((n = read(active_fds[i].fd, buf.data(), buf.size())) > 0) {
-                    if (active_fds[i].fd == stdout_pipe[0])
-                        result.stdout_str.append(buf.data(), n);
-                    else
-                        result.stderr_str.append(buf.data(), n);
+                    if (active_fds[i].fd == stdout_pipe[0]) {
+                        append_bounded(result.stdout_str, buf.data(), static_cast<std::size_t>(n),
+                                       max_output_bytes, captured, result.output_truncated);
+                    } else {
+                        append_bounded(result.stderr_str, buf.data(), static_cast<std::size_t>(n),
+                                       max_output_bytes, captured, result.output_truncated);
+                    }
                 }
                 if (active_fds[i].fd == stdout_pipe[0]) stdout_done = true;
                 else stderr_done = true;
@@ -215,7 +238,8 @@ ProcessResult run_command(const std::vector<std::string>& args, int timeout_seco
 
 ProcessResult run_command_with_input(const std::vector<std::string>& args,
                                      const std::string& input,
-                                     int timeout_seconds) {
+                                     int timeout_seconds,
+                                     std::size_t max_output_bytes) {
     ProcessResult result;
     if (args.empty()) return result;
 
@@ -284,6 +308,7 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
     bool stderr_done = false;
     bool child_exited = false;
     int child_status = 0;
+    std::size_t captured = 0;
 
     if (stdin_done) {
         close_fd(stdin_pipe[1]);
@@ -377,9 +402,11 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
                     ssize_t n = read(fd, buf.data(), buf.size());
                     if (n > 0) {
                         if (fd == stdout_pipe[0]) {
-                            result.stdout_str.append(buf.data(), n);
+                            append_bounded(result.stdout_str, buf.data(), static_cast<std::size_t>(n),
+                                           max_output_bytes, captured, result.output_truncated);
                         } else {
-                            result.stderr_str.append(buf.data(), n);
+                            append_bounded(result.stderr_str, buf.data(), static_cast<std::size_t>(n),
+                                           max_output_bytes, captured, result.output_truncated);
                         }
                         continue;
                     }
@@ -428,12 +455,14 @@ ProcessResult run_command_with_input(const std::vector<std::string>& args,
                 ssize_t n;
                 if (stdout_pipe[0] >= 0) {
                     while ((n = read(stdout_pipe[0], buf.data(), buf.size())) > 0) {
-                        result.stdout_str.append(buf.data(), n);
+                        append_bounded(result.stdout_str, buf.data(), static_cast<std::size_t>(n),
+                                       max_output_bytes, captured, result.output_truncated);
                     }
                 }
                 if (stderr_pipe[0] >= 0) {
                     while ((n = read(stderr_pipe[0], buf.data(), buf.size())) > 0) {
-                        result.stderr_str.append(buf.data(), n);
+                        append_bounded(result.stderr_str, buf.data(), static_cast<std::size_t>(n),
+                                       max_output_bytes, captured, result.output_truncated);
                     }
                 }
                 close_fd(stdin_pipe[1]);
@@ -485,20 +514,222 @@ int run_passthrough(const std::vector<std::string>& args) {
 
 #else // _WIN32
 
-ProcessResult run_command(const std::vector<std::string>& args, int timeout_seconds) {
+namespace {
+
+void append_bounded_windows(std::string& destination, const char* data,
+                            std::size_t size, std::size_t limit,
+                            std::size_t& captured, bool& truncated) {
+    const std::size_t remaining = captured < limit ? limit - captured : 0;
+    const std::size_t accepted = std::min(size, remaining);
+    if (accepted > 0) {
+        destination.append(data, accepted);
+        captured += accepted;
+    }
+    if (accepted < size) truncated = true;
+}
+
+std::wstring utf8_to_wide(const std::string& value) {
+    if (value.empty()) return {};
+    const int size = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                                         value.data(), static_cast<int>(value.size()),
+                                         nullptr, 0);
+    if (size <= 0) return {};
+    std::wstring wide(static_cast<std::size_t>(size), L'\0');
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
+                            value.data(), static_cast<int>(value.size()),
+                            wide.data(), size) <= 0) {
+        return {};
+    }
+    return wide;
+}
+
+std::wstring quote_windows_arg(const std::wstring& value) {
+    if (!value.empty() && value.find_first_of(L" \t\n\v\"") == std::wstring::npos) {
+        return value;
+    }
+
+    std::wstring quoted = L"\"";
+    std::size_t backslashes = 0;
+    for (wchar_t ch : value) {
+        if (ch == L'\\') {
+            ++backslashes;
+            continue;
+        }
+        if (ch == L'\"') {
+            quoted.append(backslashes * 2 + 1, L'\\');
+            quoted.push_back(ch);
+            backslashes = 0;
+            continue;
+        }
+        quoted.append(backslashes, L'\\');
+        backslashes = 0;
+        quoted.push_back(ch);
+    }
+    quoted.append(backslashes * 2, L'\\');
+    quoted.push_back(L'\"');
+    return quoted;
+}
+
+ProcessResult run_process_windows(const std::vector<std::string>& args,
+                                  const std::string& input,
+                                  int timeout_seconds,
+                                  std::size_t max_output_bytes) {
     ProcessResult result;
-    // Windows implementation placeholder
-    result.exit_code = -1;
-    result.stderr_str = "not implemented on Windows";
+    if (args.empty()) return result;
+
+    std::wstring command_line;
+    for (const auto& arg : args) {
+        std::wstring wide = utf8_to_wide(arg);
+        if (wide.empty() && !arg.empty()) {
+            result.stderr_str = "invalid_utf8_argument";
+            return result;
+        }
+        if (!command_line.empty()) command_line.push_back(L' ');
+        command_line += quote_windows_arg(wide);
+    }
+    std::vector<wchar_t> mutable_command(command_line.begin(), command_line.end());
+    mutable_command.push_back(L'\0');
+
+    SECURITY_ATTRIBUTES security{};
+    security.nLength = sizeof(security);
+    security.bInheritHandle = TRUE;
+
+    HANDLE child_stdin_read = nullptr;
+    HANDLE parent_stdin_write = nullptr;
+    HANDLE parent_stdout_read = nullptr;
+    HANDLE child_stdout_write = nullptr;
+    HANDLE parent_stderr_read = nullptr;
+    HANDLE child_stderr_write = nullptr;
+
+    auto close_handle = [](HANDLE& handle) {
+        if (handle) {
+            CloseHandle(handle);
+            handle = nullptr;
+        }
+    };
+    auto close_pipes = [&]() {
+        close_handle(child_stdin_read);
+        close_handle(parent_stdin_write);
+        close_handle(parent_stdout_read);
+        close_handle(child_stdout_write);
+        close_handle(parent_stderr_read);
+        close_handle(child_stderr_write);
+    };
+
+    if (!CreatePipe(&child_stdin_read, &parent_stdin_write, &security, 0) ||
+        !CreatePipe(&parent_stdout_read, &child_stdout_write, &security, 0) ||
+        !CreatePipe(&parent_stderr_read, &child_stderr_write, &security, 0)) {
+        close_pipes();
+        result.stderr_str = "pipe_error";
+        return result;
+    }
+    SetHandleInformation(parent_stdin_write, HANDLE_FLAG_INHERIT, 0);
+    SetHandleInformation(parent_stdout_read, HANDLE_FLAG_INHERIT, 0);
+    SetHandleInformation(parent_stderr_read, HANDLE_FLAG_INHERIT, 0);
+
+    STARTUPINFOW startup{};
+    startup.cb = sizeof(startup);
+    startup.dwFlags = STARTF_USESTDHANDLES;
+    startup.hStdInput = child_stdin_read;
+    startup.hStdOutput = child_stdout_write;
+    startup.hStdError = child_stderr_write;
+    PROCESS_INFORMATION process{};
+
+    const BOOL created = CreateProcessW(
+        nullptr, mutable_command.data(), nullptr, nullptr, TRUE,
+        CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process);
+    if (!created) {
+        const DWORD error = GetLastError();
+        close_pipes();
+        result.stderr_str = "create_process_failed:" + std::to_string(error);
+        return result;
+    }
+
+    close_handle(child_stdin_read);
+    close_handle(child_stdout_write);
+    close_handle(child_stderr_write);
+
+    std::mutex capture_mutex;
+    std::size_t captured = 0;
+    auto reader = [&](HANDLE handle, std::string& destination) {
+        std::array<char, 4096> buffer{};
+        DWORD count = 0;
+        while (ReadFile(handle, buffer.data(), static_cast<DWORD>(buffer.size()), &count, nullptr) &&
+               count > 0) {
+            std::lock_guard<std::mutex> lock(capture_mutex);
+            append_bounded_windows(destination, buffer.data(), static_cast<std::size_t>(count),
+                                   max_output_bytes, captured, result.output_truncated);
+        }
+        CloseHandle(handle);
+    };
+    auto writer = [&](HANDLE handle) {
+        std::size_t offset = 0;
+        while (offset < input.size()) {
+            DWORD written = 0;
+            const DWORD chunk = static_cast<DWORD>(
+                std::min<std::size_t>(4096, input.size() - offset));
+            if (!WriteFile(handle, input.data() + offset, chunk, &written, nullptr) ||
+                written == 0) {
+                break;
+            }
+            offset += written;
+        }
+        CloseHandle(handle);
+    };
+
+    std::thread stdout_thread(reader, parent_stdout_read, std::ref(result.stdout_str));
+    std::thread stderr_thread(reader, parent_stderr_read, std::ref(result.stderr_str));
+    std::thread stdin_thread(writer, parent_stdin_write);
+    parent_stdout_read = nullptr;
+    parent_stderr_read = nullptr;
+    parent_stdin_write = nullptr;
+
+    const DWORD wait_ms = timeout_seconds <= 0
+        ? 0
+        : static_cast<DWORD>(std::min<long long>(
+              static_cast<long long>(timeout_seconds) * 1000,
+              static_cast<long long>(INFINITE - 1)));
+    const DWORD wait_result = WaitForSingleObject(process.hProcess, wait_ms);
+    const bool timed_out = wait_result == WAIT_TIMEOUT;
+    const bool wait_failed = wait_result != WAIT_OBJECT_0 && !timed_out;
+    if (timed_out || wait_failed) {
+        TerminateProcess(process.hProcess, 1);
+        WaitForSingleObject(process.hProcess, INFINITE);
+    }
+
+    DWORD exit_code = 1;
+    GetExitCodeProcess(process.hProcess, &exit_code);
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+
+    stdin_thread.join();
+    stdout_thread.join();
+    stderr_thread.join();
+
+    if (timed_out) {
+        result.exit_code = -1;
+        result.stderr_str = "timeout";
+    } else if (wait_result == WAIT_OBJECT_0) {
+        result.exit_code = static_cast<int>(exit_code);
+    } else if (wait_failed) {
+        result.exit_code = -1;
+        result.stderr_str = "wait_error";
+    }
     return result;
+}
+
+}  // namespace
+
+ProcessResult run_command(const std::vector<std::string>& args, int timeout_seconds,
+                          std::size_t max_output_bytes) {
+    return run_process_windows(args, "", timeout_seconds, max_output_bytes);
 }
 
 ProcessResult run_command_with_input(const std::vector<std::string>& args,
                                      const std::string& input,
-                                     int timeout_seconds) {
-    ProcessResult result;
-    result.exit_code = -1;
-    return result;
+                                     int timeout_seconds,
+                                     std::size_t max_output_bytes) {
+    return run_process_windows(args, input, timeout_seconds, max_output_bytes);
 }
 
 int run_passthrough(const std::vector<std::string>& args) {

@@ -78,8 +78,14 @@ compute_type = "float16"
 
 [hotkeys]
 trigger = ["shift+super"]    # "super" = Command key
+ask_trigger = ["ctrl+alt+space"]
 # If ⇧⌘ conflicts with Spotlight or Input sources, try ["ctrl+space"] or
 # a Function-row key like ["f13"].
+
+[fabric]
+enabled = false              # opt in after installing/configuring Fabric
+executable = "fabric"
+timeout_seconds = 120
 ```
 
 ## Troubleshooting

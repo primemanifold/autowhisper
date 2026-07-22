@@ -16,6 +16,8 @@ namespace autowhisper {
 enum class HotkeyEvent {
     START,
     STOP,
+    ASK_START,
+    ASK_STOP,
     CANCEL,
 };
 
@@ -63,10 +65,19 @@ private:
     HotkeyConfig config_;
     EventCallback callback_;
     std::vector<KeyCombo> trigger_combos_;
+    std::vector<KeyCombo> ask_trigger_combos_;
     std::vector<KeyCombo> cancel_combos_;
     std::set<std::string> pressed_modifiers_;
     bool trigger_pressed_ = false;
-    std::optional<KeyCombo> active_trigger_;
+    enum class TriggerTarget {
+        DICTATE,
+        ASK_FABRIC,
+    };
+    struct TriggerMatch {
+        KeyCombo combo;
+        TriggerTarget target = TriggerTarget::DICTATE;
+    };
+    std::optional<TriggerMatch> active_trigger_;
     std::atomic<bool> running_{false};
 
     // Platform-specific implementation
@@ -74,9 +85,11 @@ private:
     std::unique_ptr<Impl> impl_;
 
     void send_event(HotkeyEvent event);
-    std::optional<KeyCombo> check_any_trigger(const std::string& key_name = "") const;
+    std::optional<TriggerMatch> check_any_trigger(const std::string& key_name = "") const;
     bool check_any_cancel(const std::string& key_name) const;
     bool check_combo(const KeyCombo& combo, const std::string& key_name) const;
+    static HotkeyEvent start_event(TriggerTarget target);
+    static HotkeyEvent stop_event(TriggerTarget target);
 
     // Called by platform impl
     void on_modifier_press(const std::string& modifier);

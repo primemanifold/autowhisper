@@ -87,6 +87,7 @@ HotkeyManager::HotkeyManager(const HotkeyConfig& config, EventCallback callback)
       impl_(std::make_unique<Impl>()) {
     impl_->manager = this;
     for (const auto& t : config.trigger) trigger_combos_.push_back(KeyCombo::parse(t));
+    for (const auto& t : config.ask_trigger) ask_trigger_combos_.push_back(KeyCombo::parse(t));
     for (const auto& c : config.cancel) cancel_combos_.push_back(KeyCombo::parse(c));
 }
 

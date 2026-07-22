@@ -58,6 +58,7 @@ find_package(Threads REQUIRED)
 set(CORE_LIB_SOURCES
     src/config/config.cpp
     src/config/schema.cpp
+    src/fabric/fabric_client.cpp
     src/hotkey/hotkey_common.cpp
     src/models/models.cpp
     src/platform/capabilities.cpp
@@ -310,6 +311,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_avatar.cpp
         tests/cpp/test_audio_file.cpp
         tests/cpp/test_config.cpp
+        tests/cpp/test_fabric_client.cpp
         tests/cpp/test_keycombo.cpp
         tests/cpp/test_logging.cpp
         tests/cpp/test_models.cpp

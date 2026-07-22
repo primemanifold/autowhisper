@@ -94,9 +94,17 @@ TEST_CASE("Config::default_config returns valid defaults", "[config]") {
         CHECK(cfg.hotkeys.mode == "push_to_talk");
         REQUIRE(cfg.hotkeys.trigger.size() == 1);
         CHECK(cfg.hotkeys.trigger[0] == "shift+super");
+        REQUIRE(cfg.hotkeys.ask_trigger.size() == 1);
+        CHECK(cfg.hotkeys.ask_trigger[0] == "ctrl+alt+space");
         REQUIRE(cfg.hotkeys.cancel.size() == 1);
         CHECK(cfg.hotkeys.cancel[0] == "esc");
         CHECK(cfg.hotkeys.escape_to_cancel == true);
+    }
+
+    SECTION("Fabric defaults are opt-in") {
+        CHECK_FALSE(cfg.fabric.enabled);
+        CHECK(cfg.fabric.executable == "fabric");
+        CHECK(cfg.fabric.timeout_seconds == 120);
     }
 
     SECTION("output defaults") {
@@ -211,6 +219,43 @@ TEST_CASE("Config::validate rejects invalid hotkey mode", "[config][validate]") 
     auto cfg = Config::default_config();
     cfg.hotkeys.mode = "hold";
     REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("Invalid hotkey mode"));
+}
+
+TEST_CASE("Config::validate protects Ask Fabric mode boundaries", "[config][validate]") {
+    auto cfg = Config::default_config();
+
+    SECTION("enabled requires an Ask Fabric hotkey") {
+        cfg.fabric.enabled = true;
+        cfg.hotkeys.ask_trigger.clear();
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("requires at least one"));
+    }
+
+    SECTION("Dictate and Ask Fabric hotkeys cannot overlap") {
+        cfg.hotkeys.trigger = {"shift+super"};
+        cfg.hotkeys.ask_trigger = {"cmd + shift"};
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("must not overlap"));
+    }
+
+    SECTION("modifier-only Dictate cannot shadow Ask Fabric") {
+        cfg.hotkeys.trigger = {"ctrl+alt"};
+        cfg.hotkeys.ask_trigger = {"ctrl+alt+space"};
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("shadow"));
+    }
+
+    SECTION("Ask Fabric cannot overlap cancel") {
+        cfg.hotkeys.cancel = {"ctrl+alt+space"};
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("cancel hotkeys"));
+    }
+
+    SECTION("Fabric executable is required") {
+        cfg.fabric.executable.clear();
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("fabric.executable"));
+    }
+
+    SECTION("Fabric timeout is bounded") {
+        cfg.fabric.timeout_seconds = 601;
+        REQUIRE_THROWS_WITH(cfg.validate(), ContainsSubstring("fabric.timeout_seconds"));
+    }
 }
 
 TEST_CASE("Config::validate rejects invalid output method", "[config][validate]") {
@@ -558,8 +603,14 @@ mute_other_apps = true
 [hotkeys]
 mode = "toggle"
 trigger = ["ctrl+space"]
+ask_trigger = ["ctrl+alt+space"]
 cancel = ["esc"]
 escape_to_cancel = false
+
+[fabric]
+enabled = true
+executable = "/usr/local/bin/fabric"
+timeout_seconds = 45
 
 [output]
 method = "clipboard"
@@ -598,7 +649,11 @@ enabled = false
         CHECK(cfg.hotkeys.mode == "toggle");
         REQUIRE(cfg.hotkeys.trigger.size() == 1);
         CHECK(cfg.hotkeys.trigger[0] == "ctrl+space");
+        CHECK(cfg.hotkeys.ask_trigger == std::vector<std::string>{"ctrl+alt+space"});
         CHECK(cfg.hotkeys.escape_to_cancel == false);
+        CHECK(cfg.fabric.enabled);
+        CHECK(cfg.fabric.executable == "/usr/local/bin/fabric");
+        CHECK(cfg.fabric.timeout_seconds == 45);
         CHECK(cfg.output.method == "clipboard");
         CHECK(cfg.output.auto_paste == false);
         CHECK(cfg.output.ending_action == "newline");
@@ -654,6 +709,19 @@ trigger = ["ctrl+space", "shift+super"]
         CHECK(cfg.hotkeys.trigger[0] == "ctrl+space");
         CHECK(cfg.hotkeys.trigger[1] == "shift+super");
     }
+
+    SECTION("disabled Ask Fabric accepts an explicitly empty shortcut list") {
+        TempFile tmp(R"(
+[hotkeys]
+ask_trigger = []
+
+[fabric]
+enabled = false
+)");
+        auto cfg = Config::load(tmp.path.string());
+        CHECK(cfg.hotkeys.ask_trigger.empty());
+        REQUIRE_NOTHROW(cfg.validate());
+    }
 }
 
 
@@ -695,8 +763,12 @@ TEST_CASE("Config round-trip save/load preserves values", "[config][io]") {
     original.audio.mute_other_apps = true;
     original.hotkeys.mode = "toggle";
     original.hotkeys.trigger = {"ctrl+space", "shift+super"};
+    original.hotkeys.ask_trigger = {"ctrl+alt+space", "f13"};
     original.hotkeys.cancel = {"esc", "ctrl+c"};
     original.hotkeys.escape_to_cancel = false;
+    original.fabric.enabled = true;
+    original.fabric.executable = "/opt/fabric/bin/fabric";
+    original.fabric.timeout_seconds = 90;
     original.output.method = "clipboard";
     original.output.auto_paste = false;
     original.output.paste_delay = 0.2f;
@@ -732,8 +804,12 @@ TEST_CASE("Config round-trip save/load preserves values", "[config][io]") {
     CHECK(loaded.audio.mute_other_apps == original.audio.mute_other_apps);
     CHECK(loaded.hotkeys.mode == original.hotkeys.mode);
     CHECK(loaded.hotkeys.trigger == original.hotkeys.trigger);
+    CHECK(loaded.hotkeys.ask_trigger == original.hotkeys.ask_trigger);
     CHECK(loaded.hotkeys.cancel == original.hotkeys.cancel);
     CHECK(loaded.hotkeys.escape_to_cancel == original.hotkeys.escape_to_cancel);
+    CHECK(loaded.fabric.enabled == original.fabric.enabled);
+    CHECK(loaded.fabric.executable == original.fabric.executable);
+    CHECK(loaded.fabric.timeout_seconds == original.fabric.timeout_seconds);
     CHECK(loaded.output.method == original.output.method);
     CHECK(loaded.output.auto_paste == original.output.auto_paste);
     CHECK(loaded.output.paste_delay == Approx(original.output.paste_delay));

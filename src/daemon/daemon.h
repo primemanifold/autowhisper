@@ -4,6 +4,7 @@
 #include "audio/audio.h"
 #include "avatar/avatar.h"
 #include "feedback/feedback.h"
+#include "fabric/fabric_client.h"
 #include "hotkey/hotkey.h"
 #include "inference/inference.h"
 #include "output/output.h"
@@ -29,6 +30,11 @@ enum class DaemonState {
     SHUTDOWN,
 };
 
+enum class CaptureMode {
+    DICTATE,
+    ASK_FABRIC,
+};
+
 class AutoWhisperDaemon {
 public:
     AutoWhisperDaemon(Config config, const std::string& config_path = "");
@@ -45,6 +51,8 @@ private:
     Config config_;
     std::string config_path_;
     std::atomic<DaemonState> state_{DaemonState::IDLE};
+    CaptureMode active_mode_ = CaptureMode::DICTATE;
+    FabricConfig active_fabric_config_;
 
     // Live config reload: the settings UI writes config.toml from a separate
     // process, so the daemon polls the file's mtime and re-applies hotkey
@@ -73,8 +81,9 @@ private:
     static constexpr float MIN_DURATION = 0.5f;
 
     void process_events();
-    void handle_start();
-    void handle_stop();
+    HotkeyConfig effective_hotkey_config() const;
+    void handle_start(CaptureMode mode);
+    void handle_stop(CaptureMode mode);
     void handle_cancel();
     void on_hotkey_event(HotkeyEvent event);
     void request_shutdown();

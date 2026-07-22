@@ -21,6 +21,7 @@
 #include <csignal>
 #include <cstdlib>
 
+#include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
@@ -125,9 +126,21 @@ struct EventSink {
         return cv.wait_for(lock, timeout, [&] { return events.size() >= n; });
     }
 
+    bool wait_for_event(HotkeyEvent expected, std::chrono::milliseconds timeout) {
+        std::unique_lock<std::mutex> lock(mutex);
+        return cv.wait_for(lock, timeout, [&] {
+            return std::find(events.begin(), events.end(), expected) != events.end();
+        });
+    }
+
     std::vector<HotkeyEvent> snapshot() {
         std::lock_guard<std::mutex> lock(mutex);
         return events;
+    }
+
+    void clear() {
+        std::lock_guard<std::mutex> lock(mutex);
+        events.clear();
     }
 };
 
@@ -135,7 +148,7 @@ void fake_key(Display* dpy, KeySym sym, bool press) {
     KeyCode code = XKeysymToKeycode(dpy, sym);
     REQUIRE(code != 0);
     XTestFakeKeyEvent(dpy, code, press ? True : False, CurrentTime);
-    XFlush(dpy);
+    XSync(dpy, False);
 }
 
 HotkeyConfig push_to_talk_config() {
@@ -191,6 +204,21 @@ TEST_CASE("X11 push-to-talk delivers START/STOP and stop() is bounded",
     CHECK(sink.snapshot()[1] == HotkeyEvent::STOP);
 
     fake_key(client, XK_Control_L, false);
+    std::this_thread::sleep_for(200ms);
+    sink.clear();
+
+    // The opt-in Ask Fabric binding is a distinct event pair. The daemon can
+    // latch this mode before recording and cannot silently fall back to
+    // Dictate based on transcript content.
+    fake_key(client, XK_Control_L, true);
+    fake_key(client, XK_Alt_L, true);
+    fake_key(client, XK_space, true);
+    REQUIRE(sink.wait_for_event(HotkeyEvent::ASK_START, 2000ms));
+    fake_key(client, XK_space, false);
+    REQUIRE(sink.wait_for_event(HotkeyEvent::ASK_STOP, 2000ms));
+    fake_key(client, XK_Alt_L, false);
+    fake_key(client, XK_Control_L, false);
+
     XCloseDisplay(client);
 
     const auto t0 = std::chrono::steady_clock::now();

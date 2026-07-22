@@ -13,6 +13,8 @@ enum class TrayState {
     IDLE,
     RECORDING,
     PROCESSING,
+    ASK_RECORDING,
+    ASK_PROCESSING,
     ERROR,
 };
 
@@ -34,6 +36,7 @@ public:
     void set_input_device(const std::string& name);
     void set_output_device(const std::string& name);
     void set_hotkey(const std::vector<std::string>& hotkeys);
+    void set_ask_hotkey(const std::vector<std::string>& hotkeys);
     void set_cancel_hotkey(const std::vector<std::string>& hotkeys);
 
     bool enabled() const { return enabled_; }
@@ -48,6 +51,7 @@ private:
     std::string input_device_ = "Default";
     std::string output_device_ = "Default";
     std::vector<std::string> trigger_hotkeys_ = {"shift+super"};
+    std::vector<std::string> ask_trigger_hotkeys_;
     std::vector<std::string> cancel_hotkeys_ = {"esc"};
 
     // shared_ptr so platform blocks (dispatch_async on mac) can capture a

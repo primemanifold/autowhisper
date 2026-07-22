@@ -39,6 +39,8 @@ NSImage* mic_image_for_state(TrayState state) API_AVAILABLE(macos(11.0)) {
         case TrayState::IDLE:       symbol = @"mic";                break;
         case TrayState::RECORDING:  symbol = @"mic.fill";           break;
         case TrayState::PROCESSING: symbol = @"waveform";           break;
+        case TrayState::ASK_RECORDING:  symbol = @"questionmark.bubble.fill"; break;
+        case TrayState::ASK_PROCESSING: symbol = @"sparkles";       break;
         case TrayState::ERROR:      symbol = @"exclamationmark.triangle"; break;
     }
     NSImage* img = [NSImage imageWithSystemSymbolName:symbol
@@ -54,6 +56,8 @@ std::string state_label(TrayState s) {
         case TrayState::IDLE:       return "AutoWhisper \u2014 idle";
         case TrayState::RECORDING:  return "Recording\u2026";
         case TrayState::PROCESSING: return "Transcribing\u2026";
+        case TrayState::ASK_RECORDING:  return "Ask Fabric \u2014 recording\u2026";
+        case TrayState::ASK_PROCESSING: return "Ask Fabric \u2014 thinking\u2026";
         case TrayState::ERROR:      return "Error \u2014 click to view";
     }
     return "AutoWhisper";
@@ -70,6 +74,7 @@ struct TrayManager::Impl {
     __strong NSMenuItem* input_item = nil;
     __strong NSMenuItem* output_item = nil;
     __strong NSMenuItem* hotkey_item = nil;
+    __strong NSMenuItem* ask_hotkey_item = nil;
     __strong NSMenuItem* cancel_item = nil;
     std::string config_path;
 };
@@ -189,6 +194,10 @@ void TrayManager::start() {
         [hotkey setEnabled:NO]; [menu addItem:hotkey];
         impl->hotkey_item = hotkey;
 
+        NSMenuItem* ask_hotkey = [[NSMenuItem alloc] initWithTitle:@"Ask Fabric: off" action:nil keyEquivalent:@""];
+        [ask_hotkey setEnabled:NO]; [menu addItem:ask_hotkey];
+        impl->ask_hotkey_item = ask_hotkey;
+
         NSMenuItem* cancel = [[NSMenuItem alloc] initWithTitle:@"Cancel: \u2014" action:nil keyEquivalent:@""];
         [cancel setEnabled:NO]; [menu addItem:cancel];
         impl->cancel_item = cancel;
@@ -263,6 +272,19 @@ void TrayManager::set_hotkey(const std::vector<std::string>& hotkeys) {
     dispatch_async(dispatch_get_main_queue(), ^{
         if (impl->hotkey_item) {
             impl->hotkey_item.title = [NSString stringWithUTF8String:label.c_str()];
+        }
+    });
+}
+
+void TrayManager::set_ask_hotkey(const std::vector<std::string>& hotkeys) {
+    ask_trigger_hotkeys_ = hotkeys;
+    auto impl = impl_;
+    std::string label = hotkeys.empty()
+        ? "Ask Fabric: off"
+        : "Ask Fabric: " + format_hotkeys(hotkeys);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (impl->ask_hotkey_item) {
+            impl->ask_hotkey_item.title = [NSString stringWithUTF8String:label.c_str()];
         }
     });
 }

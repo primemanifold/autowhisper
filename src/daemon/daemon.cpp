@@ -94,7 +94,7 @@ void AutoWhisperDaemon::initialize() {
     pulseaudio_->initialize();
 
     spdlog::info("Initializing hotkey manager");
-    hotkey_ = std::make_unique<HotkeyManager>(config_.hotkeys,
+    hotkey_ = std::make_unique<HotkeyManager>(effective_hotkey_config(),
         [this](HotkeyEvent e) { on_hotkey_event(e); });
 
     if (config_.avatar.enabled) {
@@ -107,9 +107,13 @@ void AutoWhisperDaemon::initialize() {
         // hotkey: START when idle, STOP while recording. Queued like any
         // hotkey event so it runs on the daemon thread.
         avatar_->on_toggle([this]() {
-            on_hotkey_event(state_.load() == DaemonState::RECORDING
-                                ? HotkeyEvent::STOP
-                                : HotkeyEvent::START);
+            if (state_.load() != DaemonState::RECORDING) {
+                on_hotkey_event(HotkeyEvent::START);
+            } else {
+                on_hotkey_event(active_mode_ == CaptureMode::ASK_FABRIC
+                                    ? HotkeyEvent::ASK_STOP
+                                    : HotkeyEvent::STOP);
+            }
         });
         avatar_->start();
         avatar_->set_state(AvatarState::Idle);
@@ -125,6 +129,9 @@ void AutoWhisperDaemon::initialize() {
     tray_->set_input_device(audio_->input_device_name());
     tray_->set_output_device(audio_->output_device_name());
     tray_->set_hotkey(config_.hotkeys.trigger);
+    tray_->set_ask_hotkey(config_.fabric.enabled
+                              ? config_.hotkeys.ask_trigger
+                              : std::vector<std::string>{});
     tray_->set_cancel_hotkey(config_.hotkeys.cancel);
 
     spdlog::info("Initialization complete");
@@ -153,6 +160,10 @@ void AutoWhisperDaemon::run() {
 }
 
 void AutoWhisperDaemon::maybe_reload_config() {
+    // Reconfiguring the matcher clears its active press. Defer reload until
+    // idle so releasing a held push-to-talk key can always deliver STOP.
+    if (state_.load() != DaemonState::IDLE) return;
+
     std::error_code ec;
     auto mtime = std::filesystem::last_write_time(config_path_, ec);
     if (ec) return;  // file gone/unreadable this tick; try again next time
@@ -168,16 +179,37 @@ void AutoWhisperDaemon::maybe_reload_config() {
         return;
     }
 
-    // Hotkeys are applied to the live listener (no restart). Other settings
+    // Hotkeys and the opt-in Fabric bridge are applied live. Other settings
     // (model, audio, output) still take effect on the next run.
-    if (fresh.hotkeys.trigger != config_.hotkeys.trigger ||
+    const bool hotkeys_changed =
+        fresh.hotkeys.trigger != config_.hotkeys.trigger ||
+        fresh.hotkeys.ask_trigger != config_.hotkeys.ask_trigger ||
         fresh.hotkeys.cancel != config_.hotkeys.cancel ||
         fresh.hotkeys.mode != config_.hotkeys.mode ||
-        fresh.hotkeys.escape_to_cancel != config_.hotkeys.escape_to_cancel) {
-        spdlog::info("Config changed: applying new hotkeys to the running listener");
+        fresh.hotkeys.escape_to_cancel != config_.hotkeys.escape_to_cancel;
+    const bool fabric_changed =
+        fresh.fabric.enabled != config_.fabric.enabled ||
+        fresh.fabric.executable != config_.fabric.executable ||
+        fresh.fabric.timeout_seconds != config_.fabric.timeout_seconds;
+    if (hotkeys_changed || fabric_changed) {
+        spdlog::info("Config changed: applying Dictate and Ask Fabric bindings live");
         config_.hotkeys = fresh.hotkeys;
-        if (hotkey_) hotkey_->set_config(config_.hotkeys);
+        config_.fabric = fresh.fabric;
+        if (hotkey_) hotkey_->set_config(effective_hotkey_config());
+        if (tray_) {
+            tray_->set_hotkey(config_.hotkeys.trigger);
+            tray_->set_ask_hotkey(config_.fabric.enabled
+                                      ? config_.hotkeys.ask_trigger
+                                      : std::vector<std::string>{});
+            tray_->set_cancel_hotkey(config_.hotkeys.cancel);
+        }
     }
+}
+
+HotkeyConfig AutoWhisperDaemon::effective_hotkey_config() const {
+    HotkeyConfig effective = config_.hotkeys;
+    if (!config_.fabric.enabled) effective.ask_trigger.clear();
+    return effective;
 }
 
 void AutoWhisperDaemon::process_events() {
@@ -198,42 +230,59 @@ void AutoWhisperDaemon::process_events() {
     event_queue_.pop();
     lock.unlock();
 
-    spdlog::debug("Processing event: {} in state {}",
-                  event == HotkeyEvent::START ? "START" :
-                  event == HotkeyEvent::STOP ? "STOP" : "CANCEL",
-                  static_cast<int>(state_.load()));
+    spdlog::debug("Processing hotkey event {} in state {}",
+                  static_cast<int>(event), static_cast<int>(state_.load()));
 
     switch (event) {
-        case HotkeyEvent::START: handle_start(); break;
-        case HotkeyEvent::STOP: handle_stop(); break;
+        case HotkeyEvent::START: handle_start(CaptureMode::DICTATE); break;
+        case HotkeyEvent::STOP: handle_stop(CaptureMode::DICTATE); break;
+        case HotkeyEvent::ASK_START: handle_start(CaptureMode::ASK_FABRIC); break;
+        case HotkeyEvent::ASK_STOP: handle_stop(CaptureMode::ASK_FABRIC); break;
         case HotkeyEvent::CANCEL: handle_cancel(); break;
     }
 }
 
-void AutoWhisperDaemon::handle_start() {
+void AutoWhisperDaemon::handle_start(CaptureMode mode) {
     if (state_.load() != DaemonState::IDLE) {
         spdlog::debug("Ignoring START in state {}", static_cast<int>(state_.load()));
         return;
     }
+    if (mode == CaptureMode::ASK_FABRIC && !config_.fabric.enabled) {
+        spdlog::warn("Ignoring Ask Fabric hotkey because the integration is disabled");
+        feedback_->play_error();
+        return;
+    }
 
-    spdlog::info("Starting recording");
+    active_mode_ = mode;
+    if (mode == CaptureMode::ASK_FABRIC) active_fabric_config_ = config_.fabric;
+    spdlog::info("Starting {} recording",
+                 mode == CaptureMode::ASK_FABRIC ? "Ask Fabric" : "Dictate");
     state_.store(DaemonState::RECORDING);
-    tray_->set_state(TrayState::RECORDING);
+    tray_->set_state(mode == CaptureMode::ASK_FABRIC
+                         ? TrayState::ASK_RECORDING
+                         : TrayState::RECORDING);
     if (avatar_) avatar_->set_state(AvatarState::Summoned);
     feedback_->play_start();
     pulseaudio_->mute_other_apps(true);
     audio_->start_recording();
 }
 
-void AutoWhisperDaemon::handle_stop() {
+void AutoWhisperDaemon::handle_stop(CaptureMode mode) {
     if (state_.load() != DaemonState::RECORDING) {
         spdlog::debug("Ignoring STOP in state {}", static_cast<int>(state_.load()));
         return;
     }
+    if (mode != active_mode_) {
+        spdlog::debug("Ignoring STOP for a mode that did not start this recording");
+        return;
+    }
 
-    spdlog::info("Stopping recording");
+    spdlog::info("Stopping {} recording",
+                 mode == CaptureMode::ASK_FABRIC ? "Ask Fabric" : "Dictate");
     state_.store(DaemonState::PROCESSING);
-    tray_->set_state(TrayState::PROCESSING);
+    tray_->set_state(mode == CaptureMode::ASK_FABRIC
+                         ? TrayState::ASK_PROCESSING
+                         : TrayState::PROCESSING);
     if (avatar_) avatar_->set_state(AvatarState::Thinking);
     feedback_->play_stop();
     pulseaudio_->unmute_other_apps();
@@ -246,6 +295,7 @@ void AutoWhisperDaemon::handle_stop() {
         feedback_->play_short_beep();
         state_.store(DaemonState::IDLE);
         tray_->set_state(TrayState::IDLE);
+        if (avatar_) avatar_->set_state(AvatarState::Idle);
         return;
     }
 
@@ -255,6 +305,7 @@ void AutoWhisperDaemon::handle_stop() {
         spdlog::warn("No audio after silence trimming");
         state_.store(DaemonState::IDLE);
         tray_->set_state(TrayState::IDLE);
+        if (avatar_) avatar_->set_state(AvatarState::Idle);
         return;
     }
 
@@ -265,12 +316,23 @@ void AutoWhisperDaemon::handle_stop() {
         text = pipeline_->process(text);
 
         if (!text.empty()) {
-            std::string preview = text.size() > 50 ? text.substr(0, 50) + "..." : text;
-            spdlog::info("Transcription: {}", preview);
+            spdlog::info("Transcription completed ({} bytes)", text.size());
             if (avatar_) avatar_->set_state(AvatarState::Writing);
-            bool success = output_->inject(text);
+            bool success = false;
+            if (mode == CaptureMode::ASK_FABRIC) {
+                FabricAskResult answer = FabricClient(active_fabric_config_).ask(text);
+                if (answer.ok()) {
+                    spdlog::info("Ask Fabric completed ({} bytes)", answer.response.size());
+                    success = output_->inject(answer.response);
+                } else {
+                    spdlog::warn("Ask Fabric failed: {}", answer.error);
+                }
+            } else {
+                success = output_->inject(text);
+            }
             if (!success) {
-                spdlog::warn("Text injection failed");
+                spdlog::warn("{} output was not inserted",
+                             mode == CaptureMode::ASK_FABRIC ? "Ask Fabric" : "Dictate");
                 feedback_->play_error();
                 if (avatar_) avatar_->set_state(AvatarState::Error);
             }

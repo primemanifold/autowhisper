@@ -78,12 +78,20 @@ void HotkeyManager::set_config(const HotkeyConfig& config) {
     // skipped rather than crashing the live listener. The settings UI
     // validates before save, so this is defensive.
     std::vector<KeyCombo> triggers;
+    std::vector<KeyCombo> ask_triggers;
     std::vector<KeyCombo> cancels;
     for (const auto& t : config.trigger) {
         try {
             triggers.push_back(KeyCombo::parse(t));
         } catch (const std::exception& e) {
             spdlog::warn("Hotkey: ignoring invalid trigger '{}': {}", t, e.what());
+        }
+    }
+    for (const auto& t : config.ask_trigger) {
+        try {
+            ask_triggers.push_back(KeyCombo::parse(t));
+        } catch (const std::exception& e) {
+            spdlog::warn("Hotkey: ignoring invalid Ask Fabric trigger '{}': {}", t, e.what());
         }
     }
     for (const auto& c : config.cancel) {
@@ -97,20 +105,27 @@ void HotkeyManager::set_config(const HotkeyConfig& config) {
     std::lock_guard<std::mutex> lock(mutex_);
     config_ = config;
     trigger_combos_ = std::move(triggers);
+    ask_trigger_combos_ = std::move(ask_triggers);
     cancel_combos_ = std::move(cancels);
     // A live re-config invalidates any in-flight press: drop cached state so a
     // half-held old chord cannot strand the trigger.
     pressed_modifiers_.clear();
     trigger_pressed_ = false;
     active_trigger_.reset();
-    spdlog::info("Hotkey: config applied live ({} trigger(s), mode {})",
-                 trigger_combos_.size(), config_.mode);
+    spdlog::info("Hotkey: config applied live ({} Dictate, {} Ask Fabric, mode {})",
+                 trigger_combos_.size(), ask_trigger_combos_.size(), config_.mode);
 }
 
 void HotkeyManager::send_event(HotkeyEvent event) {
-    spdlog::debug("Hotkey event: {}",
-                  event == HotkeyEvent::START ? "START" :
-                  event == HotkeyEvent::STOP ? "STOP" : "CANCEL");
+    const char* name = "CANCEL";
+    switch (event) {
+        case HotkeyEvent::START: name = "START"; break;
+        case HotkeyEvent::STOP: name = "STOP"; break;
+        case HotkeyEvent::ASK_START: name = "ASK_START"; break;
+        case HotkeyEvent::ASK_STOP: name = "ASK_STOP"; break;
+        case HotkeyEvent::CANCEL: break;
+    }
+    spdlog::debug("Hotkey event: {}", name);
     if (callback_) {
         callback_(event);
     }
@@ -124,17 +139,33 @@ void HotkeyManager::reset_input_state() {
     active_trigger_.reset();
 }
 
-std::optional<KeyCombo> HotkeyManager::check_any_trigger(const std::string& key_name) const {
-    for (const auto& combo : trigger_combos_) {
-        if (combo.is_modifier_only) {
-            if (combo.modifiers == pressed_modifiers_) {
-                return combo;
+std::optional<HotkeyManager::TriggerMatch>
+HotkeyManager::check_any_trigger(const std::string& key_name) const {
+    auto find = [&](const std::vector<KeyCombo>& combos,
+                    TriggerTarget target) -> std::optional<TriggerMatch> {
+        for (const auto& combo : combos) {
+            if (combo.is_modifier_only) {
+                if (combo.modifiers == pressed_modifiers_) return TriggerMatch{combo, target};
+            } else if (!key_name.empty() && check_combo(combo, key_name)) {
+                return TriggerMatch{combo, target};
             }
-        } else if (!key_name.empty() && check_combo(combo, key_name)) {
-            return combo;
         }
-    }
+        return std::nullopt;
+    };
+
+    if (auto match = find(trigger_combos_, TriggerTarget::DICTATE)) return match;
+    if (auto match = find(ask_trigger_combos_, TriggerTarget::ASK_FABRIC)) return match;
     return std::nullopt;
+}
+
+HotkeyEvent HotkeyManager::start_event(TriggerTarget target) {
+    return target == TriggerTarget::ASK_FABRIC ? HotkeyEvent::ASK_START
+                                               : HotkeyEvent::START;
+}
+
+HotkeyEvent HotkeyManager::stop_event(TriggerTarget target) {
+    return target == TriggerTarget::ASK_FABRIC ? HotkeyEvent::ASK_STOP
+                                               : HotkeyEvent::STOP;
 }
 
 bool HotkeyManager::check_any_cancel(const std::string& key_name) const {
@@ -174,11 +205,18 @@ void HotkeyManager::on_modifier_press(const std::string& modifier) {
 
     // Check for modifier-only trigger
     auto matched = check_any_trigger();
-    if (matched && matched->is_modifier_only && !trigger_pressed_) {
+    if (matched && matched->combo.is_modifier_only) {
         spdlog::debug("Modifier-only trigger combo detected");
-        trigger_pressed_ = true;
-        active_trigger_ = *matched;
-        send_event(HotkeyEvent::START);
+        if (config_.mode == "toggle" && trigger_pressed_) {
+            const auto target = active_trigger_ ? active_trigger_->target : matched->target;
+            trigger_pressed_ = false;
+            active_trigger_.reset();
+            send_event(stop_event(target));
+        } else if (!trigger_pressed_) {
+            trigger_pressed_ = true;
+            active_trigger_ = *matched;
+            send_event(start_event(matched->target));
+        }
     }
 }
 
@@ -190,13 +228,14 @@ void HotkeyManager::on_modifier_release(const std::string& modifier) {
     spdlog::debug("Mod up: {}", modifier);
 
     // For push-to-talk with modifier-only combos
-    if (active_trigger_ && active_trigger_->is_modifier_only &&
+    if (active_trigger_ && active_trigger_->combo.is_modifier_only &&
         config_.mode == "push_to_talk" && trigger_pressed_ &&
-        active_trigger_->modifiers.count(modifier) > 0) {
+        active_trigger_->combo.modifiers.count(modifier) > 0) {
         spdlog::debug("Modifier-only trigger released, stopping");
+        auto target = active_trigger_->target;
         trigger_pressed_ = false;
         active_trigger_.reset();
-        send_event(HotkeyEvent::STOP);
+        send_event(stop_event(target));
     }
 }
 
@@ -210,6 +249,7 @@ void HotkeyManager::on_key_press(const std::string& key_name) {
     if (config_.escape_to_cancel && (key_name == "esc" || key_name == "escape")) {
         spdlog::debug("Escape pressed, cancelling");
         trigger_pressed_ = false;
+        active_trigger_.reset();
         send_event(HotkeyEvent::CANCEL);
         return;
     }
@@ -218,28 +258,31 @@ void HotkeyManager::on_key_press(const std::string& key_name) {
     if (check_any_cancel(key_name)) {
         spdlog::debug("Cancel hotkey pressed");
         trigger_pressed_ = false;
+        active_trigger_.reset();
         send_event(HotkeyEvent::CANCEL);
         return;
     }
 
     // Check trigger combo (non-modifier-only)
     auto matched = check_any_trigger(key_name);
-    if (matched && !matched->is_modifier_only) {
+    if (matched && !matched->combo.is_modifier_only) {
         if (config_.mode == "toggle") {
             if (trigger_pressed_) {
+                auto target = active_trigger_ ? active_trigger_->target : matched->target;
                 trigger_pressed_ = false;
-                send_event(HotkeyEvent::STOP);
+                active_trigger_.reset();
+                send_event(stop_event(target));
             } else {
                 trigger_pressed_ = true;
                 active_trigger_ = *matched;
-                send_event(HotkeyEvent::START);
+                send_event(start_event(matched->target));
             }
         } else {
             // Push-to-talk: start on press
             if (!trigger_pressed_) {
                 trigger_pressed_ = true;
                 active_trigger_ = *matched;
-                send_event(HotkeyEvent::START);
+                send_event(start_event(matched->target));
             }
         }
     }
@@ -250,12 +293,13 @@ void HotkeyManager::on_key_release(const std::string& key_name) {
     std::lock_guard<std::mutex> lock(mutex_);
 
     // Push-to-talk: stop on release for non-modifier-only combos
-    if (active_trigger_ && !active_trigger_->is_modifier_only &&
+    if (active_trigger_ && !active_trigger_->combo.is_modifier_only &&
         config_.mode == "push_to_talk" && trigger_pressed_) {
-        if (check_combo(*active_trigger_, key_name)) {
+        if (check_combo(active_trigger_->combo, key_name)) {
+            auto target = active_trigger_->target;
             trigger_pressed_ = false;
             active_trigger_.reset();
-            send_event(HotkeyEvent::STOP);
+            send_event(stop_event(target));
         }
     }
 }

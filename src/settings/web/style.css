@@ -559,10 +559,14 @@ p { margin: 0; }
   .aw-nav { display: flex; overflow-x: auto; gap: 6px; padding: 8px; }
   .aw-nav-item { min-width: max-content; }
   .aw-sidebar-status { display: none; }
-  .aw-topbar { position: static; align-items: flex-start; flex-direction: column; padding: 18px; }
-  .aw-actions { justify-content: flex-start; }
+  .aw-main { width: 100%; max-width: 100vw; }
+  .aw-topbar { position: static; width: 100%; align-items: flex-start; flex-direction: column; padding: 18px; }
+  /* Give the wrapping action row an actual viewport-bound width. With an
+     auto width it used its max-content size and widened every settings pane. */
+  .aw-actions { width: 100%; min-width: 0; justify-content: flex-start; }
   .aw-status { margin: 18px 18px 0; }
-  .aw-form { padding: 0 18px 48px; }
+  .aw-form { width: 100%; min-width: 0; padding: 0 18px 48px; }
+  .aw-pane { width: 100%; min-width: 0; }
   .aw-field { grid-template-columns: 1fr; gap: 8px; }
 }
 

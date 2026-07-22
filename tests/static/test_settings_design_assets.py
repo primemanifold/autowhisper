@@ -39,6 +39,7 @@ class SettingsDesignAssetsTest(unittest.TestCase):
         self.assertIn('aria-live="polite"', self.index)
         for label in [
             "Dictation behavior",
+            "Ask Fabric",
             "Model & performance",
             "Audio input",
             "Output & insertion",
@@ -81,6 +82,18 @@ class SettingsDesignAssetsTest(unittest.TestCase):
         section_ids = set(re.findall(r'id: "([a-z-]+)"', self.js))
         nav_targets = set(re.findall(r'data-target="([a-z-]+)"', self.index))
         self.assertEqual(nav_targets, section_ids)
+
+    def test_ask_fabric_is_explicit_and_action_safe(self):
+        self.assertIn("Ask Fabric is disabled by default", self.js)
+        self.assertIn("non-terminal safe toolset", self.js)
+        self.assertIn("Dictate always stays", self.js)
+
+    def test_mobile_action_row_cannot_widen_the_settings_viewport(self):
+        self.assertRegex(
+            self.css,
+            r"\.aw-actions\s*\{[^}]*width:\s*100%;[^}]*min-width:\s*0;",
+        )
+        self.assertIn(".aw-main { width: 100%; max-width: 100vw; }", self.css)
 
     def test_save_errors_surface_structured_field_issues(self):
         for snippet in [
@@ -130,8 +143,18 @@ class SettingsDesignAssetsTest(unittest.TestCase):
         # the same) and adds a Record button that captures a real key chord.
         self.assertIn("renderHotkeyCapture", self.js)
         self.assertIn('name === "hotkeys.trigger"', self.js)
+        self.assertIn('name === "hotkeys.ask_trigger"', self.js)
         self.assertIn("aw-hotkey-record", self.js + self.css)
         self.assertIn('"metaKey", "super"', self.js)  # Command -> super token
+
+    def test_ask_fabric_is_explicit_opt_in_with_separate_mode_copy(self):
+        for snippet in [
+            'id: "fabric"',
+            "disabled by default",
+            "Dictate always stays",
+            "private stdin pipe",
+        ]:
+            self.assertIn(snippet, self.js)
 
     def test_permissions_pane_surfaces_os_grants(self):
         # macOS TCC status with a deep link per denied grant — the fix for the

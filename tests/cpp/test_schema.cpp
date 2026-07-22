@@ -72,7 +72,7 @@ TEST_CASE("schema enum allow-lists match Config::validate", "[schema]") {
 TEST_CASE("schema::to_json has one entry per section", "[schema]") {
     auto j = schema::to_json();
     REQUIRE(j.is_object());
-    for (auto section : {"model", "audio", "hotkeys", "output", "feedback", "daemon", "tray"}) {
+    for (auto section : {"model", "audio", "hotkeys", "fabric", "output", "feedback", "daemon", "tray"}) {
         CHECK(j.contains(section));
         CHECK(j[section].is_array());
         CHECK(!j[section].empty());

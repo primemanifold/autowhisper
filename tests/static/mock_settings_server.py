@@ -18,6 +18,12 @@ SCHEMA = {
     "hotkeys": [
         {"key": "mode", "type": "enum", "enum_values": ["push_to_talk", "toggle"], "min_numeric": None, "max_numeric": None, "description": "Hotkey activation mode."},
         {"key": "trigger", "type": "string_array", "enum_values": [], "min_numeric": None, "max_numeric": None, "description": "One or more trigger hotkeys."},
+        {"key": "ask_trigger", "type": "string_array", "enum_values": [], "min_numeric": None, "max_numeric": None, "description": "Ask Fabric hotkeys."},
+    ],
+    "fabric": [
+        {"key": "enabled", "type": "bool", "enum_values": [], "min_numeric": None, "max_numeric": None, "description": "Opt in to Ask Fabric."},
+        {"key": "executable", "type": "string", "enum_values": [], "min_numeric": None, "max_numeric": None, "description": "Fabric CLI executable."},
+        {"key": "timeout_seconds", "type": "int", "enum_values": [], "min_numeric": 1, "max_numeric": 600, "description": "Maximum response wait."},
     ],
     "output": [
         {"key": "method", "type": "enum", "enum_values": ["inject", "clipboard"], "min_numeric": None, "max_numeric": None, "description": "How transcribed text reaches the cursor."},
@@ -40,7 +46,8 @@ SCHEMA = {
 CONFIG = {
     "model": {"size": "tiny.en", "device": "cpu", "num_threads": 8},
     "audio": {"device": "", "vad_enabled": True},
-    "hotkeys": {"mode": "push_to_talk", "trigger": ["shift+super"]},
+    "hotkeys": {"mode": "push_to_talk", "trigger": ["shift+super"], "ask_trigger": ["ctrl+alt+space"]},
+    "fabric": {"enabled": False, "executable": "fabric", "timeout_seconds": 120},
     "output": {"method": "inject"},
     "feedback": {"enabled": True},
     "daemon": {"log_level": "info"},

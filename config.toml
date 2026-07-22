@@ -32,11 +32,19 @@ spoken_commands = true
 dictionary = [ ]
 
 [hotkeys]
+ask_trigger = [ 'ctrl+alt+space' ]
 cancel = [ 'esc' ]
 escape_to_cancel = true
 # mode: push_to_talk, toggle
 mode = 'push_to_talk'
 trigger = [ 'shift+super' ]
+
+[fabric]
+# Ask Fabric is opt-in. Dictate mode never invokes Fabric.
+enabled = false
+# Uses your normal Fabric profile, provider, memory, authentication, and safe toolset.
+executable = 'fabric'
+timeout_seconds = 120
 
 [model]
 beam_size = 1
