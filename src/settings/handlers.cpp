@@ -57,8 +57,15 @@ nlohmann::json config_to_json(const Config& c) {
     j["hotkeys"] = {
         {"mode", c.hotkeys.mode},
         {"trigger", c.hotkeys.trigger},
+        {"ask_trigger", c.hotkeys.ask_trigger},
         {"cancel", c.hotkeys.cancel},
         {"escape_to_cancel", c.hotkeys.escape_to_cancel},
+    };
+
+    j["fabric"] = {
+        {"enabled", c.fabric.enabled},
+        {"executable", c.fabric.executable},
+        {"timeout_seconds", c.fabric.timeout_seconds},
     };
 
     j["output"] = {
@@ -146,8 +153,13 @@ Config json_to_config(const nlohmann::json& j) {
 
     get("hotkeys", "mode", c.hotkeys.mode);
     get("hotkeys", "trigger", c.hotkeys.trigger);
+    get("hotkeys", "ask_trigger", c.hotkeys.ask_trigger);
     get("hotkeys", "cancel", c.hotkeys.cancel);
     get("hotkeys", "escape_to_cancel", c.hotkeys.escape_to_cancel);
+
+    get("fabric", "enabled", c.fabric.enabled);
+    get("fabric", "executable", c.fabric.executable);
+    get("fabric", "timeout_seconds", c.fabric.timeout_seconds);
 
     get("output", "method", c.output.method);
     get("output", "auto_paste", c.output.auto_paste);

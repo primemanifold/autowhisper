@@ -7,7 +7,7 @@
   <img src="site/assets/screenshots/settings-desktop.png" alt="AutoWhisper settings — real product UI, light and dark" width="100%">
 </picture>
 
-Native C++ on [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Your voice never leaves your machine: no cloud, no account, no telemetry. 100+ languages with auto-detection.
+Native C++ on [whisper.cpp](https://github.com/ggerganov/whisper.cpp). Dictate mode keeps your voice and transcript on your machine: no account and no telemetry. 100+ languages with auto-detection. The separate Ask Fabric mode is an explicit opt-in and follows your configured Fabric provider's privacy policy.
 
 | Platform | Status |
 |---|---|
@@ -30,7 +30,7 @@ sudo apt update && sudo apt install autowhisper
 ```bash
 autowhisper model download distil-small.en   # recommended English model, SHA-256 verified
 autowhisper doctor                            # check mic, GPU, permissions
-autowhisper run                               # hold Shift+Super (Ctrl+Alt+Space on Windows), speak, release
+autowhisper run                               # hold Shift+Super, speak, release
 ```
 
 No model yet? The binary tells you this exact command instead of crashing. Zero-setup proof of life: `autowhisper avatar demo`.
@@ -50,6 +50,29 @@ process and exchanges newline-delimited JSON over stdin/stdout. See
 [`docs/LOCAL-PROTOCOL.md`](docs/LOCAL-PROTOCOL.md) for the v1 contract and
 `TranscriptionResult` schema.
 
+### Dictate or Ask Fabric
+
+The existing shortcut remains **Dictate**: local transcription is inserted at
+the cursor and Fabric is never invoked. A second, disabled-by-default shortcut
+can send one transcript to your installed Fabric agent and insert its answer
+back into the focused app:
+
+```toml
+[hotkeys]
+trigger = [ 'shift+super' ]       # Dictate — always local
+ask_trigger = [ 'ctrl+alt+space' ]
+
+[fabric]
+enabled = true                    # explicit opt-in
+executable = 'fabric'             # or an absolute path
+timeout_seconds = 120
+```
+
+AutoWhisper calls `fabric --oneshot-stdin --toolsets safe`: the spoken prompt
+stays out of the process argument list, and Fabric uses the user's normal
+profile, authentication, memory, model provider, and non-terminal safe tools.
+Failures never fall back to inserting the question as dictation.
+
 ## The companion
 
 Echo — the nymph who can only repeat your words — is an opt-in floating button in the Wispr Flow tradition: **click to dictate**, watch the halo follow your voice, see her caption her own state and write your words down.
@@ -64,6 +87,7 @@ enabled = true      # forms: echo, hermes, mnemosyne, kalliope, morpheus
 ## What it does
 
 - **Push-to-talk or toggle** dictation into any focused app, with a cancel key.
+- **Optional Ask Fabric shortcut** with a visibly distinct recording/thinking state and no silent mode switching.
 - **Cleans transcripts as you speak**: filler words removed, personal dictionary (`"auto whisper => AutoWhisper"`), spoken "new line" / "new paragraph".
 - **Local settings app** served by the binary itself (`autowhisper config ui`) — token-protected, framework-free, light and dark.
 - **Measured, not claimed**: speed numbers come from the bundled benchmark harness (`bench/`). Reference: 11 s of audio in ~0.8 s on 4 CPU threads with `tiny.en`.
@@ -79,7 +103,7 @@ git clone --recurse-submodules https://github.com/primemanifold/autowhisper.git
 cd autowhisper
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
-ctest --test-dir build          # 198 tests
+ctest --test-dir build          # full platform-specific test suite
 ```
 
 macOS needs only Xcode CLT + CMake (`cmake -B build && cmake --build build`). Windows builds with MSVC or the MinGW toolchain file (`cmake/toolchains/`). CUDA: `-DAUTOWHISPER_ENABLE_CUDA=ON` (12.x).

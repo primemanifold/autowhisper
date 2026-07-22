@@ -19,11 +19,14 @@ namespace fs = std::filesystem;
 
 namespace autowhisper {
 
-static const char* ICON_NAMES[] = {"idle", "recording", "processing", "error"};
+static const char* ICON_NAMES[] = {
+    "idle", "recording", "processing", "recording", "processing", "error"};
 static const char* STATE_TITLES[] = {
     "AutoWhisper - Ready",
-    "AutoWhisper - Recording...",
-    "AutoWhisper - Transcribing...",
+    "AutoWhisper - Dictate: recording...",
+    "AutoWhisper - Dictate: transcribing...",
+    "AutoWhisper - Ask Fabric: recording...",
+    "AutoWhisper - Ask Fabric: thinking...",
     "AutoWhisper - Error",
 };
 
@@ -34,6 +37,7 @@ struct TrayManager::Impl {
     GMainLoop* gtk_loop = nullptr;
     std::thread gtk_thread;
     GtkWidget* trigger_label = nullptr;
+    GtkWidget* ask_trigger_label = nullptr;
     GtkWidget* cancel_label = nullptr;
     TrayManager* manager = nullptr;
 
@@ -104,7 +108,11 @@ void TrayManager::start() {
     if (!enabled_) return;
 
 #if defined(HAVE_AYATANA_APPINDICATOR) || defined(HAVE_APPINDICATOR)
-    impl_->gtk_thread = std::thread([this]() {
+    const auto initial_trigger_hotkeys = trigger_hotkeys_;
+    const auto initial_ask_hotkeys = ask_trigger_hotkeys_;
+    const auto initial_cancel_hotkeys = cancel_hotkeys_;
+    impl_->gtk_thread = std::thread([this, initial_trigger_hotkeys,
+                                     initial_ask_hotkeys, initial_cancel_hotkeys]() {
         gtk_init(nullptr, nullptr);
 
         std::string icon_path = impl_->get_icon_path(TrayState::IDLE);
@@ -126,12 +134,19 @@ void TrayManager::start() {
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), gtk_separator_menu_item_new());
 
         // Hotkey info
-        std::string trigger_text = "Record: " + format_hotkeys(trigger_hotkeys_);
+        std::string trigger_text = "Dictate: " + format_hotkeys(initial_trigger_hotkeys);
         impl_->trigger_label = gtk_menu_item_new_with_label(trigger_text.c_str());
         gtk_widget_set_sensitive(impl_->trigger_label, FALSE);
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), impl_->trigger_label);
 
-        std::string cancel_text = "Cancel: " + format_hotkeys(cancel_hotkeys_);
+        std::string ask_trigger_text = initial_ask_hotkeys.empty()
+            ? "Ask Fabric: off"
+            : "Ask Fabric: " + format_hotkeys(initial_ask_hotkeys);
+        impl_->ask_trigger_label = gtk_menu_item_new_with_label(ask_trigger_text.c_str());
+        gtk_widget_set_sensitive(impl_->ask_trigger_label, FALSE);
+        gtk_menu_shell_append(GTK_MENU_SHELL(menu), impl_->ask_trigger_label);
+
+        std::string cancel_text = "Cancel: " + format_hotkeys(initial_cancel_hotkeys);
         impl_->cancel_label = gtk_menu_item_new_with_label(cancel_text.c_str());
         gtk_widget_set_sensitive(impl_->cancel_label, FALSE);
         gtk_menu_shell_append(GTK_MENU_SHELL(menu), impl_->cancel_label);
@@ -253,10 +268,52 @@ void TrayManager::set_output_device(const std::string& name) {
 
 void TrayManager::set_hotkey(const std::vector<std::string>& hotkeys) {
     trigger_hotkeys_ = hotkeys;
+#if defined(HAVE_AYATANA_APPINDICATOR) || defined(HAVE_APPINDICATOR)
+    struct LabelUpdate { std::shared_ptr<Impl> impl; std::string label; };
+    auto* data = new LabelUpdate{impl_, "Dictate: " + format_hotkeys(hotkeys)};
+    g_idle_add(+[](gpointer ptr) -> gboolean {
+        auto* d = static_cast<LabelUpdate*>(ptr);
+        if (d->impl->trigger_label) {
+            gtk_menu_item_set_label(GTK_MENU_ITEM(d->impl->trigger_label), d->label.c_str());
+        }
+        delete d;
+        return FALSE;
+    }, data);
+#endif
+}
+
+void TrayManager::set_ask_hotkey(const std::vector<std::string>& hotkeys) {
+    ask_trigger_hotkeys_ = hotkeys;
+#if defined(HAVE_AYATANA_APPINDICATOR) || defined(HAVE_APPINDICATOR)
+    struct LabelUpdate { std::shared_ptr<Impl> impl; std::string label; };
+    auto* data = new LabelUpdate{
+        impl_, hotkeys.empty() ? "Ask Fabric: off"
+                               : "Ask Fabric: " + format_hotkeys(hotkeys)};
+    g_idle_add(+[](gpointer ptr) -> gboolean {
+        auto* d = static_cast<LabelUpdate*>(ptr);
+        if (d->impl->ask_trigger_label) {
+            gtk_menu_item_set_label(GTK_MENU_ITEM(d->impl->ask_trigger_label), d->label.c_str());
+        }
+        delete d;
+        return FALSE;
+    }, data);
+#endif
 }
 
 void TrayManager::set_cancel_hotkey(const std::vector<std::string>& hotkeys) {
     cancel_hotkeys_ = hotkeys;
+#if defined(HAVE_AYATANA_APPINDICATOR) || defined(HAVE_APPINDICATOR)
+    struct LabelUpdate { std::shared_ptr<Impl> impl; std::string label; };
+    auto* data = new LabelUpdate{impl_, "Cancel: " + format_hotkeys(hotkeys)};
+    g_idle_add(+[](gpointer ptr) -> gboolean {
+        auto* d = static_cast<LabelUpdate*>(ptr);
+        if (d->impl->cancel_label) {
+            gtk_menu_item_set_label(GTK_MENU_ITEM(d->impl->cancel_label), d->label.c_str());
+        }
+        delete d;
+        return FALSE;
+    }, data);
+#endif
 }
 
 } // namespace autowhisper

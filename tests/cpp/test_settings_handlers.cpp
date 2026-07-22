@@ -72,6 +72,8 @@ TEST_CASE("defaults_json matches Config::default_config", "[handlers]") {
     CHECK(j["model"]["size"] == c.model.size);
     CHECK(j["model"]["device"] == c.model.device);
     CHECK(j["audio"]["sample_rate"] == c.audio.sample_rate);
+    CHECK(j["fabric"]["enabled"] == c.fabric.enabled);
+    CHECK(j["fabric"]["executable"] == c.fabric.executable);
 }
 
 TEST_CASE("validate_json accepts valid config", "[handlers]") {

@@ -36,4 +36,13 @@ TEST_CASE("run_command_with_input times out when child never drains stdin", "[su
     REQUIRE(result.stderr_str == "timeout");
 }
 
+TEST_CASE("subprocess capture is bounded while the child is fully drained", "[subprocess]") {
+    auto result = autowhisper::run_command(
+        {"bash", "-lc", "printf '%0200d' 0; printf '%0200d' 0 >&2"}, 5, 64);
+
+    REQUIRE(result.exit_code == 0);
+    CHECK(result.output_truncated);
+    CHECK(result.stdout_str.size() + result.stderr_str.size() == 64);
+}
+
 #endif

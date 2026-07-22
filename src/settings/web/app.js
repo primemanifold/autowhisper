@@ -54,8 +54,15 @@
     {
       id: "dictation",
       title: "Dictation behavior",
-      lede: "Choose how AutoWhisper listens, cancels, and gets out of your way.",
+      lede: "Choose separate shortcuts for local Dictate and opt-in Ask Fabric capture.",
       sections: ["hotkeys"],
+    },
+    {
+      id: "fabric",
+      title: "Ask Fabric",
+      lede: "Speak a question, let your configured Fabric agent answer it, then insert the answer into the focused app.",
+      sections: ["fabric"],
+      note: "Ask Fabric is disabled by default. When enabled, only its dedicated shortcut sends a transcript to Fabric using Fabric's non-terminal safe toolset. Dictate always stays on the local transcription-and-insertion path.",
     },
     {
       id: "model",
@@ -78,9 +85,9 @@
     {
       id: "privacy",
       title: "Privacy",
-      lede: "AutoWhisper runs locally. This panel should become the place where that is proven, not merely promised.",
+      lede: "Local dictation stays local; network-capable agent use is explicit and mode-bound.",
       sections: [],
-      note: "Current build exposes no telemetry or cloud endpoint settings through this API. Future releases should show a read-only network and retention proof here.",
+      note: "AutoWhisper has no telemetry. Dictate never invokes Fabric. If you enable Ask Fabric, that shortcut sends its transcript over a private stdin pipe to your configured Fabric CLI, whose model provider and retention policy then apply.",
     },
     {
       id: "feedback",
@@ -177,7 +184,7 @@
         dirtyKeys.clear();
         clearIssues();
         updateDirtyState();
-        setStatus("Saved. Changes are ready for the next AutoWhisper run.", "ok");
+        setStatus("Saved. Shortcuts and Ask Fabric update when AutoWhisper is idle; other changes apply on the next run.", "ok");
       } else {
         let detail = res.statusText;
         try {
@@ -595,7 +602,7 @@
         (keyDef.enum_values || []).every((v) => CHARACTER_META[v])) {
       return renderCharacterPicker(paneId, section, keyDef, value);
     }
-    if (name === "hotkeys.trigger") {
+    if (name === "hotkeys.trigger" || name === "hotkeys.ask_trigger") {
       return renderHotkeyCapture(paneId, section, keyDef, value);
     }
     if (keyDef.type === "enum") {

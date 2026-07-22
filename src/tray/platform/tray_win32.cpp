@@ -20,6 +20,7 @@ void TrayManager::set_state(TrayState) {}
 void TrayManager::set_input_device(const std::string&) {}
 void TrayManager::set_output_device(const std::string&) {}
 void TrayManager::set_hotkey(const std::vector<std::string>&) {}
+void TrayManager::set_ask_hotkey(const std::vector<std::string>&) {}
 void TrayManager::set_cancel_hotkey(const std::vector<std::string>&) {}
 
 } // namespace autowhisper

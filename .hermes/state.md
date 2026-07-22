@@ -973,3 +973,39 @@ Next:
 - The repository Docker smoke script's Linux compile passed but its filtered
   UI test stopped because the image does not install Xvfb. This is an existing
   script/image mismatch; the new Linux tests were rerun directly and passed.
+
+## Run 2026-07-22 — opt-in system-wide Dictate and Ask Fabric modes
+
+- Branched `feat/fabric-system-modes` from fetched `origin/core` at
+  `bc5f23d9` in an isolated worktree. The existing dirty checkout was not
+  changed.
+- Kept the original system-wide shortcut as local Dictate and added a separate
+  Ask Fabric shortcut with mode-specific start/stop events, tray states, and
+  live idle-time config reload. Ask Fabric is disabled by default and its
+  matcher is not registered until the user opts in.
+- Added the five-layer settings contract for `hotkeys.ask_trigger` and the
+  `fabric` section: C++ config, schema, JSON handlers, settings UI/mock, and
+  sample/docs. Validation rejects alias-equivalent overlaps, modifier-only
+  shadowing, cancel conflicts, missing enabled shortcuts, invalid executables,
+  and unbounded timeouts.
+- Added `FabricClient`, which invokes exactly
+  `fabric --oneshot-stdin --toolsets safe`, sends the transcript only through
+  stdin, bounds input/output, enforces timeout, and fails closed without
+  inserting the original question or exposing provider diagnostics. This
+  depends on Fabric PR #104 (`feat/oneshot-stdin`). Transcript and answer
+  contents are no longer written to AutoWhisper logs.
+- Completed the bounded subprocess implementation on Win32 with inherited
+  stdin/stdout/stderr pipes, quoting, concurrent drain/write, timeout, and
+  termination. POSIX output capture now uses the same combined byte cap.
+- Settings UI copy separates local Dictate from provider-bound Ask Fabric.
+  Browser QA found a real 375 px overflow in the action row; the mobile layout
+  now measures exactly 375 px document width with no horizontal overflow.
+- Verification: 204/204 native macOS C++ tests, 41/41 static/settings tests,
+  Node syntax check, native app bundle build; 201/201 Linux C++ tests under
+  Docker/Xvfb including synthesized Dictate and Ask Fabric key sequences;
+  Linux app build; Windows x86-64 MinGW cross-build of app and tests with only
+  system DLL dependencies; `git diff --check`. MSVC/runtime behavior remains
+  covered by repository CI because no local Windows host is available.
+- Deliberately deferred meetings, diarization, background capture, Watch, and
+  widgets. The existing Windows tray remains the repository's placeholder;
+  this layer does not widen that unrelated platform surface.
