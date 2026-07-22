@@ -1,4 +1,3 @@
-#define MINIAUDIO_IMPLEMENTATION
 #include <miniaudio.h>
 
 #include "audio/audio.h"

@@ -15,6 +15,11 @@ int cmd_status();
 int cmd_logs(bool follow, int lines);
 int cmd_run(const std::string& config_path, const std::string& device,
             const std::string& model, bool verbose);
+int cmd_serve(const std::string& config_path, const std::string& device,
+              const std::string& model, bool stdio, bool verbose);
+int cmd_transcribe(const std::string& input_path, const std::string& config_path,
+                   const std::string& device, const std::string& model,
+                   const std::string& language, bool json_output, bool verbose);
 int cmd_config_show();
 int cmd_config_edit();
 int cmd_config_set(const std::string& key, const std::string& value);

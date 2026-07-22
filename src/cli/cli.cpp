@@ -3,6 +3,9 @@
 #include "daemon/daemon.h"
 #include "doctor/doctor.h"
 #include "models/models.h"
+#include "protocol/local_protocol.h"
+#include "runtime/autowhisper_runtime.h"
+#include "runtime/transcription.h"
 #include "service/service.h"
 #include "util/logging.h"
 #include "util/subprocess.h"
@@ -11,9 +14,11 @@
 #endif
 
 #include <spdlog/spdlog.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
 #include <toml++/toml.hpp>
 
 #include <cstdlib>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -26,6 +31,31 @@ static std::string get_config_path_cli() {
     std::string user_config = get_user_config_path();
     if (fs::exists(user_config)) return user_config;
     return find_config_file();
+}
+
+static Config load_runtime_config(const std::string& config_path,
+                                  const std::string& device,
+                                  const std::string& model) {
+    const std::string path = config_path.empty() ? find_config_file() : config_path;
+    Config config = Config::load(path);
+    if (!device.empty()) config.model.device = device;
+    if (!model.empty()) config.model.size = model;
+    return config;
+}
+
+static void setup_machine_logging(bool verbose) {
+    auto sink = std::make_shared<spdlog::sinks::stderr_color_sink_mt>();
+    auto logger = std::make_shared<spdlog::logger>("autowhisper-machine", sink);
+    logger->set_level(verbose ? spdlog::level::debug : spdlog::level::warn);
+    logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
+    spdlog::set_default_logger(std::move(logger));
+}
+
+static std::string make_cli_request_id() {
+    const auto ticks = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::system_clock::now().time_since_epoch()
+    ).count();
+    return "cli-" + std::to_string(ticks);
 }
 
 void setup_cli(CLI::App& app) {
@@ -61,6 +91,52 @@ void setup_cli(CLI::App& app) {
     run_cmd->add_option("--model", run_model, "Model name");
     run_cmd->add_flag("-v,--verbose", run_verbose, "Verbose logging");
     run_cmd->callback([]() { std::exit(cmd_run(run_config, run_device, run_model, run_verbose)); });
+
+    // Reusable local runtime. stdout is reserved for protocol/data output.
+    static std::string serve_config;
+    static std::string serve_device;
+    static std::string serve_model;
+    static bool serve_stdio = false;
+    static bool serve_verbose = false;
+    auto* serve_cmd = app.add_subcommand("serve", "Run the reusable local transcription service");
+    serve_cmd->add_option("-c,--config", serve_config, "Config file path");
+    serve_cmd->add_option("--device", serve_device, "Inference device")
+        ->check(CLI::IsMember({"cuda", "cpu", "auto"}));
+    serve_cmd->add_option("--model", serve_model, "Model to keep loaded");
+    serve_cmd->add_flag("--stdio", serve_stdio, "Use newline-delimited JSON over stdin/stdout")
+        ->required();
+    serve_cmd->add_flag("-v,--verbose", serve_verbose, "Verbose logs on stderr");
+    serve_cmd->callback([]() {
+        std::exit(cmd_serve(serve_config, serve_device, serve_model, serve_stdio, serve_verbose));
+    });
+
+    static std::string transcribe_input;
+    static std::string transcribe_config;
+    static std::string transcribe_device;
+    static std::string transcribe_model;
+    static std::string transcribe_language;
+    static bool transcribe_json = false;
+    static bool transcribe_verbose = false;
+    auto* transcribe_cmd = app.add_subcommand("transcribe", "Transcribe one local audio file");
+    transcribe_cmd->add_option("input", transcribe_input, "Audio file path")->required();
+    transcribe_cmd->add_option("-c,--config", transcribe_config, "Config file path");
+    transcribe_cmd->add_option("--device", transcribe_device, "Inference device")
+        ->check(CLI::IsMember({"cuda", "cpu", "auto"}));
+    transcribe_cmd->add_option("--model", transcribe_model, "Model name");
+    transcribe_cmd->add_option("--language", transcribe_language, "Language hint or auto");
+    transcribe_cmd->add_flag("--json", transcribe_json, "Emit TranscriptionResult v1 JSON");
+    transcribe_cmd->add_flag("-v,--verbose", transcribe_verbose, "Verbose logs on stderr");
+    transcribe_cmd->callback([]() {
+        std::exit(cmd_transcribe(
+            transcribe_input,
+            transcribe_config,
+            transcribe_device,
+            transcribe_model,
+            transcribe_language,
+            transcribe_json,
+            transcribe_verbose
+        ));
+    });
 
     // --- Config commands ---
     auto* config_cmd = app.add_subcommand("config", "View and edit configuration");
@@ -222,6 +298,55 @@ int cmd_run(const std::string& config_path, const std::string& device,
             }
         }
 #endif
+        return 1;
+    }
+}
+
+int cmd_serve(const std::string& config_path, const std::string& device,
+              const std::string& model, bool stdio, bool verbose) {
+    if (!stdio) {
+        std::cerr << "Error: serve currently requires --stdio\n";
+        return 2;
+    }
+    setup_machine_logging(verbose);
+    try {
+        Config config = load_runtime_config(config_path, device, model);
+        AutoWhisperRuntime runtime(config.model);
+        runtime.load();
+        ProtocolHandler handler(runtime);
+        StdioServer server(handler);
+        return server.run(std::cin, std::cout);
+    } catch (const std::exception& error) {
+        std::cerr << "AutoWhisper service failed: " << error.what() << "\n";
+        return 1;
+    }
+}
+
+int cmd_transcribe(const std::string& input_path, const std::string& config_path,
+                   const std::string& device, const std::string& model,
+                   const std::string& language, bool json_output, bool verbose) {
+    setup_machine_logging(verbose);
+    try {
+        Config config = load_runtime_config(config_path, device, model);
+        AutoWhisperRuntime runtime(config.model);
+        runtime.load();
+        TranscriptionOptions options;
+        options.request_id = make_cli_request_id();
+        options.language = language;
+        options.model = model;
+        TranscriptionResult result = runtime.transcribe_file(input_path, options);
+        if (json_output) {
+            std::cout << nlohmann::json(result).dump() << "\n";
+        } else if (result.status == TranscriptionStatus::completed) {
+            std::cout << result.text << "\n";
+        } else if (result.status == TranscriptionStatus::no_speech) {
+            std::cout << "\n";
+        } else if (result.error.has_value()) {
+            std::cerr << "Transcription failed: " << result.error->message << "\n";
+        }
+        return result.status == TranscriptionStatus::failed ? 1 : 0;
+    } catch (const std::exception& error) {
+        std::cerr << "Transcription failed: " << error.what() << "\n";
         return 1;
     }
 }
