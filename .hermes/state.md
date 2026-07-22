@@ -952,3 +952,24 @@ Next:
   gotcha audit 0 findings, Chromium-verified version display. The .icns
   assembly + bundle icon are CI-compiled on macOS; runtime appearance needs
   a Mac.
+
+## Run 2026-07-22 — reusable runtime and local stdio protocol
+
+- Branched `feat/fabric-runtime-service` from fetched `origin/core` at
+  `68302286b7097fe9041a453d7d7265a5a8a9e586` without touching the dirty
+  `macos-port` checkout.
+- Extracted `autowhisper_runtime` as a reusable CMake target owning the shared
+  Whisper inference implementation and a bounded miniaudio file decoder.
+- Added `fabric.transcription` v1 structs/JSON, one-shot `autowhisper
+  transcribe`, and persistent `autowhisper serve --stdio`.
+- Local protocol v1 supports health, capabilities, transcribe_file, and
+  shutdown. It bounds lines to 1 MiB, correlates IDs, fails closed on version
+  mismatch, processes serially, opens no listener, and reserves stdout for
+  JSON while diagnostics use stderr.
+- Verification: native macOS app build; 198/198 C++ tests; 38/38 static tests;
+  Node syntax check; targeted Linux runtime/protocol tests; Windows x86-64
+  cross-build of the app and test binary; live stdio health/shutdown and two
+  real speech transcriptions through one cached distil-small.en model load.
+- The repository Docker smoke script's Linux compile passed but its filtered
+  UI test stopped because the image does not install Xvfb. This is an existing
+  script/image mismatch; the new Linux tests were rerun directly and passed.

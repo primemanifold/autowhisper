@@ -68,6 +68,8 @@ set(CORE_LIB_SOURCES
     src/avatar/avatar_core.cpp
     src/bench/wer.cpp
     src/pipeline/transcript_pipeline.cpp
+    src/protocol/local_protocol.cpp
+    src/runtime/transcription.cpp
     src/tray/tray_common.cpp
     src/util/logging.cpp
     src/util/sha256.cpp
@@ -113,12 +115,30 @@ if(WIN32)
 endif()
 autowhisper_set_warnings(autowhisper_core)
 
-# === Application sources (need platform libs, whisper, miniaudio) ===
+# === Reusable transcription runtime (whisper + file decoding, no UI) ===
+set(RUNTIME_LIB_SOURCES
+    src/audio/miniaudio_impl.cpp
+    src/inference/inference.cpp
+    src/runtime/audio_file.cpp
+    src/runtime/autowhisper_runtime.cpp
+)
+
+add_library(autowhisper_runtime STATIC ${RUNTIME_LIB_SOURCES})
+target_include_directories(autowhisper_runtime PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+target_link_libraries(autowhisper_runtime PUBLIC
+    autowhisper_core
+    whisper
+    miniaudio
+)
+autowhisper_set_warnings(autowhisper_runtime)
+
+# === Application sources (need platform libs and microphone capture) ===
 set(APP_SOURCES
     src/main.cpp
     src/daemon/daemon.cpp
     src/audio/audio.cpp
-    src/inference/inference.cpp
     src/feedback/feedback.cpp
     src/cli/cli.cpp
     src/cli/cli_settings_ui.cpp
@@ -169,8 +189,7 @@ target_include_directories(autowhisper PRIVATE
 )
 
 target_link_libraries(autowhisper PRIVATE
-    autowhisper_core
-    whisper
+    autowhisper_runtime
     CLI11::CLI11
     miniaudio
     cpp_httplib
@@ -257,12 +276,9 @@ autowhisper_set_warnings(autowhisper)
 if(AUTOWHISPER_ENABLE_BENCH)
     add_executable(autowhisper_bench
         tools/bench/bench_main.cpp
-        src/inference/inference.cpp
     )
     target_link_libraries(autowhisper_bench PRIVATE
-        autowhisper_core
-        whisper
-        miniaudio
+        autowhisper_runtime
     )
     if(APPLE)
         target_link_libraries(autowhisper_bench PRIVATE
@@ -292,6 +308,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
 
     set(TEST_SOURCES
         tests/cpp/test_avatar.cpp
+        tests/cpp/test_audio_file.cpp
         tests/cpp/test_config.cpp
         tests/cpp/test_keycombo.cpp
         tests/cpp/test_logging.cpp
@@ -305,6 +322,8 @@ if(AUTOWHISPER_ENABLE_TESTS)
         tests/cpp/test_sha256.cpp
         tests/cpp/test_sidecar.cpp
         tests/cpp/test_subprocess.cpp
+        tests/cpp/test_local_protocol.cpp
+        tests/cpp/test_transcription_result.cpp
         tests/cpp/test_transcript_pipeline.cpp
         tests/cpp/test_tray_display.cpp
         tests/cpp/test_wer.cpp
@@ -337,7 +356,7 @@ if(AUTOWHISPER_ENABLE_TESTS)
         )
     endif()
     target_link_libraries(autowhisper_tests PRIVATE
-        autowhisper_core
+        autowhisper_runtime
         cpp_httplib
         Catch2::Catch2WithMain
     )

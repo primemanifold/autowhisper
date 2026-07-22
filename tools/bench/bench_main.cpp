@@ -10,13 +10,11 @@
 // Manifest format (tab-separated): <wav path>\t<reference transcript>
 // Relative wav paths resolve against the manifest's directory.
 
-#define MINIAUDIO_IMPLEMENTATION
-#include <miniaudio.h>
-
 #include "bench/wer.h"
 #include "config/config.h"
 #include "inference/inference.h"
 #include "models/models.h"
+#include "runtime/audio_file.h"
 
 #include <algorithm>
 #include <chrono>
@@ -72,29 +70,6 @@ std::vector<Utterance> load_manifest(const std::string& path) {
         throw std::runtime_error("Manifest has no utterances: " + path);
     }
     return utterances;
-}
-
-// Decodes any audio file to 16 kHz mono float32 (whisper's input format).
-std::vector<float> decode_to_16k_mono(const std::string& path) {
-    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 1, 16000);
-    ma_decoder decoder;
-    if (ma_decoder_init_file(path.c_str(), &cfg, &decoder) != MA_SUCCESS) {
-        throw std::runtime_error("Cannot decode audio file: " + path);
-    }
-
-    std::vector<float> samples;
-    float chunk[4096];
-    ma_uint64 frames_read = 0;
-    while (ma_decoder_read_pcm_frames(&decoder, chunk, 4096, &frames_read) == MA_SUCCESS &&
-           frames_read > 0) {
-        samples.insert(samples.end(), chunk, chunk + frames_read);
-    }
-    ma_decoder_uninit(&decoder);
-
-    if (samples.empty()) {
-        throw std::runtime_error("Decoded zero samples from: " + path);
-    }
-    return samples;
 }
 
 double median(std::vector<double> v) {
@@ -177,7 +152,7 @@ int main(int argc, char** argv) {
             UtteranceResult r;
             r.wav_path = u.wav_path;
 
-            auto samples = decode_to_16k_mono(u.wav_path);
+            auto samples = decode_audio_file(u.wav_path).samples;
             r.audio_seconds = static_cast<double>(samples.size()) / 16000.0;
 
             std::vector<double> latencies;

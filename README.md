@@ -35,6 +35,21 @@ autowhisper run                               # hold Shift+Super (Ctrl+Alt+Space
 
 No model yet? The binary tells you this exact command instead of crashing. Zero-setup proof of life: `autowhisper avatar demo`.
 
+### Use AutoWhisper from another local app
+
+AutoWhisper also ships a reusable transcription runtime. Transcribe one file,
+or keep the model warm behind the versioned local stdio protocol:
+
+```bash
+autowhisper transcribe recording.wav --model distil-small.en --json
+autowhisper serve --stdio --model distil-small.en
+```
+
+The service opens no network listener: its parent application owns the child
+process and exchanges newline-delimited JSON over stdin/stdout. See
+[`docs/LOCAL-PROTOCOL.md`](docs/LOCAL-PROTOCOL.md) for the v1 contract and
+`TranscriptionResult` schema.
+
 ## The companion
 
 Echo — the nymph who can only repeat your words — is an opt-in floating button in the Wispr Flow tradition: **click to dictate**, watch the halo follow your voice, see her caption her own state and write your words down.
@@ -64,7 +79,7 @@ git clone --recurse-submodules https://github.com/primemanifold/autowhisper.git
 cd autowhisper
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
-ctest --test-dir build          # 178 tests
+ctest --test-dir build          # 198 tests
 ```
 
 macOS needs only Xcode CLT + CMake (`cmake -B build && cmake --build build`). Windows builds with MSVC or the MinGW toolchain file (`cmake/toolchains/`). CUDA: `-DAUTOWHISPER_ENABLE_CUDA=ON` (12.x).
